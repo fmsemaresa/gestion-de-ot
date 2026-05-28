@@ -1,0 +1,20 @@
+# Python Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+*.pyc
+__pycache__/
+
+# Local Database Files (Render uses environment variables / PostgreSQL instead)
+*.db
+*.sqlite3
+
+# Logs
+*.log
+
+# Editor configurations and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

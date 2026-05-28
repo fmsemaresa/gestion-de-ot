@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Técnico - Gestión de OTs</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* Mobile Specific Overrides */
+        body {
+            background-color: #090d16;
+        }
+        .tech-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--bg-secondary);
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .tech-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 60px;
+            z-index: 9;
+        }
+        .tech-tab {
+            padding: 1rem;
+            text-align: center;
+            font-weight: 600;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: var(--transition-fast);
+        }
+        .tech-tab.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+            background: rgba(59, 130, 246, 0.05);
+        }
+        .tech-content-section {
+            display: none;
+            padding: 1rem;
+        }
+        .tech-content-section.active {
+            display: block;
+        }
+        .flex-inline {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Simple Mobile Header -->
+    <div class="tech-nav">
+        <div class="brand" style="gap: 0.5rem;">
+            <div class="brand-logo" style="width: 30px; height: 30px; font-size: 1rem; border-radius: 6px;">T</div>
+            <span style="font-size: 1.05rem; font-weight: 600;">FM <span>Terreno</span></span>
+        </div>
+        
+        <div class="role-badge" style="padding: 0.35rem 0.75rem;">
+            <span style="font-size: 0.75rem;">Técnico:</span>
+            <select id="select-tech-user" class="role-select" style="font-size: 0.75rem;">
+                <!-- Dynamically loaded -->
+            </select>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tech-tabs">
+        <div class="tech-tab active" id="tab-my-tasks">Mis Tareas</div>
+        <div class="tech-tab" id="tab-new-report">Reportar Falla</div>
+    </div>
+
+    <!-- Container -->
+    <div class="tech-container">
+
+        <!-- SECTION 1: MY TASKS -->
+        <div id="section-tasks" class="tech-content-section active">
+            <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-main);">Mis Órdenes de Trabajo</h3>
+            <div id="tech-ot-list">
+                <!-- Dynamically loaded OTs -->
+                <p style="color: var(--text-muted); text-align: center; margin-top: 2rem;">Cargando tareas...</p>
+            </div>
+        </div>
+
+        <!-- SECTION 2: NEW REPORT (CORRECTIVE ON THE GO) -->
+        <div id="section-report" class="tech-content-section">
+            <h3 style="margin-bottom: 1.25rem; font-size: 1.1rem; color: var(--text-main);">Nueva OT Correctiva</h3>
+            <form id="tech-report-form">
+                <div class="form-group">
+                    <label for="tech-select-planta">Selecciona la Planta *</label>
+                    <select id="tech-select-planta" class="form-control" required>
+                        <option value="">-- Selecciona --</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="tech-select-edificio">Selecciona el Edificio / Sector *</label>
+                    <select id="tech-select-edificio" class="form-control" required disabled>
+                        <option value="">Selecciona una planta primero...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="tech-select-ubicacion">Ubicación / Sala *</label>
+                    <div class="flex-inline">
+                        <select id="tech-select-ubicacion" class="form-control" required disabled style="flex: 1;">
+                            <option value="">Selecciona un edificio primero...</option>
+                        </select>
+                        <button type="button" id="btn-add-location" class="btn-primary" disabled style="padding: 0.65rem 0.85rem;">
+                            +
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="tech-select-activo">Activo / Equipo (Opcional)</label>
+                    <select id="tech-select-activo" class="form-control" disabled>
+                        <option value="">Selecciona una ubicación primero...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="tech-problem-description">Descripción de la Falla *</label>
+                    <textarea id="tech-problem-description" class="form-control" rows="3" required
+                              placeholder="Ej: Fuga de agua en el condensador, compresor trancado."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="tech-select-prioridad">Prioridad</label>
+                    <select id="tech-select-prioridad" class="form-control">
+                        <option value="Baja">Baja</option>
+                        <option value="Media" selected>Media</option>
+                        <option value="Alta">Alta</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem;">
+                    Crear y Registrar OT
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL FOR COMPLETING WORK ORDER -->
+    <div class="modal-overlay" id="resolve-modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h3>Finalizar Orden de Trabajo</h3>
+                <button class="btn-icon" id="close-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="resolve-form">
+                    <input type="hidden" id="resolve-ot-id">
+                    
+                    <!-- Checklist Container -->
+                    <div id="tech-checklist-section" style="display: none; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                        <h4 style="margin-bottom: 0.75rem; color: var(--accent-color); font-size: 0.95rem;">Checklist / Pauta de Inspección</h4>
+                        <div id="tech-checklist-container" style="display: flex; flex-direction: column; gap: 0.85rem;">
+                            <!-- Dynamic checklist items will be rendered here -->
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="resolve-comments">Comentarios Técnicos / Trabajo Realizado *</label>
+                        <textarea id="resolve-comments" class="form-control" rows="4" required
+                                  placeholder="Explica qué reparaste, qué repuestos usaste, etc."></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                        Marcar OT como Resuelta
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL TO ADD NEW LOCATION QUICKLY -->
+    <div class="modal-overlay" id="location-modal">
+        <div class="modal-content" style="max-width: 400px; margin-top: 10%;">
+            <div class="modal-header">
+                <h3>Crear Nueva Ubicación</h3>
+                <button class="btn-icon" id="close-location-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="new-location-form">
+                    <div class="form-group">
+                        <label for="new-location-name">Nombre de la Ubicación / Sala *</label>
+                        <input type="text" id="new-location-name" class="form-control" required 
+                               placeholder="Ej: Sala Electrónica 1, Oficina Gerente">
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                        Guardar Ubicación
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/technician.js"></script>
+</body>
+</html>

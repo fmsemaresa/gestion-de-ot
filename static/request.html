@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportar Falla - Gestión de OTs</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body style="justify-content: center; align-items: center;">
+    
+    <div class="user-form-container">
+        <!-- Form Screen -->
+        <div id="form-screen">
+            <div class="user-form-header">
+                <div class="brand-logo" style="margin: 0 auto 1rem auto;">FM</div>
+                <h2>Reportar Falla o Avería</h2>
+                <p>Usa este formulario para reportar incidentes, luminarias quemadas o problemas de climatización en las plantas.</p>
+            </div>
+            
+            <form id="request-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reporter-name">Tu Nombre (Opcional)</label>
+                        <input type="text" id="reporter-name" class="form-control" placeholder="Ej: Juan Soto">
+                    </div>
+                    <div class="form-group">
+                        <label for="reporter-contact">Contacto / Email</label>
+                        <input type="text" id="reporter-contact" class="form-control" placeholder="Ej: juan.soto@emaresa.cl">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="select-planta">1. Selecciona la Planta *</label>
+                    <select id="select-planta" class="form-control" required>
+                        <option value="">Cargando plantas...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="select-edificio">2. Selecciona el Edificio / Sector *</label>
+                    <select id="select-edificio" class="form-control" required disabled>
+                        <option value="">Selecciona una planta primero...</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" id="ubicacion-select-group">
+                    <label for="select-ubicacion">3. Ubicación o Sala (Si existe en el sistema)</label>
+                    <select id="select-ubicacion" class="form-control" disabled>
+                        <option value="">No hay ubicaciones registradas aún...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="custom-location">Detalle de ubicación exacta *</label>
+                    <input type="text" id="custom-location" class="form-control" required 
+                           placeholder="Ej: Oficina 204, Baño de visitas, Pasillo central">
+                    <small style="color: var(--text-muted); font-size: 0.75rem; display: block; margin-top: 0.25rem;">
+                        Especifica dónde se encuentra el problema para ayudar al técnico.
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="problem-description">Descripción detallada del problema *</label>
+                    <textarea id="problem-description" class="form-control" rows="4" required
+                              placeholder="Ej: El aire acondicionado no enfría y hace un ruido extraño, o Luz quemada en el techo."></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="select-prioridad">Prioridad estimada</label>
+                    <select id="select-prioridad" class="form-control">
+                        <option value="Baja">Baja (No urgente, ej: ampolleta quemada)</option>
+                        <option value="Media" selected>Media (Molesto pero funcional, ej: termostato descalibrado)</option>
+                        <option value="Alta">Alta (Urgente, ej: gotera sobre equipos eléctricos, sin climatización en servidor)</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem;">
+                    Enviar Reporte de Falla
+                </button>
+            </form>
+        </div>
+
+        <!-- Success Screen -->
+        <div id="success-screen" class="success-screen">
+            <div class="success-icon">✓</div>
+            <h2>¡Reporte Recibido!</h2>
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.95rem;">
+                Tu reporte ha sido ingresado al sistema. Un administrador revisará la solicitud para asignar un técnico a la brevedad.
+            </p>
+            <p style="font-weight: 600; margin-bottom: 2rem;">
+                Código de Solicitud: <span id="request-code" style="color: var(--accent-color);">#0000</span>
+            </p>
+            <button id="btn-new-report" class="btn-secondary" style="width: 100%;">Crear otro reporte</button>
+        </div>
+    </div>
+
+    <script src="/static/js/request.js"></script>
+</body>
+</html>

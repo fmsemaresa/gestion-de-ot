@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de OTs - FMS Climatización</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+    <!-- App Header -->
+    <header class="app-header">
+        <div class="brand">
+            <div class="brand-logo">FM</div>
+            <h1 class="brand-name">Gestión de <span>OTs</span></h1>
+        </div>
+        
+        <nav class="nav-links">
+            <a href="/static/index.html" class="nav-link active">Dashboard</a>
+            <a href="/static/technician.html" class="nav-link" target="_blank">Portal Técnico</a>
+            <a href="/static/request.html" class="nav-link" target="_blank">Portal Reportes</a>
+        </nav>
+
+        <div class="header-controls">
+            <div class="role-badge">
+                <span>Rol:</span>
+                <select id="select-role" class="role-select">
+                    <option value="admin">Administrador (Backoffice)</option>
+                    <option value="tech">Técnico (Terreno)</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+
+        <!-- KPI Row -->
+        <div class="kpi-container" id="kpi-row">
+            <div class="kpi-card">
+                <div class="kpi-info">
+                    <h3>Total OTs</h3>
+                    <div class="kpi-value" id="kpi-total-ots">0</div>
+                </div>
+                <div class="kpi-icon-wrapper blue">📋</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-info">
+                    <h3>Pendientes</h3>
+                    <div class="kpi-value" id="kpi-pendientes">0</div>
+                </div>
+                <div class="kpi-icon-wrapper orange">⏳</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-info">
+                    <h3>Resueltas</h3>
+                    <div class="kpi-value" id="kpi-resueltas">0</div>
+                </div>
+                <div class="kpi-icon-wrapper green">✓</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-info">
+                    <h3>MTTR (Horas)</h3>
+                    <div class="kpi-value" id="kpi-mttr">0.0</div>
+                </div>
+                <div class="kpi-icon-wrapper red">⏱</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-info">
+                    <h3>Equipos Operativos</h3>
+                    <div class="kpi-value" id="kpi-activos">0/0</div>
+                </div>
+                <div class="kpi-icon-wrapper blue">⚙️</div>
+            </div>
+        </div>
+
+        <!-- Dashboard Layout -->
+        <div class="dashboard-grid">
+            
+            <!-- Sidebar: Hierarchical Selector -->
+            <div class="hierarchy-panel">
+                <div class="panel-title">
+                    <span>Estructura Jerárquica</span>
+                </div>
+                <div class="hierarchy-list" id="hierarchy-tree">
+                    <!-- Loaded dynamically -->
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">Cargando plantas...</p>
+                </div>
+            </div>
+
+            <!-- Content Area -->
+            <div class="content-panel">
+                
+                <!-- Tab Headers -->
+                <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem;">
+                    <button class="btn-secondary active" id="tab-btn-ots" style="border: none; background: transparent; padding: 0.5rem 1rem; border-bottom: 2px solid var(--accent-color); border-radius: 0; font-weight: 600;">
+                        Órdenes de Trabajo (OT)
+                    </button>
+                    <button class="btn-secondary" id="tab-btn-activos" style="border: none; background: transparent; padding: 0.5rem 1rem; border-bottom: 2px solid transparent; border-radius: 0; font-weight: 600;">
+                        Activos (Equipos)
+                    </button>
+                </div>
+
+                <!-- Tab 1 Content: Work Orders -->
+                <div id="tab-ots" class="tab-content">
+                    <div class="card-header-actions">
+                        <h2 style="font-size: 1.25rem;">Gestión de Órdenes de Trabajo</h2>
+                        <div style="display: flex; gap: 0.75rem; align-items: center;">
+                            <button class="btn-secondary" id="btn-export-ots-excel" style="background: #107c41; color: white; border-color: #107c41; display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.85rem;">
+                                <span>📥</span> Exportar Excel
+                            </button>
+                            <select id="filter-ot-state" class="form-control" style="width: auto; padding: 0.4rem 1rem;">
+                                <option value="">Todos los Estados</option>
+                                <option value="Pendiente">Pendientes</option>
+                                <option value="En Proceso">En Proceso</option>
+                                <option value="Resuelta">Resueltas</option>
+                            </select>
+                            <button class="btn-primary" id="btn-create-ot">
+                                <span>+</span> Nueva OT
+                            </button>
+                        </div>
+                    </div>
+                    <div class="grid-container" id="ot-grid">
+                        <!-- Loaded dynamically -->
+                        <p style="color: var(--text-muted);">Selecciona una planta o edificio a la izquierda para ver sus OTs.</p>
+                    </div>
+                </div>
+
+                <!-- Tab 2 Content: Assets -->
+                <div id="tab-activos" class="tab-content" style="display: none;">
+                    <div class="card-header-actions">
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <h2 style="font-size: 1.25rem;">Inventario de Activos</h2>
+                            <span id="current-location-label" style="font-size: 0.85rem; color: var(--text-muted);">Selecciona una ubicación a la izquierda</span>
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; align-items: center;">
+                            <button class="btn-secondary" id="btn-export-activos-excel" style="background: #107c41; color: white; border-color: #107c41; display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.85rem;">
+                                <span>📥</span> Exportar Excel
+                            </button>
+                            <label for="excel-import-file" class="btn-secondary" style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; padding: 0.45rem 0.85rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px;">
+                                <span>📤</span> Importar Excel
+                                <input type="file" id="excel-import-file" accept=".xlsx, .xls" style="display: none;">
+                            </label>
+                            <button class="btn-primary" id="btn-create-activo" disabled>
+                                <span>+</span> Registrar Activo
+                            </button>
+                        </div>
+                    </div>
+                    <div class="grid-container" id="activo-grid">
+                        <p style="color: var(--text-muted);">Selecciona una ubicación específica a la izquierda para ver sus activos.</p>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- SLIDING DETAIL DRAWER (Ficha Técnica y Despiece) -->
+    <div class="drawer" id="asset-drawer">
+        <div class="drawer-header">
+            <h3 id="drawer-asset-name">Nombre del Activo</h3>
+            <button class="btn-icon" id="close-drawer">✕</button>
+        </div>
+        <div class="drawer-body">
+            
+            <!-- Asset Specs -->
+            <div class="detail-section">
+                <h4 class="detail-section-title">Ficha Técnica</h4>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Marca</div>
+                        <div class="detail-value" id="drawer-asset-marca"> Carrier </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Modelo</div>
+                        <div class="detail-value" id="drawer-asset-modelo"> 30XA-200 </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">N° Serie</div>
+                        <div class="detail-value" id="drawer-asset-serie"> CN-929312 </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Estado</div>
+                        <div class="detail-value" id="drawer-asset-estado"> Operativo </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Asset Hierarchy Location Info -->
+            <div class="detail-section">
+                <h4 class="detail-section-title">Ubicación Jerárquica</h4>
+                <div style="font-size: 0.9rem;">
+                    <span id="drawer-asset-planta">Planta</span> &gt; 
+                    <span id="drawer-asset-edificio">Edificio</span> &gt; 
+                    <span id="drawer-asset-ubicacion">Ubicación</span>
+                </div>
+            </div>
+
+            <!-- Despiece / Components -->
+            <div class="detail-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                    <h4 class="detail-section-title" style="margin-bottom: 0;">Despiece del Activo</h4>
+                    <button class="btn-primary" id="btn-add-component" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">+ Agregar Parte</button>
+                </div>
+                <div class="component-list" id="drawer-component-list">
+                    <!-- Dynamic Component List -->
+                </div>
+            </div>
+
+            <!-- Historical OTs -->
+            <div class="detail-section">
+                <h4 class="detail-section-title">Historial de Intervenciones (OTs)</h4>
+                <div class="component-list" id="drawer-history-list">
+                    <!-- Dynamic OT History -->
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL: CREATE MANUAL OT -->
+    <div class="modal-overlay" id="ot-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Crear Nueva Orden de Trabajo</h3>
+                <button class="btn-icon" id="close-ot-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="ot-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ot-select-planta">Planta *</label>
+                            <select id="ot-select-planta" class="form-control" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ot-select-edificio">Edificio / Sector *</label>
+                            <select id="ot-select-edificio" class="form-control" required disabled>
+                                <option value="">Selecciona planta...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ot-select-ubicacion">Ubicación *</label>
+                            <select id="ot-select-ubicacion" class="form-control" required disabled>
+                                <option value="">Selecciona edificio...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ot-select-activo">Activo / Equipo (Opcional)</label>
+                            <select id="ot-select-activo" class="form-control" disabled>
+                                <option value="">Selecciona ubicación...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ot-tipo">Tipo de Mantenimiento *</label>
+                            <select id="ot-tipo" class="form-control" required>
+                                <option value="Correctiva">Correctiva (Falla inesperada)</option>
+                                <option value="Preventiva">Preventiva (Planificada)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ot-prioridad">Prioridad</label>
+                            <select id="ot-prioridad" class="form-control">
+                                <option value="Baja">Baja</option>
+                                <option value="Media" selected>Media</option>
+                                <option value="Alta">Alta</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ot-descripcion">Descripción del Problema / Tarea *</label>
+                        <textarea id="ot-descripcion" class="form-control" rows="3" required placeholder="Ej: Realizar mantención mensual de filtros de aire, o Compresor en corto circuito."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ot-tecnico">Asignar Técnico (Opcional)</label>
+                        <select id="ot-tecnico" class="form-control">
+                            <option value="">No Asignado</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ot-select-plantilla">Plantilla de Chequeo / Inspección (Opcional)</label>
+                        <select id="ot-select-plantilla" class="form-control">
+                            <option value="">-- Sin plantilla / Pauta estándar --</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem;">
+                        Crear Orden de Trabajo
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: REGISTER NEW ASSET -->
+    <div class="modal-overlay" id="asset-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Registrar Nuevo Activo (Equipo)</h3>
+                <button class="btn-icon" id="close-asset-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="asset-form">
+                    <input type="hidden" id="asset-location-id">
+                    
+                    <div class="form-group">
+                        <label for="asset-name">Nombre del Activo *</label>
+                        <input type="text" id="asset-name" class="form-control" required placeholder="Ej: Chiller Principal, Aire Acondicionado Split 12k">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="asset-tipo">Tipo de Activo *</label>
+                            <select id="asset-tipo" class="form-control" required>
+                                <option value="Climatizacion">Climatización (HVAC/R)</option>
+                                <option value="Electrico">Electricidad</option>
+                                <option value="Gasfiteria">Gasfitería / Fontanería</option>
+                                <option value="Edificación">Edificación (General)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="asset-marca">Marca</label>
+                            <input type="text" id="asset-marca" class="form-control" placeholder="Ej: Carrier, Daikin">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="asset-modelo">Modelo</label>
+                            <input type="text" id="asset-modelo" class="form-control" placeholder="Ej: 30XA-100">
+                        </div>
+                        <div class="form-group">
+                            <label for="asset-serie">Número de Serie</label>
+                            <input type="text" id="asset-serie" class="form-control" placeholder="Ej: SN-8293910">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem;">
+                        Guardar Activo
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD COMPONENT (DESPIECE) -->
+    <div class="modal-overlay" id="component-modal">
+        <div class="modal-content" style="max-width: 400px; margin-top: 5%;">
+            <div class="modal-header">
+                <h3>Agregar Componente (Despiece)</h3>
+                <button class="btn-icon" id="close-component-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="component-form">
+                    <input type="hidden" id="component-asset-id">
+                    
+                    <div class="form-group">
+                        <label for="component-name">Nombre de la Parte / Repuesto *</label>
+                        <input type="text" id="component-name" class="form-control" required placeholder="Ej: Compresor, Correa Ventilador, Filtro G4">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="component-marca">Marca</label>
+                            <input type="text" id="component-marca" class="form-control" placeholder="Ej: Copeland">
+                        </div>
+                        <div class="form-group">
+                            <label for="component-modelo">Modelo</label>
+                            <input type="text" id="component-modelo" class="form-control" placeholder="Ej: ZR72KCE">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="component-nparte">Número de Parte / Serie</label>
+                        <input type="text" id="component-nparte" class="form-control" placeholder="Ej: N/P 823-1A">
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem;">
+                        Guardar Componente
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ASSIGN TECHNICIAN -->
+    <div class="modal-overlay" id="assign-modal">
+        <div class="modal-content" style="max-width: 400px; margin-top: 10%;">
+            <div class="modal-header">
+                <h3>Asignar Técnico</h3>
+                <button class="btn-icon" id="close-assign-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="assign-form">
+                    <input type="hidden" id="assign-ot-id">
+                    <div class="form-group">
+                        <label for="assign-select-tecnico">Selecciona el Técnico *</label>
+                        <select id="assign-select-tecnico" class="form-control" required></select>
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                        Asignar y Empezar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>
