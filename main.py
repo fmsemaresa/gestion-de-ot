@@ -150,6 +150,44 @@ def create_componente(componente: ComponenteActivo, db: Session = Depends(get_db
     db.refresh(componente)
     return componente
 
+@app.put("/api/activos/{activo_id}", response_model=Activo)
+def update_activo(activo_id: int, updated_activo: Activo, db: Session = Depends(get_db)):
+    activo = db.get(Activo, activo_id)
+    if not activo:
+        raise HTTPException(status_code=404, detail="Activo no encontrado")
+        
+    activo.nombre = updated_activo.nombre
+    activo.tipo = updated_activo.tipo
+    activo.marca = updated_activo.marca
+    activo.modelo = updated_activo.modelo
+    activo.numero_serie = updated_activo.numero_serie
+    activo.estado = updated_activo.estado
+    if updated_activo.ubicacion_id:
+        activo.ubicacion_id = updated_activo.ubicacion_id
+        
+    db.add(activo)
+    db.commit()
+    db.refresh(activo)
+    return activo
+
+@app.put("/api/componentes/{componente_id}", response_model=ComponenteActivo)
+def update_componente(componente_id: int, updated_comp: ComponenteActivo, db: Session = Depends(get_db)):
+    comp = db.get(ComponenteActivo, componente_id)
+    if not comp:
+        raise HTTPException(status_code=404, detail="Componente no encontrado")
+        
+    comp.nombre = updated_comp.nombre
+    comp.marca = updated_comp.marca
+    comp.modelo = updated_comp.modelo
+    comp.numero_serie = updated_comp.numero_serie
+    comp.estado = updated_comp.estado
+    comp.activo_id = updated_comp.activo_id
+    
+    db.add(comp)
+    db.commit()
+    db.refresh(comp)
+    return comp
+
 # --- ENDPOINTS TÉCNICOS ---
 
 @app.get("/api/tecnicos", response_model=List[Tecnico])

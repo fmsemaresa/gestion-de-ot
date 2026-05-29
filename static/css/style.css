@@ -440,6 +440,11 @@ body {
 .entity-card.priority-baja::before { background-color: var(--accent-color); }
 .entity-card.status-ok::before { background-color: var(--success); }
 .entity-card.status-issue::before { background-color: var(--danger); }
+.entity-card.status-inactive::before { background-color: var(--text-muted); }
+.entity-card.status-repair::before { background-color: var(--warning); }
+.entity-card.status-inactive { opacity: 0.55; filter: grayscale(50%); }
+.entity-card.status-inactive .entity-title { text-decoration: line-through; color: var(--text-muted); }
+
 
 .card-tag {
     position: absolute;
@@ -693,6 +698,9 @@ textarea.form-control {
 
 .status-badge.status-ok { background: rgba(16, 185, 129, 0.15); color: var(--success); }
 .status-badge.status-issue { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+.status-badge.status-inactive { background: rgba(156, 163, 175, 0.15); color: var(--text-muted); }
+.status-badge.status-repair { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+
 
 /* Technician Mobile Interface */
 .tech-container {

@@ -49,6 +49,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const assignSelectTecnico = document.getElementById('assign-select-tecnico');
     const assignOtId = document.getElementById('assign-ot-id');
 
+    // Edit Modals (Asset and Component lifecycle)
+    const assetEditModal = document.getElementById('asset-edit-modal');
+    const assetEditForm = document.getElementById('asset-edit-form');
+    const closeAssetEditModal = document.getElementById('close-asset-edit-modal');
+    const btnEditAsset = document.getElementById('btn-edit-asset');
+    
+    const componentEditModal = document.getElementById('component-edit-modal');
+    const componentEditForm = document.getElementById('component-edit-form');
+    const closeComponentEditModal = document.getElementById('close-component-edit-modal');
+
+    let currentAssetData = null;
+
     // Drawer
     const assetDrawer = document.getElementById('asset-drawer');
     const closeDrawer = document.getElementById('close-drawer');
@@ -457,8 +469,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 activoGrid.innerHTML = '';
                 activos.forEach(a => {
                     const isOk = a.estado === 'Operativo';
+                    const isInactive = a.estado === 'Reemplazado' || a.estado === 'Eliminado sin Reemplazo';
+                    const isRepair = a.estado === 'En Reparación';
+                    
+                    let cardClass = `entity-card status-${isOk ? 'ok' : 'issue'}`;
+                    let statusBadgeClass = isOk ? 'status-ok' : 'status-issue';
+                    
+                    if (isInactive) {
+                        cardClass = 'entity-card status-inactive';
+                        statusBadgeClass = 'status-inactive';
+                    } else if (isRepair) {
+                        cardClass = 'entity-card status-repair';
+                        statusBadgeClass = 'status-repair';
+                    }
+
                     const card = document.createElement('div');
-                    card.className = `entity-card status-${isOk ? 'ok' : 'issue'}`;
+                    card.className = cardClass;
                     card.innerHTML = `
                         <h4 class="entity-title" style="margin-bottom:0.25rem;">${a.nombre}</h4>
                         <div class="entity-subtitle" style="margin-bottom:0.75rem;">${a.tipo}</div>
@@ -467,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span>Marca/Mod: <strong>${a.marca || 'S/M'} / ${a.modelo || 'S/M'}</strong></span>
                             </div>
                             <div class="meta-row" style="justify-content: space-between; margin-top: 0.5rem;">
-                                <span class="status-badge ${isOk ? 'status-ok' : 'status-issue'}">${a.estado}</span>
+                                <span class="status-badge ${statusBadgeClass}">${a.estado}</span>
                                 <span style="font-size: 0.8rem; color: var(--accent-color); font-weight: 500;">Ficha &gt;</span>
                             </div>
                         </div>
@@ -489,14 +515,23 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch(`/api/activos/${activoId}`)
             .then(res => res.json())
             .then(data => {
+                currentAssetData = data;
                 drawerAssetName.textContent = data.nombre;
                 drawerAssetMarca.textContent = data.marca || 'Sin Marca';
                 drawerAssetModelo.textContent = data.modelo || 'Sin Modelo';
                 drawerAssetSerie.textContent = data.numero_serie || 'S/N';
-                drawerAssetEstado.textContent = data.estado;
                 
                 // Color code state
-                drawerAssetEstado.className = 'status-badge ' + (data.estado === 'Operativo' ? 'status-ok' : 'status-issue');
+                let stateClass = 'status-badge status-issue';
+                if (data.estado === 'Operativo') {
+                    stateClass = 'status-badge status-ok';
+                } else if (data.estado === 'Reemplazado' || data.estado === 'Eliminado sin Reemplazo') {
+                    stateClass = 'status-badge status-inactive';
+                } else if (data.estado === 'En Reparación') {
+                    stateClass = 'status-badge status-repair';
+                }
+                drawerAssetEstado.className = stateClass;
+                drawerAssetEstado.textContent = data.estado;
                 
                 drawerAssetPlanta.textContent = data.planta_nombre || 'N/A';
                 drawerAssetEdificio.textContent = data.edificio_nombre || 'N/A';
@@ -508,15 +543,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     drawerComponentList.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0;">No se ha registrado despiece de partes para este activo.</p>';
                 } else {
                     data.componentes.forEach(c => {
-                        drawerComponentList.innerHTML += `
-                            <div class="component-item">
-                                <div class="component-info">
-                                    <h4>${c.nombre}</h4>
-                                    <p>${c.marca || 'S/M'} - ${c.modelo || 'S/M'} ${c.numero_serie ? ' / Serie: ' + c.numero_serie : ''}</p>
-                                </div>
-                                <span class="status-badge ${c.estado === 'Operativo' ? 'status-ok' : 'status-issue'}">${c.estado}</span>
+                        let compStateClass = 'status-badge ' + (c.estado === 'Operativo' ? 'status-ok' : 'status-issue');
+                        if (c.estado === 'En Reparación') compStateClass = 'status-badge status-repair';
+
+                        const compRow = document.createElement('div');
+                        compRow.className = 'component-item';
+                        compRow.innerHTML = `
+                            <div class="component-info" style="flex: 1;">
+                                <h4>${c.nombre}</h4>
+                                <p>${c.marca || 'S/M'} - ${c.modelo || 'S/M'} ${c.numero_serie ? ' / Serie: ' + c.numero_serie : ''}</p>
+                            </div>
+                            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                <span class="${compStateClass}">${c.estado}</span>
+                                <button class="btn-edit-comp-trigger btn-secondary" style="padding: 0.2rem 0.4rem; font-size: 0.7rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--accent-color); cursor: pointer;">⚙️ Reemplazar</button>
                             </div>
                         `;
+                        drawerComponentList.appendChild(compRow);
+                        
+                        compRow.querySelector('.btn-edit-comp-trigger').addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            openComponentEditModal(c);
+                        });
                     });
                 }
                 
@@ -546,6 +593,115 @@ document.addEventListener('DOMContentLoaded', () => {
 
     closeDrawer.addEventListener('click', () => {
         assetDrawer.classList.remove('open');
+    });
+
+    // --- 6.1 EDIT ASSET AND COMPONENT LIFE CYCLE LOGIC ---
+    function openComponentEditModal(c) {
+        document.getElementById('edit-comp-id').value = c.id;
+        document.getElementById('edit-comp-asset-id').value = c.activo_id;
+        document.getElementById('edit-comp-name').value = c.nombre;
+        document.getElementById('edit-comp-marca').value = c.marca || '';
+        document.getElementById('edit-comp-modelo').value = c.modelo || '';
+        document.getElementById('edit-comp-nparte').value = c.numero_serie || '';
+        document.getElementById('edit-comp-estado').value = c.estado;
+        componentEditModal.style.display = 'flex';
+    }
+
+    closeComponentEditModal.addEventListener('click', () => {
+        componentEditModal.style.display = 'none';
+    });
+
+    componentEditForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const compId = parseInt(document.getElementById('edit-comp-id').value);
+        const assetId = parseInt(document.getElementById('edit-comp-asset-id').value);
+        const name = document.getElementById('edit-comp-name').value.trim();
+        const marca = document.getElementById('edit-comp-marca').value.trim() || null;
+        const modelo = document.getElementById('edit-comp-modelo').value.trim() || null;
+        const serie = document.getElementById('edit-comp-nparte').value.trim() || null;
+        const estado = document.getElementById('edit-comp-estado').value;
+
+        const payload = {
+            id: compId,
+            nombre: name,
+            marca: marca,
+            modelo: modelo,
+            numero_serie: serie,
+            estado: estado,
+            activo_id: assetId
+        };
+
+        fetch(`/api/componentes/${compId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al actualizar componente');
+            return res.json();
+        })
+        .then(data => {
+            componentEditModal.style.display = 'none';
+            openAssetDrawer(assetId);
+        })
+        .catch(err => alert(err.message));
+    });
+
+    btnEditAsset.addEventListener('click', () => {
+        if (!currentAssetData) return;
+        document.getElementById('edit-asset-id').value = currentAssetData.id;
+        document.getElementById('edit-asset-name').value = currentAssetData.nombre;
+        document.getElementById('edit-asset-tipo').value = currentAssetData.tipo;
+        document.getElementById('edit-asset-marca').value = currentAssetData.marca || '';
+        document.getElementById('edit-asset-modelo').value = currentAssetData.modelo || '';
+        document.getElementById('edit-asset-serie').value = currentAssetData.numero_serie || '';
+        document.getElementById('edit-asset-estado').value = currentAssetData.estado;
+        document.getElementById('edit-asset-location-id').value = currentAssetData.ubicacion_id || '';
+        assetEditModal.style.display = 'flex';
+    });
+
+    closeAssetEditModal.addEventListener('click', () => {
+        assetEditModal.style.display = 'none';
+    });
+
+    assetEditForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const assetId = parseInt(document.getElementById('edit-asset-id').value);
+        const name = document.getElementById('edit-asset-name').value.trim();
+        const tipo = document.getElementById('edit-asset-tipo').value;
+        const marca = document.getElementById('edit-asset-marca').value.trim() || null;
+        const modelo = document.getElementById('edit-asset-modelo').value.trim() || null;
+        const serie = document.getElementById('edit-asset-serie').value.trim() || null;
+        const estado = document.getElementById('edit-asset-estado').value;
+        const uId = document.getElementById('edit-asset-location-id').value ? parseInt(document.getElementById('edit-asset-location-id').value) : null;
+
+        const payload = {
+            id: assetId,
+            nombre: name,
+            tipo: tipo,
+            marca: marca,
+            modelo: modelo,
+            numero_serie: serie,
+            estado: estado,
+            ubicacion_id: uId
+        };
+
+        fetch(`/api/activos/${assetId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al actualizar activo');
+            return res.json();
+        })
+        .then(data => {
+            assetEditModal.style.display = 'none';
+            loadAssets();
+            loadKPIs();
+            openAssetDrawer(assetId);
+        })
+        .catch(err => alert(err.message));
     });
 
     // --- 7. LOAD TECHNICIANS FOR SELECTS ---
@@ -705,8 +861,9 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(activos => {
                 aSelect.disabled = false;
                 aSelect.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
-                activos.forEach(a => {
-                    aSelect.innerHTML += `<option value="${a.id}">${a.nombre}</option>`;
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                activeActivos.forEach(a => {
+                    aSelect.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
                 });
             });
     });

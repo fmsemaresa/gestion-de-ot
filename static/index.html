@@ -162,9 +162,12 @@
 
     <!-- SLIDING DETAIL DRAWER (Ficha Técnica y Despiece) -->
     <div class="drawer" id="asset-drawer">
-        <div class="drawer-header">
+        <div class="drawer-header" style="display: flex; justify-content: space-between; align-items: center;">
             <h3 id="drawer-asset-name">Nombre del Activo</h3>
-            <button class="btn-icon" id="close-drawer">✕</button>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button class="btn-primary" id="btn-edit-asset" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-color);">✏️ Editar</button>
+                <button class="btn-icon" id="close-drawer">✕</button>
+            </div>
         </div>
         <div class="drawer-body">
             
@@ -412,6 +415,119 @@
                     </div>
                     <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
                         Asignar y Empezar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT ASSET (ESTADO / DETALLES) -->
+    <div class="modal-overlay" id="asset-edit-modal">
+        <div class="modal-content" style="max-width: 450px; margin-top: 5%;">
+            <div class="modal-header">
+                <h3>Editar Activo (Ciclo de Vida)</h3>
+                <button class="btn-icon" id="close-asset-edit-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="asset-edit-form">
+                    <input type="hidden" id="edit-asset-id">
+                    <input type="hidden" id="edit-asset-location-id">
+                    
+                    <div class="form-group">
+                        <label for="edit-asset-name">Nombre del Activo *</label>
+                        <input type="text" id="edit-asset-name" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-asset-tipo">Tipo de Activo *</label>
+                        <select id="edit-asset-tipo" class="form-control" required>
+                            <option value="Climatizacion">Climatización (Fancoils, Splits, etc.)</option>
+                            <option value="Electricidad">Electricidad (Extractores, Luces, Generadores)</option>
+                            <option value="Gasfiteria">Gasfitería (Baños, Llaves, Lavamanos)</option>
+                            <option value="Dispensadores">Dispensadores (Jabón, Toallas, Papel)</option>
+                            <option value="Otras Infraestructuras">Otras Infraestructuras</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-asset-marca">Marca</label>
+                            <input type="text" id="edit-asset-marca" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-asset-modelo">Modelo</label>
+                            <input type="text" id="edit-asset-modelo" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-asset-serie">Número de Serie</label>
+                        <input type="text" id="edit-asset-serie" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-asset-estado">Estado del Ciclo de Vida *</label>
+                        <select id="edit-asset-estado" class="form-control" required style="border-left: 3px solid var(--accent-color);">
+                            <option value="Operativo">Operativo (En funcionamiento)</option>
+                            <option value="En Reparación">En Reparación</option>
+                            <option value="Fuera de Servicio">Fuera de Servicio (Temporalmente inactivo)</option>
+                            <option value="Reemplazado">Reemplazado (Retirado por nuevo activo)</option>
+                            <option value="Eliminado sin Reemplazo">Eliminado sin Reemplazo (Retirado permanentemente)</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem;">
+                        Guardar Cambios
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT/REPLACE COMPONENT -->
+    <div class="modal-overlay" id="component-edit-modal">
+        <div class="modal-content" style="max-width: 400px; margin-top: 5%;">
+            <div class="modal-header">
+                <h3>Editar / Reemplazar Componente</h3>
+                <button class="btn-icon" id="close-component-edit-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="component-edit-form">
+                    <input type="hidden" id="edit-comp-id">
+                    <input type="hidden" id="edit-comp-asset-id">
+                    
+                    <div class="form-group">
+                        <label for="edit-comp-name">Nombre de la Parte / Repuesto *</label>
+                        <input type="text" id="edit-comp-name" class="form-control" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-comp-marca">Marca</label>
+                            <input type="text" id="edit-comp-marca" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-comp-modelo">Modelo</label>
+                            <input type="text" id="edit-comp-modelo" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-comp-nparte">Número de Serie / Parte</label>
+                        <input type="text" id="edit-comp-nparte" class="form-control">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-comp-estado">Estado del Componente *</label>
+                        <select id="edit-comp-estado" class="form-control" required>
+                            <option value="Operativo">Operativo (Buen estado)</option>
+                            <option value="Falla">Falla (Requiere atención)</option>
+                            <option value="En Reparación">En Reparación</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem;">
+                        Guardar Cambios de Pieza
                     </button>
                 </form>
             </div>
