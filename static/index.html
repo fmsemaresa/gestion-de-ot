@@ -164,13 +164,21 @@
     <div class="drawer" id="asset-drawer">
         <div class="drawer-header" style="display: flex; justify-content: space-between; align-items: center;">
             <h3 id="drawer-asset-name">Nombre del Activo</h3>
-            <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <button class="btn-primary" id="btn-edit-asset" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-color);">🔄 Reemplazar / Estado</button>
-                <button class="btn-icon" id="close-drawer">✕</button>
-            </div>
+            <button class="btn-icon" id="close-drawer">✕</button>
         </div>
         <div class="drawer-body">
             
+            <!-- Asset Status & Lifecycle Transition Row -->
+            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Estado:</span>
+                    <span id="drawer-asset-estado" class="status-badge status-ok">Operativo</span>
+                </div>
+                <button class="btn-primary" id="btn-edit-asset" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-color); cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 0.25rem;">
+                    🔄 Reemplazar / Estado
+                </button>
+            </div>
+
             <!-- Asset Specs -->
             <div class="detail-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
@@ -189,10 +197,6 @@
                     <div class="detail-item">
                         <div class="detail-label">N° Serie</div>
                         <div class="detail-value" id="drawer-asset-serie"> CN-929312 </div>
-                    </div>
-                    <div class="detail-item">
-                        <div class="detail-label">Estado</div>
-                        <div class="detail-value" id="drawer-asset-estado"> Operativo </div>
                     </div>
                 </div>
             </div>
