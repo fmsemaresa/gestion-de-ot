@@ -527,7 +527,87 @@ def exportar_activos(db: Session = Depends(get_db)):
         headers={"Content-Disposition": "attachment; filename=inventario_activos.xlsx"}
     )
 
+@app.get("/api/excel/plantilla-importacion")
+def descargar_plantilla_importacion(db: Session = Depends(get_db)):
+    wb = openpyxl.Workbook()
+    
+    # Hoja 1: Plantilla
+    ws_plantilla = wb.active
+    ws_plantilla.title = "Importar Activos"
+    headers_plantilla = [
+        "Planta", "Edificio", "Ubicación", "Nombre Activo", "Tipo", "Marca", "Modelo", "N° Serie"
+    ]
+    ws_plantilla.append(headers_plantilla)
+    
+    # Agregar fila de ejemplo
+    ws_plantilla.append([
+        "Santa Adela",
+        "Edificio Corporativo",
+        "Oficina Gerencia [EC-P2-ON-OF1]",
+        "Fancoil Muro Oficina 1",
+        "Climatizacion",
+        "Carrier",
+        "42GW",
+        "FC-SAMPLE-001"
+    ])
+    
+    # Estilo de cabeceras de la Plantilla
+    from openpyxl.styles import Font, PatternFill
+    header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    for col in range(1, len(headers_plantilla) + 1):
+        cell = ws_plantilla.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = header_fill
+    
+    # Hoja 2: Ubicaciones de Referencia
+    ws_ubicaciones = wb.create_sheet(title="Ubicaciones de Referencia")
+    headers_ubicaciones = ["Planta", "Edificio", "Ubicación (Nombre Exacto)"]
+    ws_ubicaciones.append(headers_ubicaciones)
+    
+    # Obtener todas las ubicaciones ordenadas
+    ubicaciones = db.exec(select(Ubicacion)).all()
+    locs_data = []
+    for u in ubicaciones:
+        ed = db.get(Edificio, u.edificio_id) if u.edificio_id else None
+        pl = db.get(Planta, ed.planta_id) if ed else None
+        locs_data.append({
+            "planta": pl.nombre if pl else "",
+            "edificio": ed.nombre if ed else "",
+            "ubicacion": u.nombre
+        })
+        
+    # Ordenar por planta, edificio y ubicacion
+    locs_data.sort(key=lambda x: (x["planta"], x["edificio"], x["ubicacion"]))
+    
+    for item in locs_data:
+        ws_ubicaciones.append([item["planta"], item["edificio"], item["ubicacion"]])
+        
+    # Estilo de cabeceras de Ubicaciones
+    for col in range(1, len(headers_ubicaciones) + 1):
+        cell = ws_ubicaciones.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
+        
+    # Ajuste automático del ancho de columna
+    for ws in [ws_plantilla, ws_ubicaciones]:
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = openpyxl.utils.get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+            
+    file_stream = io.BytesIO()
+    wb.save(file_stream)
+    file_stream.seek(0)
+    
+    return StreamingResponse(
+        file_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=plantilla_importar_activos.xlsx"}
+    )
+
 @app.post("/api/excel/importar/activos")
+
 async def importar_activos(file: UploadFile = File(...), db: Session = Depends(get_db)):
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(status_code=400, detail="Por favor sube un archivo Excel válido (.xlsx)")
