@@ -165,7 +165,7 @@
         <div class="drawer-header" style="display: flex; justify-content: space-between; align-items: center;">
             <h3 id="drawer-asset-name">Nombre del Activo</h3>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
-                <button class="btn-primary" id="btn-edit-asset" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-color);">✏️ Editar</button>
+                <button class="btn-primary" id="btn-edit-asset" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-color);">🔄 Reemplazar / Estado</button>
                 <button class="btn-icon" id="close-drawer">✕</button>
             </div>
         </div>
@@ -173,7 +173,10 @@
             
             <!-- Asset Specs -->
             <div class="detail-section">
-                <h4 class="detail-section-title">Ficha Técnica</h4>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h4 class="detail-section-title" style="margin-bottom: 0;">Ficha Técnica</h4>
+                    <button class="btn-secondary" id="btn-edit-tech-sheet" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-muted); cursor: pointer; border-radius: 4px;">✏️ Editar Ficha (Admin)</button>
+                </div>
                 <div class="detail-grid">
                     <div class="detail-item">
                         <div class="detail-label">Marca</div>
@@ -423,9 +426,9 @@
 
     <!-- MODAL: EDIT ASSET (ESTADO / DETALLES) -->
     <div class="modal-overlay" id="asset-edit-modal">
-        <div class="modal-content" style="max-width: 450px; margin-top: 5%;">
+        <div class="modal-content" style="max-width: 400px; margin-top: 5%;">
             <div class="modal-header">
-                <h3>Editar Activo (Ciclo de Vida)</h3>
+                <h3>Dar de Baja / Cambiar Estado</h3>
                 <button class="btn-icon" id="close-asset-edit-modal">✕</button>
             </div>
             <div class="modal-body">
@@ -433,41 +436,22 @@
                     <input type="hidden" id="edit-asset-id">
                     <input type="hidden" id="edit-asset-location-id">
                     
-                    <div class="form-group">
-                        <label for="edit-asset-name">Nombre del Activo *</label>
-                        <input type="text" id="edit-asset-name" class="form-control" required>
+                    <!-- Guardar datos de ficha de forma oculta para no modificarlos -->
+                    <input type="hidden" id="edit-asset-name">
+                    <input type="hidden" id="edit-asset-tipo">
+                    <input type="hidden" id="edit-asset-marca">
+                    <input type="hidden" id="edit-asset-modelo">
+                    <input type="hidden" id="edit-asset-serie">
+
+                    <div style="background: rgba(255,255,255,0.03); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; font-size: 0.9rem; border-left: 3px solid var(--accent-color);">
+                        <div style="margin-bottom: 0.5rem;">Activo: <strong id="lbl-edit-asset-name" style="color:var(--text-main);"></strong></div>
+                        <div style="margin-bottom: 0.5rem;">Marca / Modelo: <strong id="lbl-edit-asset-specs" style="color:var(--text-main);"></strong></div>
+                        <div>N° Serie: <strong id="lbl-edit-asset-serie" style="color:var(--text-main);"></strong></div>
                     </div>
 
                     <div class="form-group">
-                        <label for="edit-asset-tipo">Tipo de Activo *</label>
-                        <select id="edit-asset-tipo" class="form-control" required>
-                            <option value="Climatizacion">Climatización (Fancoils, Splits, etc.)</option>
-                            <option value="Electricidad">Electricidad (Extractores, Luces, Generadores)</option>
-                            <option value="Gasfiteria">Gasfitería (Baños, Llaves, Lavamanos)</option>
-                            <option value="Dispensadores">Dispensadores (Jabón, Toallas, Papel)</option>
-                            <option value="Otras Infraestructuras">Otras Infraestructuras</option>
-                        </select>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="edit-asset-marca">Marca</label>
-                            <input type="text" id="edit-asset-marca" class="form-control">
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-asset-modelo">Modelo</label>
-                            <input type="text" id="edit-asset-modelo" class="form-control">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="edit-asset-serie">Número de Serie</label>
-                        <input type="text" id="edit-asset-serie" class="form-control">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="edit-asset-estado">Estado del Ciclo de Vida *</label>
-                        <select id="edit-asset-estado" class="form-control" required style="border-left: 3px solid var(--accent-color);">
+                        <label for="edit-asset-estado">Selecciona el Nuevo Estado *</label>
+                        <select id="edit-asset-estado" class="form-control" required style="border-left: 3px solid var(--warning);">
                             <option value="Operativo">Operativo (En funcionamiento)</option>
                             <option value="En Reparación">En Reparación</option>
                             <option value="Fuera de Servicio">Fuera de Servicio (Temporalmente inactivo)</option>
@@ -477,7 +461,63 @@
                     </div>
 
                     <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem;">
-                        Guardar Cambios
+                        Guardar Cambios de Estado
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDIT ASSET TECHNICAL SHEET (RESTRICTED) -->
+    <div class="modal-overlay" id="asset-tech-edit-modal">
+        <div class="modal-content" style="max-width: 400px; margin-top: 5%;">
+            <div class="modal-header">
+                <h3>Editar Ficha Técnica</h3>
+                <button class="btn-icon" id="close-asset-tech-edit-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="asset-tech-edit-form">
+                    <input type="hidden" id="tech-edit-asset-id">
+                    <input type="hidden" id="tech-edit-asset-location-id">
+                    <input type="hidden" id="tech-edit-asset-estado">
+                    
+                    <div class="form-group">
+                        <label for="tech-edit-asset-name">Nombre del Activo *</label>
+                        <input type="text" id="tech-edit-asset-name" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tech-edit-asset-tipo">Tipo de Activo *</label>
+                        <select id="tech-edit-asset-tipo" class="form-control" required>
+                            <option value="Climatizacion">Climatización (HVAC/R)</option>
+                            <option value="Electrico">Electricidad</option>
+                            <option value="Gasfiteria">Gasfitería / Fontanería</option>
+                            <option value="Edificación">Edificación (General)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="tech-edit-asset-marca">Marca</label>
+                            <input type="text" id="tech-edit-asset-marca" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="tech-edit-asset-modelo">Modelo</label>
+                            <input type="text" id="tech-edit-asset-modelo" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tech-edit-asset-serie">Número de Serie</label>
+                        <input type="text" id="tech-edit-asset-serie" class="form-control">
+                    </div>
+
+                    <div style="background: rgba(255, 193, 7, 0.05); padding: 0.75rem; border-radius: 6px; border-left: 3px solid var(--warning); margin-bottom: 1.25rem; font-size: 0.8rem; color: var(--warning-text);">
+                        ⚠️ <strong>Advertencia:</strong> Modificar los datos de la ficha técnica (marca, modelo, N° de serie) afecta la trazabilidad histórica de los registros de OT asociados a este identificador de activo.
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem;">
+                        Guardar Cambios de Ficha
                     </button>
                 </form>
             </div>

@@ -647,6 +647,12 @@ document.addEventListener('DOMContentLoaded', () => {
         .catch(err => alert(err.message));
     });
 
+    // New Technical Edit Modal Elements
+    const assetTechEditModal = document.getElementById('asset-tech-edit-modal');
+    const assetTechEditForm = document.getElementById('asset-tech-edit-form');
+    const closeAssetTechEditModal = document.getElementById('close-asset-tech-edit-modal');
+    const btnEditTechSheet = document.getElementById('btn-edit-tech-sheet');
+
     btnEditAsset.addEventListener('click', () => {
         if (!currentAssetData) return;
         document.getElementById('edit-asset-id').value = currentAssetData.id;
@@ -657,6 +663,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('edit-asset-serie').value = currentAssetData.numero_serie || '';
         document.getElementById('edit-asset-estado').value = currentAssetData.estado;
         document.getElementById('edit-asset-location-id').value = currentAssetData.ubicacion_id || '';
+
+        // Populate read-only labels in the state change modal
+        document.getElementById('lbl-edit-asset-name').textContent = currentAssetData.nombre;
+        document.getElementById('lbl-edit-asset-specs').textContent = `${currentAssetData.marca || 'S/M'} / ${currentAssetData.modelo || 'S/M'}`;
+        document.getElementById('lbl-edit-asset-serie').textContent = currentAssetData.numero_serie || 'S/N';
+
         assetEditModal.style.display = 'flex';
     });
 
@@ -692,11 +704,100 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify(payload)
         })
         .then(res => {
-            if (!res.ok) throw new Error('Error al actualizar activo');
+            if (!res.ok) throw new Error('Error al actualizar estado del activo');
             return res.json();
         })
         .then(data => {
             assetEditModal.style.display = 'none';
+            loadAssets();
+            loadKPIs();
+            
+            // Check if user selected Reemplazado. If so, prompt to register the replacing asset!
+            if (estado === 'Reemplazado') {
+                setTimeout(() => {
+                    const confirmReplacement = confirm(`El activo ha sido marcado como "Reemplazado". ¿Deseas registrar de inmediato el nuevo activo que lo reemplazará en esta misma ubicación?`);
+                    if (confirmReplacement) {
+                        // Open the "Registrar Nuevo Activo" modal prefilled with location, name, type
+                        document.getElementById('asset-location-id').value = uId || '';
+                        document.getElementById('asset-name').value = name; // prefill with old name
+                        document.getElementById('asset-tipo').value = tipo; // prefill with old type
+                        document.getElementById('asset-marca').value = ''; // clear brand for new one
+                        document.getElementById('asset-modelo').value = ''; // clear model for new one
+                        document.getElementById('asset-serie').value = ''; // clear serial for new one
+                        
+                        // Show modal
+                        assetModal.style.display = 'flex';
+                    } else {
+                        openAssetDrawer(assetId);
+                    }
+                }, 100);
+            } else {
+                openAssetDrawer(assetId);
+            }
+        })
+        .catch(err => alert(err.message));
+    });
+
+    // --- Technical Specifications Edit Handlers (Restricted) ---
+    btnEditTechSheet.addEventListener('click', () => {
+        if (!currentAssetData) return;
+
+        const clave = prompt("La modificación de datos críticos de la ficha técnica requiere privilegios de Administrador. Ingrese la clave de autorización:");
+        if (clave === null) return; // User cancelled
+
+        if (clave === 'admin' || clave === '1234') {
+            document.getElementById('tech-edit-asset-id').value = currentAssetData.id;
+            document.getElementById('tech-edit-asset-name').value = currentAssetData.nombre;
+            document.getElementById('tech-edit-asset-tipo').value = currentAssetData.tipo;
+            document.getElementById('tech-edit-asset-marca').value = currentAssetData.marca || '';
+            document.getElementById('tech-edit-asset-modelo').value = currentAssetData.modelo || '';
+            document.getElementById('tech-edit-asset-serie').value = currentAssetData.numero_serie || '';
+            document.getElementById('tech-edit-asset-estado').value = currentAssetData.estado;
+            document.getElementById('tech-edit-asset-location-id').value = currentAssetData.ubicacion_id || '';
+
+            assetTechEditModal.style.display = 'flex';
+        } else {
+            alert("Acceso denegado: Clave de Administrador incorrecta.");
+        }
+    });
+
+    closeAssetTechEditModal.addEventListener('click', () => {
+        assetTechEditModal.style.display = 'none';
+    });
+
+    assetTechEditForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const assetId = parseInt(document.getElementById('tech-edit-asset-id').value);
+        const name = document.getElementById('tech-edit-asset-name').value.trim();
+        const tipo = document.getElementById('tech-edit-asset-tipo').value;
+        const marca = document.getElementById('tech-edit-asset-marca').value.trim() || null;
+        const modelo = document.getElementById('tech-edit-asset-modelo').value.trim() || null;
+        const serie = document.getElementById('tech-edit-asset-serie').value.trim() || null;
+        const estado = document.getElementById('tech-edit-asset-estado').value;
+        const uId = document.getElementById('tech-edit-asset-location-id').value ? parseInt(document.getElementById('tech-edit-asset-location-id').value) : null;
+
+        const payload = {
+            id: assetId,
+            nombre: name,
+            tipo: tipo,
+            marca: marca,
+            modelo: modelo,
+            numero_serie: serie,
+            estado: estado,
+            ubicacion_id: uId
+        };
+
+        fetch(`/api/activos/${assetId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al actualizar ficha técnica');
+            return res.json();
+        })
+        .then(data => {
+            assetTechEditModal.style.display = 'none';
             loadAssets();
             loadKPIs();
             openAssetDrawer(assetId);
