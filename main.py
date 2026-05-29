@@ -616,7 +616,12 @@ async def importar_activos(file: UploadFile = File(...), db: Session = Depends(g
         contents = await file.read()
         file_stream = io.BytesIO(contents)
         wb = openpyxl.load_workbook(file_stream, read_only=True)
-        sheet = wb.active
+        if "Importar Activos" in wb.sheetnames:
+            sheet = wb["Importar Activos"]
+        elif "Plantilla Importar Activos" in wb.sheetnames:
+            sheet = wb["Plantilla Importar Activos"]
+        else:
+            sheet = wb.active
         
         imported_count = 0
         rows = list(sheet.iter_rows(values_only=True))
