@@ -431,18 +431,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 5. LOAD ASSETS ---
     function loadAssets() {
-        if (!selectedUbicacionId) {
-            activoGrid.innerHTML = '<p style="color: var(--text-muted);">Selecciona una ubicación específica a la izquierda para ver sus activos.</p>';
-            return;
+        let url = '/api/activos';
+        const params = [];
+        if (selectedUbicacionId) {
+            params.push(`ubicacion_id=${selectedUbicacionId}`);
+        } else if (selectedEdificioId) {
+            params.push(`edificio_id=${selectedEdificioId}`);
+        } else if (selectedPlantaId) {
+            params.push(`planta_id=${selectedPlantaId}`);
+        }
+        if (params.length > 0) {
+            url += '?' + params.join('&');
         }
 
         activoGrid.innerHTML = '<p style="color: var(--text-muted);">Cargando activos...</p>';
 
-        fetch(`/api/activos?ubicacion_id=${selectedUbicacionId}`)
+        fetch(url)
             .then(res => res.json())
             .then(activos => {
                 if (activos.length === 0) {
-                    activoGrid.innerHTML = '<p style="color: var(--text-muted);">No hay activos registrados en esta ubicación. ¡Crea uno nuevo usando el botón superior!</p>';
+                    activoGrid.innerHTML = '<p style="color: var(--text-muted);">No hay activos registrados en esta selección.</p>';
                     return;
                 }
 
@@ -932,5 +940,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadKPIs();
     loadHierarchy();
     loadWorkOrders();
+    loadAssets();
     loadTechniciansForAssign();
 });
