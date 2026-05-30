@@ -339,6 +339,20 @@ body {
     background: var(--border-color);
 }
 
+.search-result-item {
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    border-radius: 6px;
+    margin: 0.25rem 0;
+    transition: var(--transition-fast);
+}
+
+.search-result-item:hover, .search-result-item.active {
+    color: var(--text-main);
+    background: var(--border-color);
+}
+
 /* Detail Display Area */
 .content-panel {
     display: flex;

@@ -61,6 +61,34 @@ def get_edificios(planta_id: int, db: Session = Depends(get_db)):
 def get_ubicaciones(edificio_id: int, db: Session = Depends(get_db)):
     return db.exec(select(Ubicacion).where(Ubicacion.edificio_id == edificio_id)).all()
 
+@app.get("/api/search/locations")
+def search_locations(db: Session = Depends(get_db)):
+    results = []
+    ubicaciones = db.exec(select(Ubicacion)).all()
+    for u in ubicaciones:
+        edificio = db.get(Edificio, u.edificio_id)
+        planta = db.get(Planta, edificio.planta_id) if edificio else None
+        
+        # Get active assets (not replaced/deleted)
+        activos = db.exec(
+            select(Activo)
+            .where(Activo.ubicacion_id == u.id)
+            .where(Activo.estado != "Reemplazado")
+            .where(Activo.estado != "Eliminado sin Reemplazo")
+        ).all()
+        nombres_activos = [a.nombre for a in activos]
+        
+        results.append({
+            "id": u.id,
+            "nombre": u.nombre,
+            "edificio_id": u.edificio_id,
+            "edificio_nombre": edificio.nombre if edificio else "N/A",
+            "planta_id": edificio.planta_id if edificio else None,
+            "planta_nombre": planta.nombre if planta else "N/A",
+            "activos": nombres_activos
+        })
+    return results
+
 @app.post("/api/ubicaciones", response_model=Ubicacion)
 def create_ubicacion(ubicacion: Ubicacion, db: Session = Depends(get_db)):
     # Verificar que el edificio existe

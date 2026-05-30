@@ -118,7 +118,99 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.error('Error al cargar KPIs:', err));
     }
 
-    // --- 3. LOAD HIERARCHY TREE ---
+    // --- 3. LOAD HIERARCHY TREE & SEARCH ---
+    let locationsSearchList = [];
+
+    function preloadSearchList() {
+        fetch('/api/search/locations')
+            .then(res => res.json())
+            .then(data => {
+                locationsSearchList = data;
+            })
+            .catch(err => console.error('Error preloading search list:', err));
+    }
+    preloadSearchList();
+
+    const hierarchySearchInput = document.getElementById('hierarchy-search');
+    if (hierarchySearchInput) {
+        hierarchySearchInput.addEventListener('input', () => {
+            const query = hierarchySearchInput.value.trim().toLowerCase();
+            if (query.length < 2) {
+                loadHierarchy();
+                return;
+            }
+
+            const cleanQuery = query.replace(/[^a-z0-9]/g, '');
+
+            const filtered = locationsSearchList.filter(u => {
+                const cleanName = u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const cleanPlanta = u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const cleanEdificio = u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                // Match location, plant, or building name
+                if (cleanName.includes(cleanQuery) || cleanPlanta.includes(cleanQuery) || cleanEdificio.includes(cleanQuery)) {
+                    return true;
+                }
+
+                // Match asset names
+                if (u.activos && u.activos.some(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                    return true;
+                }
+
+                return false;
+            });
+
+            renderSearchResults(filtered);
+        });
+    }
+
+    function renderSearchResults(results) {
+        hierarchyTree.innerHTML = '';
+        if (results.length === 0) {
+            hierarchyTree.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem; padding: 0.75rem; text-align: center;">No se encontraron ubicaciones</p>';
+            return;
+        }
+
+        results.forEach(u => {
+            const item = document.createElement('div');
+            item.className = 'search-result-item';
+            item.innerHTML = `
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.15rem;">
+                    🏢 ${u.planta_nombre} &gt; 📦 ${u.edificio_nombre}
+                </div>
+                <div style="font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 0.35rem;">
+                    📍 ${u.nombre}
+                </div>
+                ${u.activos.length > 0 ? `
+                    <div style="font-size: 0.75rem; color: var(--accent-color); margin-top: 0.2rem; display: flex; align-items: center; gap: 0.25rem;">
+                        <span>⚡</span> <span style="font-style: italic;">${u.activos.join(', ')}</span>
+                    </div>
+                ` : ''}
+            `;
+
+            if (selectedUbicacionId === u.id) {
+                item.classList.add('active');
+            }
+
+            item.addEventListener('click', () => {
+                selectedPlantaId = u.planta_id;
+                selectedEdificioId = u.edificio_id;
+                selectedUbicacionId = u.id;
+
+                document.querySelectorAll('.search-result-item').forEach(s => s.classList.remove('active'));
+                item.classList.add('active');
+
+                currentLocationLabel.textContent = `📍 Ubicación seleccionada: ${u.nombre}`;
+                btnCreateActivo.disabled = false;
+
+                loadAssets();
+                loadWorkOrders();
+            });
+
+            hierarchyTree.appendChild(item);
+        });
+    }
+
     function loadHierarchy() {
         fetch('/api/plantas')
             .then(res => res.json())
@@ -1061,6 +1153,7 @@ document.addEventListener('DOMContentLoaded', () => {
             assetForm.reset();
             loadAssets();
             loadKPIs();
+            preloadSearchList();
         })
         .catch(err => alert(err.message));
     });
@@ -1136,6 +1229,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Reload parent building's location tree
             const locContainer = document.getElementById(`building-locations-${edificioId}`);
             loadLocations(edificioId, locContainer);
+            preloadSearchList();
         })
         .catch(err => alert(err.message));
     }
@@ -1183,6 +1277,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadHierarchy();
                 loadWorkOrders();
                 loadAssets();
+                preloadSearchList();
             })
             .catch(err => {
                 alert(`Error de Importación: ${err.message}`);
