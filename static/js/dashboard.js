@@ -606,6 +606,35 @@ document.addEventListener('DOMContentLoaded', () => {
     filterOtState.addEventListener('change', loadWorkOrders);
 
     // --- 5. LOAD ASSETS ---
+    const typeNorm = {
+        'climatizacion': 'Climatización',
+        'climatización': 'Climatización',
+        'gasfiteria': 'Gasfitería',
+        'gasfitería': 'Gasfitería',
+        'electricidad': 'Electricidad',
+        'dispensadores': 'Dispensadores',
+        'mobiliario': 'Mobiliario',
+        'quincalleria': 'Quincallería',
+        'quincallería': 'Quincallería'
+    };
+    function normalizeType(t) {
+        if (!t) return 'Otros';
+        const clean = t.trim().toLowerCase();
+        return typeNorm[clean] || (t.charAt(0).toUpperCase() + t.slice(1));
+    }
+    const typeColors = {
+        'Climatización': '#3b82f6', // Accent blue
+        'Gasfitería': '#10b981', // Success green
+        'Electricidad': '#f59e0b', // Warning yellow
+        'Dispensadores': '#a855f7', // Purple
+        'Mobiliario': '#ec4899', // Pink
+        'Quincallería': '#64748b' // Slate/grey
+    };
+    function getDotColor(type) {
+        return typeColors[type] || '#6b7280'; // Default gray
+    }
+    const typeOrder = ['Climatización', 'Gasfitería', 'Electricidad', 'Dispensadores', 'Mobiliario', 'Quincallería'];
+
     function loadAssets() {
         let url = '/api/activos';
         const params = [];
@@ -620,53 +649,98 @@ document.addEventListener('DOMContentLoaded', () => {
             url += '?' + params.join('&');
         }
 
+        activoGrid.className = 'grid-container';
         activoGrid.innerHTML = '<p style="color: var(--text-muted);">Cargando activos...</p>';
 
         fetch(url)
             .then(res => res.json())
             .then(activos => {
                 if (activos.length === 0) {
+                    activoGrid.className = 'grid-container';
                     activoGrid.innerHTML = '<p style="color: var(--text-muted);">No hay activos registrados en esta selección.</p>';
                     return;
                 }
 
-                activoGrid.innerHTML = '';
+                // Group assets by type
+                const grouped = {};
                 activos.forEach(a => {
-                    const isOk = a.estado === 'Operativo';
-                    const isInactive = a.estado === 'Reemplazado' || a.estado === 'Eliminado sin Reemplazo';
-                    const isRepair = a.estado === 'En Reparación';
-                    
-                    let cardClass = `entity-card status-${isOk ? 'ok' : 'issue'}`;
-                    let statusBadgeClass = isOk ? 'status-ok' : 'status-issue';
-                    
-                    if (isInactive) {
-                        cardClass = 'entity-card status-inactive';
-                        statusBadgeClass = 'status-inactive';
-                    } else if (isRepair) {
-                        cardClass = 'entity-card status-repair';
-                        statusBadgeClass = 'status-repair';
+                    const normType = normalizeType(a.tipo);
+                    if (!grouped[normType]) {
+                        grouped[normType] = [];
                     }
+                    grouped[normType].push(a);
+                });
 
-                    const card = document.createElement('div');
-                    card.className = cardClass;
-                    card.innerHTML = `
-                        <h4 class="entity-title" style="margin-bottom:0.25rem;">${a.nombre}</h4>
-                        <div class="entity-subtitle" style="margin-bottom:0.75rem;">${a.tipo}</div>
-                        <div class="entity-meta">
-                            <div class="meta-row">
-                                <span>Marca/Mod: <strong>${a.marca || 'S/M'} / ${a.modelo || 'S/M'}</strong></span>
-                            </div>
-                            <div class="meta-row" style="justify-content: space-between; margin-top: 0.5rem;">
-                                <span class="status-badge ${statusBadgeClass}">${a.estado}</span>
-                                <span style="font-size: 0.8rem; color: var(--accent-color); font-weight: 500;">Ficha &gt;</span>
-                            </div>
+                // Sort types
+                const sortedTypes = Object.keys(grouped).sort((a, b) => {
+                    const idxA = typeOrder.indexOf(a);
+                    const idxB = typeOrder.indexOf(b);
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                    return a.localeCompare(b);
+                });
+
+                activoGrid.className = 'assets-columns-container';
+                activoGrid.innerHTML = '';
+
+                sortedTypes.forEach(type => {
+                    const column = document.createElement('div');
+                    column.className = 'assets-type-column';
+
+                    const header = document.createElement('div');
+                    header.className = 'assets-type-header';
+                    header.innerHTML = `
+                        <div>
+                            <span class="assets-type-dot" style="background-color: ${getDotColor(type)};"></span>
+                            <span>${type}</span>
                         </div>
+                        <span class="assets-type-count">${grouped[type].length}</span>
                     `;
-                    activoGrid.appendChild(card);
+                    column.appendChild(header);
 
-                    card.addEventListener('click', () => {
-                        openAssetDrawer(a.id);
+                    const cardsContainer = document.createElement('div');
+                    cardsContainer.className = 'assets-type-cards';
+
+                    grouped[type].forEach(a => {
+                        const isOk = a.estado === 'Operativo';
+                        const isInactive = a.estado === 'Reemplazado' || a.estado === 'Eliminado sin Reemplazo';
+                        const isRepair = a.estado === 'En Reparación';
+                        
+                        let cardClass = `entity-card status-${isOk ? 'ok' : 'issue'}`;
+                        let statusBadgeClass = isOk ? 'status-ok' : 'status-issue';
+                        
+                        if (isInactive) {
+                            cardClass = 'entity-card status-inactive';
+                            statusBadgeClass = 'status-inactive';
+                        } else if (isRepair) {
+                            cardClass = 'entity-card status-repair';
+                            statusBadgeClass = 'status-repair';
+                        }
+
+                        const card = document.createElement('div');
+                        card.className = cardClass;
+                        card.innerHTML = `
+                            <h4 class="entity-title" style="margin-bottom:0.25rem; font-size:0.95rem;">${a.nombre}</h4>
+                            <div class="entity-meta">
+                                <div class="meta-row">
+                                    <span style="font-size:0.8rem; color: var(--text-muted);">Marca/Mod: <strong>${a.marca || 'S/M'} / ${a.modelo || 'S/M'}</strong></span>
+                                </div>
+                                <div class="meta-row" style="justify-content: space-between; margin-top: 0.5rem; align-items: center;">
+                                    <span class="status-badge ${statusBadgeClass}" style="padding: 0.15rem 0.45rem; font-size: 0.75rem;">${a.estado}</span>
+                                    <span style="font-size: 0.75rem; color: var(--accent-color); font-weight: 600;">Ficha &gt;</span>
+                                </div>
+                            </div>
+                        `;
+                        cardsContainer.appendChild(card);
+
+                        card.addEventListener('click', () => {
+                            openAssetDrawer(a.id);
+                        });
                     });
+
+                    column.appendChild(cardsContainer);
+                    activoGrid.appendChild(column);
                 });
             })
             .catch(err => console.error('Error al cargar activos:', err));
