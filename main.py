@@ -222,7 +222,7 @@ def update_componente(componente_id: int, updated_comp: ComponenteActivo, db: Se
 
 @app.get("/api/tecnicos", response_model=List[Tecnico])
 def get_tecnicos(db: Session = Depends(get_db)):
-    return db.exec(select(Tecnico)).all()
+    return db.exec(select(Tecnico).order_by(Tecnico.id)).all()
 
 # --- ENDPOINTS ÓRDENES DE TRABAJO (OT) ---
 

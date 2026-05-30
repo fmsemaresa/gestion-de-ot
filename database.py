@@ -90,10 +90,12 @@ def seed_database():
             session.add(Edificio(nombre=name, planta_id=p3.id))
             
         # Add some initial Technicians
-        t1 = Tecnico(nombre="Juan Pérez", email="juan.perez@emaresa.cl", especialidad="Climatización")
-        t2 = Tecnico(nombre="Pedro Gómez", email="pedro.gomez@emaresa.cl", especialidad="Electricidad")
-        t3 = Tecnico(nombre="Carlos Silva", email="carlos.silva@emaresa.cl", especialidad="General")
-        session.add_all([t1, t2, t3])
+        t1 = Tecnico(nombre="Javier Pinochet", email="javier.pinochet@emaresa.cl", especialidad="Climatización")
+        t2 = Tecnico(nombre="Alex Valenzuela", email="alex.valenzuela@emaresa.cl", especialidad="Climatización")
+        t3 = Tecnico(nombre="Simón Monardes", email="simon.monardes@emaresa.cl", especialidad="Climatización")
+        t4 = Tecnico(nombre="Víctor Hugo Hurtado", email="victor.hurtado@emaresa.cl", especialidad="Climatización")
+        t5 = Tecnico(nombre="Víctor Parra", email="victor.parra@emaresa.cl", especialidad="Climatización")
+        session.add_all([t1, t2, t3, t4, t5])
         session.commit()
 
         # Dictionary to keep track of locations by normalized code
