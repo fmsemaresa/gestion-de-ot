@@ -203,6 +203,42 @@ body {
     box-shadow: var(--shadow-md);
 }
 
+.kpi-card.interactive {
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card.interactive::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: transparent;
+    transition: var(--transition-fast);
+}
+
+#card-kpi-total-ots.interactive:hover::after {
+    background: var(--accent-color);
+}
+
+#card-kpi-pendientes.interactive:hover::after {
+    background: var(--warning);
+}
+
+#card-kpi-resueltas.interactive:hover::after {
+    background: var(--success);
+}
+
+.kpi-card.interactive:hover {
+    transform: translateY(-5px);
+    border-color: var(--border-focus);
+    box-shadow: var(--shadow-lg);
+    background-color: var(--bg-card-hover);
+}
+
 .kpi-info h3 {
     font-size: 0.85rem;
     color: var(--text-muted);

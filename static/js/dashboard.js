@@ -13,6 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const kpiResueltas = document.getElementById('kpi-resueltas');
     const kpiMttr = document.getElementById('kpi-mttr');
     const kpiActivos = document.getElementById('kpi-activos');
+    const cardKpiTotalOts = document.getElementById('card-kpi-total-ots');
+    const cardKpiPendientes = document.getElementById('card-kpi-pendientes');
+    const cardKpiResueltas = document.getElementById('card-kpi-resueltas');
     
     const hierarchyTree = document.getElementById('hierarchy-tree');
     
@@ -103,6 +106,28 @@ document.addEventListener('DOMContentLoaded', () => {
         tabOts.style.display = 'none';
         loadAssets();
     });
+
+    // --- 1.5. KPI INTERACTION ---
+    if (cardKpiTotalOts) {
+        cardKpiTotalOts.addEventListener('click', () => {
+            filterOtState.value = '';
+            tabBtnOts.click();
+        });
+    }
+
+    if (cardKpiPendientes) {
+        cardKpiPendientes.addEventListener('click', () => {
+            filterOtState.value = 'Pendiente';
+            tabBtnOts.click();
+        });
+    }
+
+    if (cardKpiResueltas) {
+        cardKpiResueltas.addEventListener('click', () => {
+            filterOtState.value = 'Resuelta';
+            tabBtnOts.click();
+        });
+    }
 
     // --- 2. LOAD KPIS ---
     function loadKPIs() {
