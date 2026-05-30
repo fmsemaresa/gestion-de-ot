@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cardKpiTotalOts = document.getElementById('card-kpi-total-ots');
     const cardKpiPendientes = document.getElementById('card-kpi-pendientes');
     const cardKpiResueltas = document.getElementById('card-kpi-resueltas');
+    const cardKpiActivos = document.getElementById('card-kpi-activos');
     
     const hierarchyTree = document.getElementById('hierarchy-tree');
     
@@ -29,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCreateOt = document.getElementById('btn-create-ot');
     
     const activoGrid = document.getElementById('activo-grid');
+    const filterActivoState = document.getElementById('filter-activo-state');
     const btnCreateActivo = document.getElementById('btn-create-activo');
     const currentLocationLabel = document.getElementById('current-location-label');
     
@@ -126,6 +128,13 @@ document.addEventListener('DOMContentLoaded', () => {
         cardKpiResueltas.addEventListener('click', () => {
             filterOtState.value = 'Resuelta';
             tabBtnOts.click();
+        });
+    }
+
+    if (cardKpiActivos) {
+        cardKpiActivos.addEventListener('click', () => {
+            filterActivoState.value = 'Operativo';
+            tabBtnActivos.click();
         });
     }
 
@@ -630,6 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     filterOtState.addEventListener('change', loadWorkOrders);
+    filterActivoState.addEventListener('change', loadAssets);
 
     // --- 5. LOAD ASSETS ---
     const typeNorm = {
@@ -681,15 +691,26 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch(url)
             .then(res => res.json())
             .then(activos => {
-                if (activos.length === 0) {
+                // Filter by state if selected
+                const filterState = filterActivoState.value;
+                let filteredActivos = activos;
+                if (filterState) {
+                    if (filterState === 'Inactivo') {
+                        filteredActivos = activos.filter(a => a.estado === 'Inactivo' || a.estado === 'Reemplazado' || a.estado === 'Eliminado sin Reemplazo');
+                    } else {
+                        filteredActivos = activos.filter(a => a.estado === filterState);
+                    }
+                }
+
+                if (filteredActivos.length === 0) {
                     activoGrid.className = 'grid-container';
-                    activoGrid.innerHTML = '<p style="color: var(--text-muted);">No hay activos registrados en esta selección.</p>';
+                    activoGrid.innerHTML = '<p style="color: var(--text-muted);">No hay activos registrados que coincidan con este filtro.</p>';
                     return;
                 }
 
                 // Group assets by type
                 const grouped = {};
-                activos.forEach(a => {
+                filteredActivos.forEach(a => {
                     const normType = normalizeType(a.tipo);
                     if (!grouped[normType]) {
                         grouped[normType] = [];

@@ -232,6 +232,10 @@ body {
     background: var(--success);
 }
 
+#card-kpi-activos.interactive:hover::after {
+    background: var(--accent-color);
+}
+
 .kpi-card.interactive:hover {
     transform: translateY(-5px);
     border-color: var(--border-focus);
