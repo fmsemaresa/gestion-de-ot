@@ -149,7 +149,9 @@ def get_activo_detail(activo_id: int, db: Session = Depends(get_db)):
         "estado": activo.estado,
         "ubicacion_id": activo.ubicacion_id,
         "ubicacion_nombre": ubicacion.nombre if ubicacion else None,
+        "edificio_id": edificio.id if edificio else None,
         "edificio_nombre": edificio.nombre if edificio else None,
+        "planta_id": planta.id if planta else None,
         "planta_nombre": planta.nombre if planta else None,
         "componentes": componentes,
         "ordenes_trabajo": ots

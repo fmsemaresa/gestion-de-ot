@@ -74,6 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const drawerAssetUbicacion = document.getElementById('drawer-asset-ubicacion');
     const drawerComponentList = document.getElementById('drawer-component-list');
     const drawerHistoryList = document.getElementById('drawer-history-list');
+    const btnCreateOtForAsset = document.getElementById('btn-create-ot-for-asset');
 
     // Simulated Role Toggle
     const selectRole = document.getElementById('select-role');
@@ -831,6 +832,100 @@ document.addEventListener('DOMContentLoaded', () => {
 
     closeDrawer.addEventListener('click', () => {
         assetDrawer.classList.remove('open');
+    });
+
+    // Helper to open New OT Modal pre-filled for a specific asset
+    function openNewOTModalForAsset(plantaId, edificioId, ubicacionId, activoId) {
+        // Close asset drawer
+        assetDrawer.classList.remove('open');
+
+        const otPlanta = document.getElementById('ot-select-planta');
+        const otEdificio = document.getElementById('ot-select-edificio');
+        const otUbicacion = document.getElementById('ot-select-ubicacion');
+        const otActivo = document.getElementById('ot-select-activo');
+
+        // Load plants
+        fetch('/api/plantas')
+            .then(res => res.json())
+            .then(plantas => {
+                otPlanta.innerHTML = '<option value="">-- Selecciona Planta --</option>';
+                plantas.forEach(p => {
+                    otPlanta.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+                });
+                otPlanta.value = plantaId;
+
+                // Load buildings for this planta
+                return fetch(`/api/plantas/${plantaId}/edificios`);
+            })
+            .then(res => res.json())
+            .then(edificios => {
+                otEdificio.disabled = false;
+                otEdificio.innerHTML = '<option value="">-- Selecciona --</option>';
+                edificios.forEach(b => {
+                    otEdificio.innerHTML += `<option value="${b.id}">${b.nombre}</option>`;
+                });
+                otEdificio.value = edificioId;
+
+                // Load locations for this building
+                return fetch(`/api/edificios/${edificioId}/ubicaciones`);
+            })
+            .then(res => res.json())
+            .then(ubicaciones => {
+                otUbicacion.disabled = false;
+                otUbicacion.innerHTML = '<option value="">-- Selecciona --</option>';
+                ubicaciones.forEach(u => {
+                    otUbicacion.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+                });
+                otUbicacion.value = ubicacionId;
+
+                // Load assets for this location
+                return fetch(`/api/activos?ubicacion_id=${ubicacionId}`);
+            })
+            .then(res => res.json())
+            .then(activos => {
+                otActivo.disabled = false;
+                otActivo.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                activeActivos.forEach(a => {
+                    otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
+                });
+                otActivo.value = activoId;
+
+                // Load technicians in assignment dropdown
+                const otTecnico = document.getElementById('ot-tecnico');
+                otTecnico.innerHTML = '<option value="">No Asignado</option>';
+                techniciansList.forEach(t => {
+                    otTecnico.innerHTML += `<option value="${t.id}">${t.nombre} (${t.especialidad})</option>`;
+                });
+
+                // Load checklists in template selector dropdown
+                return fetch('/api/plantillas');
+            })
+            .then(res => res.json())
+            .then(plantillas => {
+                const otSelectPlantilla = document.getElementById('ot-select-plantilla');
+                otSelectPlantilla.innerHTML = '<option value="">-- Sin plantilla / Pauta estándar --</option>';
+                plantillas.forEach(p => {
+                    otSelectPlantilla.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+                });
+
+                // Show modal!
+                otModal.style.display = 'flex';
+            })
+            .catch(err => console.error('Error pre-filling OT modal for asset:', err));
+    }
+
+    btnCreateOtForAsset.addEventListener('click', () => {
+        if (currentAssetData && currentAssetData.planta_id && currentAssetData.edificio_id && currentAssetData.ubicacion_id) {
+            openNewOTModalForAsset(
+                currentAssetData.planta_id,
+                currentAssetData.edificio_id,
+                currentAssetData.ubicacion_id,
+                currentAssetData.id
+            );
+        } else {
+            alert('No se pudo cargar la ubicación jerárquica del activo.');
+        }
     });
 
     // --- 6.1 EDIT ASSET AND COMPONENT LIFE CYCLE LOGIC ---
