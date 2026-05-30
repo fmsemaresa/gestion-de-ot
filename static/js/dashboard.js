@@ -131,34 +131,106 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     preloadSearchList();
 
+    function getSelectedPlantaNombre() {
+        if (!selectedPlantaId || locationsSearchList.length === 0) return null;
+        const found = locationsSearchList.find(u => u.planta_id === selectedPlantaId);
+        return found ? found.planta_nombre : null;
+    }
+
+    function updateSearchPlantaIndicator() {
+        const indicator = document.getElementById('search-planta-indicator');
+        if (!indicator) return;
+
+        if (selectedPlantaId) {
+            const plantaNombre = getSelectedPlantaNombre() || 'Planta Seleccionada';
+            indicator.innerHTML = `📍 Filtrando en: <strong>${plantaNombre}</strong><br><span id="btn-clear-search-planta" style="color: var(--accent-color); cursor: pointer; text-decoration: underline; font-size: 0.65rem;">Buscar en todas las plantas</span>`;
+            indicator.style.display = 'block';
+
+            const btnClear = document.getElementById('btn-clear-search-planta');
+            if (btnClear) {
+                btnClear.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectedPlantaId = null;
+                    selectedEdificioId = null;
+                    selectedUbicacionId = null;
+                    
+                    // Reset active styles
+                    document.querySelectorAll('.hierarchy-header').forEach(h => h.classList.remove('active'));
+                    document.querySelectorAll('.sub-item').forEach(s => s.classList.remove('active'));
+                    currentLocationLabel.textContent = '📍 Selecciona una ubicación para ver sus detalles';
+                    btnCreateActivo.disabled = true;
+
+                    // Update indicator
+                    updateSearchPlantaIndicator();
+
+                    // Refresh main screen data
+                    loadKPIs();
+                    loadWorkOrders();
+                    loadAssets();
+
+                    // Re-trigger filtering
+                    hierarchySearchInput.dispatchEvent(new Event('input'));
+                });
+            }
+        } else {
+            indicator.style.display = 'none';
+            indicator.innerHTML = '';
+        }
+    }
+
     const hierarchySearchInput = document.getElementById('hierarchy-search');
     if (hierarchySearchInput) {
         hierarchySearchInput.addEventListener('input', () => {
             const query = hierarchySearchInput.value.trim().toLowerCase();
-            if (query.length < 2) {
+            
+            // If empty, show full tree and hide indicator
+            if (query.length === 0) {
+                const indicator = document.getElementById('search-planta-indicator');
+                if (indicator) indicator.style.display = 'none';
                 loadHierarchy();
                 return;
             }
 
+            // Update the plant filter indicator UI
+            updateSearchPlantaIndicator();
+
             const cleanQuery = query.replace(/[^a-z0-9]/g, '');
+            
+            let filtered = [];
+            if (cleanQuery === '') {
+                // Fallback to literal search if only symbols are typed (e.g. "[", "#")
+                filtered = locationsSearchList.filter(u => {
+                    if (selectedPlantaId && u.planta_id !== selectedPlantaId) {
+                        return false;
+                    }
+                    return u.nombre.toLowerCase().includes(query) || 
+                           u.planta_nombre.toLowerCase().includes(query) || 
+                           u.edificio_nombre.toLowerCase().includes(query);
+                });
+            } else {
+                filtered = locationsSearchList.filter(u => {
+                    // Filter by plant context if selected
+                    if (selectedPlantaId && u.planta_id !== selectedPlantaId) {
+                        return false;
+                    }
 
-            const filtered = locationsSearchList.filter(u => {
-                const cleanName = u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
-                const cleanPlanta = u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
-                const cleanEdificio = u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanName = u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanPlanta = u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanEdificio = u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-                // Match location, plant, or building name
-                if (cleanName.includes(cleanQuery) || cleanPlanta.includes(cleanQuery) || cleanEdificio.includes(cleanQuery)) {
-                    return true;
-                }
+                    // Match location, plant, or building name
+                    if (cleanName.includes(cleanQuery) || cleanPlanta.includes(cleanQuery) || cleanEdificio.includes(cleanQuery)) {
+                        return true;
+                    }
 
-                // Match asset names
-                if (u.activos && u.activos.some(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
-                    return true;
-                }
+                    // Match asset names
+                    if (u.activos && u.activos.some(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                        return true;
+                    }
 
-                return false;
-            });
+                    return false;
+                });
+            }
 
             renderSearchResults(filtered);
         });
