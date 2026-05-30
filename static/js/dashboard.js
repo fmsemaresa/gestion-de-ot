@@ -271,6 +271,147 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- Smart Location Search in OT Form ---
+    const otSearchInput = document.getElementById('ot-search-location');
+    const otSearchResults = document.getElementById('ot-search-location-results');
+
+    if (otSearchInput && otSearchResults) {
+        otSearchInput.addEventListener('input', () => {
+            const query = otSearchInput.value.trim().toLowerCase();
+            if (!query) {
+                otSearchResults.style.display = 'none';
+                otSearchResults.innerHTML = '';
+                return;
+            }
+
+            const cleanQuery = query.replace(/[^a-z0-9]/g, '');
+            let filtered = [];
+
+            if (cleanQuery === '') {
+                filtered = locationsSearchList.filter(u => {
+                    return u.nombre.toLowerCase().includes(query) || 
+                           u.planta_nombre.toLowerCase().includes(query) || 
+                           u.edificio_nombre.toLowerCase().includes(query);
+                });
+            } else {
+                filtered = locationsSearchList.filter(u => {
+                    const cleanName = u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanPlanta = u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanEdificio = u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                    if (cleanName.includes(cleanQuery) || cleanPlanta.includes(cleanQuery) || cleanEdificio.includes(cleanQuery)) {
+                        return true;
+                    }
+
+                    if (u.activos && u.activos.some(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                        return true;
+                    }
+                    return false;
+                });
+            }
+
+            // Render results
+            if (filtered.length === 0) {
+                otSearchResults.innerHTML = '<div style="padding: 0.5rem 1rem; color: var(--text-muted); font-size: 0.85rem;">No se encontraron ubicaciones</div>';
+            } else {
+                otSearchResults.innerHTML = '';
+                filtered.slice(0, 10).forEach(u => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-dropdown-item';
+                    
+                    let matchingAsset = '';
+                    if (query && u.activos) {
+                        const foundAsset = u.activos.find(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery));
+                        if (foundAsset) {
+                            matchingAsset = `<div class="result-active-badge">⚡ Equipo coincidente: <strong>${foundAsset}</strong></div>`;
+                        }
+                    }
+
+                    item.innerHTML = `
+                        <div style="font-weight: 600; color: var(--text-main);">${u.nombre}</div>
+                        <div class="result-path">📍 ${u.planta_nombre} &gt; ${u.edificio_nombre}</div>
+                        ${matchingAsset}
+                    `;
+                    
+                    item.addEventListener('click', () => {
+                        let assetName = null;
+                        if (query && u.activos) {
+                            assetName = u.activos.find(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery));
+                        }
+                        
+                        prefillOTFormLocationAndAsset(u.planta_id, u.edificio_id, u.id, assetName);
+                        
+                        otSearchInput.value = u.nombre;
+                        otSearchResults.style.display = 'none';
+                    });
+                    otSearchResults.appendChild(item);
+                });
+            }
+            otSearchResults.style.display = 'block';
+        });
+
+        // Close results when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!otSearchInput.contains(e.target) && !otSearchResults.contains(e.target)) {
+                otSearchResults.style.display = 'none';
+            }
+        });
+    }
+
+    function prefillOTFormLocationAndAsset(plantaId, edificioId, ubicacionId, assetName = null) {
+        const otPlanta = document.getElementById('ot-select-planta');
+        const otEdificio = document.getElementById('ot-select-edificio');
+        const otUbicacion = document.getElementById('ot-select-ubicacion');
+        const otActivo = document.getElementById('ot-select-activo');
+
+        otPlanta.value = plantaId;
+
+        fetch(`/api/plantas/${plantaId}/edificios`)
+            .then(res => res.json())
+            .then(edificios => {
+                otEdificio.disabled = false;
+                otEdificio.innerHTML = '<option value="">-- Selecciona --</option>';
+                edificios.forEach(b => {
+                    otEdificio.innerHTML += `<option value="${b.id}">${b.nombre}</option>`;
+                });
+                otEdificio.value = edificioId;
+
+                return fetch(`/api/edificios/${edificioId}/ubicaciones`);
+            })
+            .then(res => res.json())
+            .then(ubicaciones => {
+                otUbicacion.disabled = false;
+                otUbicacion.innerHTML = '<option value="">-- Selecciona --</option>';
+                ubicaciones.forEach(u => {
+                    otUbicacion.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+                });
+                otUbicacion.value = ubicacionId;
+
+                return fetch(`/api/activos?ubicacion_id=${ubicacionId}`);
+            })
+            .then(res => res.json())
+            .then(activos => {
+                otActivo.disabled = false;
+                otActivo.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                activeActivos.forEach(a => {
+                    otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
+                });
+                
+                if (assetName) {
+                    const matchedAsset = activeActivos.find(a => a.nombre === assetName);
+                    if (matchedAsset) {
+                        otActivo.value = matchedAsset.id;
+                    } else {
+                        otActivo.value = '';
+                    }
+                } else {
+                    otActivo.value = '';
+                }
+            })
+            .catch(err => console.error('Error pre-filling dropdowns:', err));
+    }
+
     function renderSearchResults(results) {
         hierarchyTree.innerHTML = '';
         if (results.length === 0) {
@@ -885,6 +1026,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Close asset drawer
         assetDrawer.classList.remove('open');
 
+        // Clear search inputs
+        const otSearchInput = document.getElementById('ot-search-location');
+        const otSearchResults = document.getElementById('ot-search-location-results');
+        if (otSearchInput) otSearchInput.value = '';
+        if (otSearchResults) {
+            otSearchResults.style.display = 'none';
+            otSearchResults.innerHTML = '';
+        }
+
         const otPlanta = document.getElementById('ot-select-planta');
         const otEdificio = document.getElementById('ot-select-edificio');
         const otUbicacion = document.getElementById('ot-select-ubicacion');
@@ -1232,6 +1382,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 9. MANUAL OT CREATION MODAL ---
     btnCreateOt.addEventListener('click', () => {
+        // Clear search inputs
+        const otSearchInput = document.getElementById('ot-search-location');
+        const otSearchResults = document.getElementById('ot-search-location-results');
+        if (otSearchInput) otSearchInput.value = '';
+        if (otSearchResults) {
+            otSearchResults.style.display = 'none';
+            otSearchResults.innerHTML = '';
+        }
+
         // Load Plants in form dropdown
         fetch('/api/plantas')
             .then(res => res.json())

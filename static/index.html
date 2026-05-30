@@ -259,6 +259,14 @@
             </div>
             <div class="modal-body">
                 <form id="ot-form">
+                    <!-- Smart Location Search -->
+                    <div class="form-group" style="position: relative; margin-bottom: 1.25rem;">
+                        <label for="ot-search-location">🔍 Buscador Rápido de Ubicación o Equipo (Opcional)</label>
+                        <input type="text" id="ot-search-location" class="form-control" placeholder="Escribe para buscar (ej: Oficina RRHH, ecp1on, FC-P1A-E6)..." autocomplete="off">
+                        <div id="ot-search-location-results" class="search-results-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; z-index: 1000; box-shadow: var(--shadow-lg); padding: 0.25rem 0;">
+                        </div>
+                    </div>
+                    
                     <div class="form-row">
                         <div class="form-group">
                             <label for="ot-select-planta">Planta *</label>

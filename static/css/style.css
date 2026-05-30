@@ -916,3 +916,34 @@ textarea.form-control {
     gap: 0.75rem;
 }
 
+/* Autocomplete Dropdown in Modals */
+.search-results-dropdown {
+    scrollbar-width: thin;
+}
+.search-results-dropdown::-webkit-scrollbar {
+    width: 4px;
+}
+.search-result-dropdown-item {
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: var(--transition-fast);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+.search-result-dropdown-item:last-child {
+    border-bottom: none;
+}
+.search-result-dropdown-item:hover {
+    background-color: var(--bg-card-hover);
+}
+.search-result-dropdown-item .result-path {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+}
+.search-result-dropdown-item .result-active-badge {
+    font-size: 0.75rem;
+    color: var(--warning);
+    margin-top: 0.15rem;
+}
+
