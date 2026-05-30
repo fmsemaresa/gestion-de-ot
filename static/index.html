@@ -53,7 +53,7 @@
             </div>
             <div class="kpi-card interactive" id="card-kpi-resueltas">
                 <div class="kpi-info">
-                    <h3>Resueltas</h3>
+                    <h3>Realizadas</h3>
                     <div class="kpi-value" id="kpi-resueltas">0</div>
                 </div>
                 <div class="kpi-icon-wrapper green">✓</div>
@@ -113,11 +113,12 @@
                             <button class="btn-secondary" id="btn-export-ots-excel" style="background: #107c41; color: white; border-color: #107c41; display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.85rem;">
                                 <span>📥</span> Exportar Excel
                             </button>
-                            <select id="filter-ot-state" class="form-control" style="width: auto; padding: 0.4rem 1rem;">
+                             <select id="filter-ot-state" class="form-control" style="width: auto; padding: 0.4rem 1rem;">
                                 <option value="">Todos los Estados</option>
-                                <option value="Pendiente">Pendientes</option>
-                                <option value="En Proceso">En Proceso</option>
-                                <option value="Resuelta">Resueltas</option>
+                                <option value="CREADA">Creadas</option>
+                                <option value="ASIGNADA">Asignadas</option>
+                                <option value="PROGRAMADA">Programadas</option>
+                                <option value="REALIZADA">Realizadas</option>
                             </select>
                             <button class="btn-primary" id="btn-create-ot">
                                 <span>+</span> Nueva OT
@@ -318,11 +319,17 @@
                         <textarea id="ot-descripcion" class="form-control" rows="3" required placeholder="Ej: Realizar mantención mensual de filtros de aire, o Compresor en corto circuito."></textarea>
                     </div>
 
-                    <div class="form-group">
-                        <label for="ot-tecnico">Asignar Técnico (Opcional)</label>
-                        <select id="ot-tecnico" class="form-control">
-                            <option value="">No Asignado</option>
-                        </select>
+                     <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label for="ot-tecnico">Asignar Técnico (Opcional)</label>
+                            <select id="ot-tecnico" class="form-control">
+                                <option value="">No Asignado</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label for="ot-fecha-programada">Fecha Programada (Opcional)</label>
+                            <input type="date" id="ot-fecha-programada" class="form-control">
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -441,12 +448,16 @@
             <div class="modal-body">
                 <form id="assign-form">
                     <input type="hidden" id="assign-ot-id">
-                    <div class="form-group">
+                     <div class="form-group">
                         <label for="assign-select-tecnico">Selecciona el Técnico *</label>
                         <select id="assign-select-tecnico" class="form-control" required></select>
                     </div>
+                    <div class="form-group">
+                        <label for="assign-fecha-programada">Fecha Programada de Ejecución (Opcional)</label>
+                        <input type="date" id="assign-fecha-programada" class="form-control">
+                    </div>
                     <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
-                        Asignar y Empezar
+                        Guardar
                     </button>
                 </form>
             </div>

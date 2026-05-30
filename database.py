@@ -22,6 +22,18 @@ engine = create_engine(database_url, connect_args=connect_args)
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
+    try:
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        columns = [col['name'] for col in inspector.get_columns('ordentrabajo')]
+        if 'fecha_programada' not in columns:
+            print("Migrando base de datos: agregando columna 'fecha_programada' a la tabla 'ordentrabajo'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE ordentrabajo ADD COLUMN fecha_programada TIMESTAMP"))
+            print("Columna 'fecha_programada' agregada exitosamente.")
+    except Exception as e:
+        print(f"Error al verificar/migrar la columna 'fecha_programada': {e}")
+
 
 def normalize_code(code):
     if not code:

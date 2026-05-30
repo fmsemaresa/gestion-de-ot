@@ -235,8 +235,6 @@ def get_ordenes(
 ):
     query = select(OrdenTrabajo)
     
-    if estado:
-        query = query.where(OrdenTrabajo.estado == estado)
     if tecnico_id:
         query = query.where(OrdenTrabajo.tecnico_id == tecnico_id)
     if planta_id:
@@ -250,6 +248,30 @@ def get_ordenes(
     # Enriquecer respuesta con nombres legibles
     results = []
     for ot in ots:
+        # Mapeo dinámico del estado
+        mapped_estado = ot.estado
+        if mapped_estado in ("Resuelta", "REALIZADA"):
+            mapped_estado = "REALIZADA"
+        elif mapped_estado != "Cancelada":
+            if ot.tecnico_id:
+                if ot.fecha_programada:
+                    mapped_estado = "PROGRAMADA"
+                else:
+                    mapped_estado = "ASIGNADA"
+            else:
+                mapped_estado = "CREADA"
+        
+        # Filtrar por estado si es requerido
+        if estado:
+            target_states = [estado]
+            if estado == "REALIZADA":
+                target_states.append("Resuelta")
+            elif estado == "Resuelta":
+                target_states.append("REALIZADA")
+            
+            if mapped_estado not in target_states:
+                continue
+                
         planta = db.get(Planta, ot.planta_id)
         edificio = db.get(Edificio, ot.edificio_id)
         ubicacion = db.get(Ubicacion, ot.ubicacion_id) if ot.ubicacion_id else None
@@ -260,10 +282,11 @@ def get_ordenes(
             "id": ot.id,
             "descripcion": ot.descripcion,
             "tipo": ot.tipo,
-            "estado": ot.estado,
+            "estado": mapped_estado,
             "prioridad": ot.prioridad,
             "fecha_creacion": ot.fecha_creacion,
             "fecha_resolucion": ot.fecha_resolucion,
+            "fecha_programada": ot.fecha_programada,
             "reportado_por": ot.reportado_por,
             "comentarios_tecnicos": ot.comentarios_tecnicos,
             "planta_nombre": planta.nombre if planta else None,
@@ -295,6 +318,15 @@ def create_orden(ot: OrdenTrabajo, db: Session = Depends(get_db)):
         if not activo:
             raise HTTPException(status_code=404, detail="Activo no encontrado")
             
+    # Calcular automáticamente el estado
+    if ot.tecnico_id:
+        if ot.fecha_programada:
+            ot.estado = "PROGRAMADA"
+        else:
+            ot.estado = "ASIGNADA"
+    else:
+        ot.estado = "CREADA"
+        
     db.add(ot)
     db.commit()
     db.refresh(ot)
@@ -306,31 +338,66 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
     if not ot:
         raise HTTPException(status_code=404, detail="Orden de Trabajo no encontrada")
         
-    # Campos que el Administrador o Técnico pueden actualizar
-    if "estado" in updated_ot:
-        ot.estado = updated_ot["estado"]
-        if updated_ot["estado"] == "Resuelta":
-            ot.fecha_resolucion = datetime.utcnow()
-            # Si la OT se resolvió y tiene un activo, podemos asegurar que el activo vuelva a estar Operativo
-            if ot.activo_id:
-                activo = db.get(Activo, ot.activo_id)
-                if activo:
-                    activo.estado = "Operativo"
-                    db.add(activo)
-        elif updated_ot["estado"] == "En Proceso":
-            if ot.activo_id:
-                activo = db.get(Activo, ot.activo_id)
-                if activo and ot.tipo == "Correctiva":
-                    activo.estado = "En Reparación"
-                    db.add(activo)
-                    
+    # Process technician assignment
     if "tecnico_id" in updated_ot:
-        ot.tecnico_id = updated_ot["tecnico_id"]
+        val = updated_ot["tecnico_id"]
+        ot.tecnico_id = int(val) if val is not None and str(val).isdigit() else None
+        
+    # Process scheduled date
+    if "fecha_programada" in updated_ot:
+        val = updated_ot["fecha_programada"]
+        if val:
+            if isinstance(val, str):
+                try:
+                    if "T" in val:
+                        ot.fecha_programada = datetime.fromisoformat(val.replace("Z", "+00:00"))
+                    else:
+                        ot.fecha_programada = datetime.strptime(val, "%Y-%m-%d")
+                except Exception:
+                    ot.fecha_programada = datetime.fromisoformat(val)
+            else:
+                ot.fecha_programada = val
+        else:
+            ot.fecha_programada = None
+
     if "prioridad" in updated_ot:
         ot.prioridad = updated_ot["prioridad"]
     if "comentarios_tecnicos" in updated_ot:
         ot.comentarios_tecnicos = updated_ot["comentarios_tecnicos"]
         
+    # Process status transition
+    if "estado" in updated_ot:
+        req_estado = updated_ot["estado"]
+        if req_estado in ("REALIZADA", "Resuelta"):
+            ot.estado = "REALIZADA"
+            ot.fecha_resolucion = datetime.utcnow()
+            if ot.activo_id:
+                activo = db.get(Activo, ot.activo_id)
+                if activo:
+                    activo.estado = "Operativo"
+                    db.add(activo)
+        elif req_estado == "Cancelada":
+            ot.estado = "Cancelada"
+        else:
+            # Re-evaluate non-terminal state
+            if ot.tecnico_id:
+                if ot.fecha_programada:
+                    ot.estado = "PROGRAMADA"
+                else:
+                    ot.estado = "ASIGNADA"
+            else:
+                ot.estado = "CREADA"
+    else:
+        # Re-evaluate state if not terminal
+        if ot.estado not in ("REALIZADA", "Resuelta", "Cancelada"):
+            if ot.tecnico_id:
+                if ot.fecha_programada:
+                    ot.estado = "PROGRAMADA"
+                else:
+                    ot.estado = "ASIGNADA"
+            else:
+                ot.estado = "CREADA"
+                
     if "respuestas" in updated_ot:
         respuestas_data = updated_ot["respuestas"]
         # Limpiar respuestas previas si existen
@@ -364,6 +431,7 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
     db.refresh(ot)
     return ot
 
+
 # --- ENDPOINTS KPI & DASHBOARD ---
 
 @app.get("/api/dashboard/stats")
@@ -371,17 +439,32 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     ots = db.exec(select(OrdenTrabajo)).all()
     
     total = len(ots)
-    pendientes = len([ot for ot in ots if ot.estado == "Pendiente"])
-    en_proceso = len([ot for ot in ots if ot.estado == "En Proceso"])
-    resueltas = len([ot for ot in ots if ot.estado == "Resuelta"])
     
-    # Calcular MTTR promedio en horas
+    # Calcular estados mapeados
+    pendientes = 0
+    resueltas = 0
     tiempos_resolucion = []
+    
     for ot in ots:
-        if ot.estado == "Resuelta" and ot.fecha_resolucion:
-            diff = ot.fecha_resolucion - ot.fecha_creacion
-            # Convertir diferencia a horas
-            tiempos_resolucion.append(diff.total_seconds() / 3600.0)
+        mapped_estado = ot.estado
+        if mapped_estado in ("Resuelta", "REALIZADA"):
+            mapped_estado = "REALIZADA"
+        elif mapped_estado != "Cancelada":
+            if ot.tecnico_id:
+                if ot.fecha_programada:
+                    mapped_estado = "PROGRAMADA"
+                else:
+                    mapped_estado = "ASIGNADA"
+            else:
+                mapped_estado = "CREADA"
+                
+        if mapped_estado == "REALIZADA":
+            resueltas += 1
+            if ot.fecha_resolucion:
+                diff = ot.fecha_resolucion - ot.fecha_creacion
+                tiempos_resolucion.append(diff.total_seconds() / 3600.0)
+        elif mapped_estado != "Cancelada":
+            pendientes += 1
             
     mttr = round(sum(tiempos_resolucion) / len(tiempos_resolucion), 1) if tiempos_resolucion else 0.0
     
@@ -393,13 +476,11 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     
     # Cumplimiento preventivos vs correctivos
     preventivos = len([ot for ot in ots if ot.tipo == "Preventiva"])
-    correctivos = len([ot for ot in ots if ot.tipo == "Correctiva"])
     
     return {
         "kpis": {
             "total_ots": total,
             "pendientes": pendientes,
-            "en_proceso": en_proceso,
             "resueltas": resueltas,
             "mttr_horas": mttr,
             "total_activos": total_activos,
@@ -488,7 +569,7 @@ def exportar_ordenes(db: Session = Depends(get_db)):
     
     headers = [
         "ID OT", "Descripción", "Tipo Mantenimiento", "Estado", "Prioridad",
-        "Fecha Creación", "Fecha Resolución", "Reportado Por", "Comentarios Técnicos",
+        "Fecha Creación", "Fecha Programada", "Fecha Realización", "Reportado Por", "Comentarios Técnicos",
         "Planta", "Edificio", "Ubicación", "Activo Afectado", "Técnico Asignado"
     ]
     ws.append(headers)
@@ -500,13 +581,27 @@ def exportar_ordenes(db: Session = Depends(get_db)):
         activo = db.get(Activo, ot.activo_id) if ot.activo_id else None
         tecnico = db.get(Tecnico, ot.tecnico_id) if ot.tecnico_id else None
         
+        # Mapeo dinámico del estado
+        mapped_estado = ot.estado
+        if mapped_estado in ("Resuelta", "REALIZADA"):
+            mapped_estado = "REALIZADA"
+        elif mapped_estado != "Cancelada":
+            if ot.tecnico_id:
+                if ot.fecha_programada:
+                    mapped_estado = "PROGRAMADA"
+                else:
+                    mapped_estado = "ASIGNADA"
+            else:
+                mapped_estado = "CREADA"
+                
         ws.append([
             f"OT-{ot.id}",
             ot.descripcion,
             ot.tipo,
-            ot.estado,
+            mapped_estado,
             ot.prioridad,
             ot.fecha_creacion.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_creacion else "",
+            ot.fecha_programada.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_programada else "",
             ot.fecha_resolucion.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_resolucion else "",
             ot.reportado_por or "",
             ot.comentarios_tecnicos or "",

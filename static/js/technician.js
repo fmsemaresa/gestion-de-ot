@@ -92,37 +92,52 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 techOtList.innerHTML = '';
                 ots.forEach(ot => {
-                    const isPending = ot.estado === 'Pendiente';
-                    const isInProgress = ot.estado === 'En Proceso';
-                    const isDone = ot.estado === 'Resuelta';
+                    const isDone = ot.estado === 'REALIZADA' || ot.estado === 'Resuelta';
+                    const isScheduled = ot.estado === 'PROGRAMADA';
+                    const isAssigned = ot.estado === 'ASIGNADA';
                     
-                    let statusClass = 'pending';
-                    let statusLabel = 'Pendiente';
+                    let statusClass = 'assigned';
+                    let statusLabel = 'Asignada';
                     let actionBtn = '';
                     
-                    if (isInProgress) {
-                        statusClass = 'in-progress';
-                        statusLabel = 'En Proceso';
-                        actionBtn = `<button class="btn-primary btn-complete-task" data-id="${ot.id}" data-plantilla-id="${ot.plantilla_id || ''}" style="font-size: 0.8rem; background: var(--success);">Finalizar</button>`;
-                    } else if (isPending) {
-                        actionBtn = `<button class="btn-secondary btn-start-task" data-id="${ot.id}" style="font-size: 0.8rem; border-color: var(--accent-color); color: var(--accent-color);">Iniciar</button>`;
-                    } else if (isDone) {
+                    if (isDone) {
                         statusClass = 'status-ok';
-                        statusLabel = 'Resuelta';
-                        actionBtn = '<span style="color: var(--success); font-size: 0.85rem; font-weight: 600;">✓ Resuelta</span>';
+                        statusLabel = 'Realizada';
+                        actionBtn = '<span style="color: var(--success); font-size: 0.85rem; font-weight: 600;">✓ Realizada</span>';
+                    } else {
+                        if (isScheduled) {
+                            statusClass = 'scheduled';
+                            statusLabel = 'Programada';
+                        } else {
+                            statusClass = 'assigned';
+                            statusLabel = 'Asignada';
+                        }
+                        actionBtn = `<button class="btn-primary btn-complete-task" data-id="${ot.id}" data-plantilla-id="${ot.plantilla_id || ''}" style="font-size: 0.8rem; background: var(--success);">Finalizar</button>`;
                     }
 
                     const activeName = ot.activo_nombre ? `<strong>Activo:</strong> ${ot.activo_nombre}` : '<span style="color: var(--warning);">Reporte general de área</span>';
                     
+                    let dateHtml = '';
+                    if (ot.fecha_programada) {
+                        const dateObj = new Date(ot.fecha_programada);
+                        const formattedDate = dateObj.toLocaleDateString('es-CL', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                        });
+                        dateHtml = `<p style="margin-bottom: 0.4rem; color: var(--warning);"><span style="font-size: 1.1rem; vertical-align: middle; margin-right: 0.2rem;">📅</span><strong>Prog:</strong> ${formattedDate}</p>`;
+                    }
+
                     techOtList.innerHTML += `
                         <div class="tech-ot-card ${statusClass}">
                             <div class="tech-ot-header">
                                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--accent-color);">#OT-${ot.id}</span>
-                                <span class="card-tag status-${isPending ? 'open' : isInProgress ? 'progress' : 'done'}">${statusLabel}</span>
+                                <span class="card-tag status-${isDone ? 'done' : isScheduled ? 'scheduled' : 'assigned'}">${statusLabel}</span>
                             </div>
                             <div class="tech-ot-body">
                                 <p style="margin-bottom: 0.4rem;"><strong>Ubicación:</strong> ${ot.planta_nombre} / ${ot.edificio_nombre} ${ot.ubicacion_nombre ? '/ ' + ot.ubicacion_nombre : ''}</p>
                                 <p style="margin-bottom: 0.4rem;">${activeName}</p>
+                                ${dateHtml}
                                 <p style="margin-top: 0.5rem; background: rgba(0,0,0,0.15); padding: 0.6rem; border-radius: 6px; font-size: 0.85rem; color: #cbd5e1; border-left: 2px solid var(--border-focus);">${ot.descripcion}</p>
                                 ${ot.comentarios_tecnicos ? `<p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--success);"><strong>Resolución:</strong> ${ot.comentarios_tecnicos}</p>` : ''}
                             </div>
@@ -135,9 +150,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 
                 // Add event listeners to action buttons
-                document.querySelectorAll('.btn-start-task').forEach(btn => {
-                    btn.addEventListener('click', () => startTask(btn.getAttribute('data-id')));
-                });
                 document.querySelectorAll('.btn-complete-task').forEach(btn => {
                     btn.addEventListener('click', () => {
                         const otId = btn.getAttribute('data-id');
@@ -267,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                estado: 'Resuelta',
+                estado: 'REALIZADA',
                 comentarios_tecnicos: comment,
                 respuestas: respuestas
             })

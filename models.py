@@ -87,9 +87,10 @@ class OrdenTrabajo(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     descripcion: str
     tipo: str = Field(default="Correctiva")  # Correctiva, Preventiva
-    estado: str = Field(default="Pendiente")  # Pendiente, En Proceso, Resuelta, Cancelada
+    estado: str = Field(default="CREADA")  # CREADA, ASIGNADA, PROGRAMADA, REALIZADA, Cancelada
     prioridad: str = Field(default="Media")  # Alta, Media, Baja
     fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
+    fecha_programada: Optional[datetime] = None
     fecha_resolucion: Optional[datetime] = None
     reportado_por: Optional[str] = None  # Nombre o email de quien reporta
     comentarios_tecnicos: Optional[str] = None

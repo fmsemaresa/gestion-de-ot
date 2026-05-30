@@ -512,7 +512,11 @@ body {
 
 .card-tag.status-open { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
 .card-tag.status-progress { background: rgba(59, 130, 246, 0.15); color: var(--accent-color); }
+.card-tag.status-created { background: rgba(156, 163, 175, 0.15); color: #9ca3af; }
+.card-tag.status-assigned { background: rgba(59, 130, 246, 0.15); color: var(--accent-color); }
+.card-tag.status-scheduled { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
 .card-tag.status-done { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+
 
 .entity-title {
     font-size: 1rem;

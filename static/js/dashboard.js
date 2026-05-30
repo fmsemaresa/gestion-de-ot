@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedActivoId = null;
     let activeTab = 'ots'; // 'ots' or 'activos'
     let techniciansList = [];
+    let loadedWorkOrdersList = [];
 
     // DOM Elements
     const kpiTotalOts = document.getElementById('kpi-total-ots');
@@ -119,14 +120,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (cardKpiPendientes) {
         cardKpiPendientes.addEventListener('click', () => {
-            filterOtState.value = 'Pendiente';
+            filterOtState.value = 'CREADA'; // Filter by the first active state
             tabBtnOts.click();
         });
     }
 
     if (cardKpiResueltas) {
         cardKpiResueltas.addEventListener('click', () => {
-            filterOtState.value = 'Resuelta';
+            filterOtState.value = 'REALIZADA';
             tabBtnOts.click();
         });
     }
@@ -655,25 +656,60 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 otGrid.innerHTML = '';
+                loadedWorkOrdersList = filteredOts;
                 filteredOts.forEach(ot => {
-                    const isPending = ot.estado === 'Pendiente';
-                    const isInProgress = ot.estado === 'En Proceso';
-                    const isDone = ot.estado === 'Resuelta';
+                    const isCreated = ot.estado === 'CREADA';
+                    const isAssigned = ot.estado === 'ASIGNADA';
+                    const isScheduled = ot.estado === 'PROGRAMADA';
+                    const isDone = ot.estado === 'REALIZADA' || ot.estado === 'Resuelta';
 
-                    let statusLabel = 'Pendiente';
-                    let statusClass = 'status-open';
+                    let statusLabel = 'Creada';
+                    let statusClass = 'status-created';
                     let assignBtn = '';
 
-                    if (isInProgress) {
-                        statusLabel = 'En Proceso';
-                        statusClass = 'status-progress';
-                        assignBtn = `<span style="font-size:0.8rem; color: var(--text-muted);">Asignado a: <strong>${ot.tecnico_nombre}</strong></span>`;
-                    } else if (isPending) {
+                    if (isCreated) {
+                        statusLabel = 'Creada';
+                        statusClass = 'status-created';
                         assignBtn = `<button class="btn-primary btn-assign" data-ot-id="${ot.id}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Asignar Técnico</button>`;
+                    } else if (isAssigned) {
+                        statusLabel = 'Asignada';
+                        statusClass = 'status-assigned';
+                        assignBtn = `<div style="display:flex; flex-direction:column; gap:0.25rem;">
+                            <span style="font-size:0.8rem; color: var(--text-muted);">Asignado a: <strong>${ot.tecnico_nombre}</strong></span>
+                            <button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-top: 0.15rem; width: fit-content;">Programar / Reasignar</button>
+                        </div>`;
+                    } else if (isScheduled) {
+                        statusLabel = 'Programada';
+                        statusClass = 'status-scheduled';
+                        assignBtn = `<div style="display:flex; flex-direction:column; gap:0.25rem;">
+                            <span style="font-size:0.8rem; color: var(--text-muted);">Asignado a: <strong>${ot.tecnico_nombre}</strong></span>
+                            <button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-top: 0.15rem; width: fit-content;">Reprogramar / Reasignar</button>
+                        </div>`;
                     } else if (isDone) {
-                        statusLabel = 'Resuelta';
+                        statusLabel = 'Realizada';
                         statusClass = 'status-done';
-                        assignBtn = `<span style="font-size:0.8rem; color: var(--success);">✓ Resuelta por ${ot.tecnico_nombre}</span>`;
+                        let completionDateStr = '';
+                        if (ot.fecha_resolucion) {
+                            const dateObj = new Date(ot.fecha_resolucion);
+                            completionDateStr = ` el ${dateObj.toLocaleDateString()}`;
+                        }
+                        assignBtn = `<span style="font-size:0.8rem; color: var(--success); font-weight: 500;">✓ Realizada por ${ot.tecnico_nombre}${completionDateStr}</span>`;
+                    } else {
+                        statusLabel = ot.estado;
+                        statusClass = 'status-created';
+                    }
+
+                    let progDateHtml = '';
+                    if (ot.fecha_programada) {
+                        const pDate = new Date(ot.fecha_programada);
+                        const formatted = pDate.toLocaleDateString('es-CL', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                        });
+                        progDateHtml = `<div style="margin-top: 0.4rem; font-size: 0.8rem; color: var(--warning); display: flex; align-items: center; gap: 0.25rem;">
+                            <span>📅</span> <strong>Prog:</strong> ${formatted}
+                        </div>`;
                     }
 
                     let checklistBtn = '';
@@ -696,9 +732,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="card-tag ${statusClass}">${statusLabel}</div>
                         <h4 class="entity-title">#OT-${ot.id} - ${ot.tipo}</h4>
                         <div class="entity-subtitle">${ot.planta_nombre} / ${ot.edificio_nombre} ${ot.ubicacion_nombre ? '/ ' + ot.ubicacion_nombre : ''}</div>
-                        <p style="font-size:0.85rem; background:rgba(0,0,0,0.1); padding:0.5rem; border-radius:6px; margin-bottom:0.75rem; color:#cbd5e1;">${ot.descripcion}</p>
+                        <p style="font-size:0.85rem; background:rgba(0,0,0,0.1); padding:0.5rem; border-radius:6px; margin-bottom:0.25rem; color:#cbd5e1;">${ot.descripcion}</p>
+                        ${progDateHtml}
                         ${checklistBtn}
-                        <div class="entity-meta">
+                        <div class="entity-meta" style="margin-top: 0.75rem;">
                             <div class="meta-row">
                                 <span class="meta-icon">👤</span>
                                 <span>Reportado por: ${ot.reportado_por || 'Sistema'}</span>
@@ -711,14 +748,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     `;
                     otGrid.appendChild(card);
 
-                    // Add Assign Technician Button Handler
-                    const btn = card.querySelector('.btn-assign');
-                    if (btn) {
+                    card.querySelectorAll('.btn-assign').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
                             openAssignModalDialog(ot.id);
                         });
-                    }
+                    });
                 });
 
                 // Attach event listeners for checklist toggles
@@ -1351,6 +1386,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 8. ASSIGN TECHNICIAN MODAL ACTIONS ---
     function openAssignModalDialog(otId) {
         assignOtId.value = otId;
+        const ot = loadedWorkOrdersList.find(o => o.id === parseInt(otId));
+        
+        const dateInput = document.getElementById('assign-fecha-programada');
+        if (ot) {
+            assignSelectTecnico.value = ot.tecnico_id || '';
+            if (ot.fecha_programada) {
+                dateInput.value = ot.fecha_programada.substring(0, 10);
+            } else {
+                dateInput.value = '';
+            }
+        } else {
+            assignSelectTecnico.value = '';
+            dateInput.value = '';
+        }
         assignModal.style.display = 'flex';
     }
 
@@ -1361,14 +1410,22 @@ document.addEventListener('DOMContentLoaded', () => {
     assignForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const otId = assignOtId.value;
-        const techId = parseInt(assignSelectTecnico.value);
+        const techId = parseInt(assignSelectTecnico.value) || null;
+        const fechaProgramadaVal = document.getElementById('assign-fecha-programada').value || null;
+
+        // Calcular estado mapeado
+        let targetState = 'CREADA';
+        if (techId) {
+            targetState = fechaProgramadaVal ? 'PROGRAMADA' : 'ASIGNADA';
+        }
 
         fetch(`/api/ordenes/${otId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 tecnico_id: techId,
-                estado: 'En Proceso' // Al asignar, pasa a En Proceso
+                fecha_programada: fechaProgramadaVal,
+                estado: targetState
             })
         })
         .then(res => {
@@ -1522,10 +1579,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const plantillaIdVal = document.getElementById('ot-select-plantilla').value;
         const plantillaId = plantillaIdVal ? parseInt(plantillaIdVal) : null;
 
+        const fechaProgramadaVal = document.getElementById('ot-fecha-programada').value || null;
         const payload = {
             descripcion,
             tipo,
-            estado: tecnicoId ? 'En Proceso' : 'Pendiente',
+            estado: tecnicoId ? (fechaProgramadaVal ? 'PROGRAMADA' : 'ASIGNADA') : 'CREADA',
             prioridad,
             reportado_por: 'Administración',
             planta_id: plantaId,
@@ -1533,7 +1591,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ubicacion_id: ubicacionId,
             activo_id: activoId,
             tecnico_id: tecnicoId,
-            plantilla_id: plantillaId
+            plantilla_id: plantillaId,
+            fecha_programada: fechaProgramadaVal
         };
 
         fetch('/api/ordenes', {
