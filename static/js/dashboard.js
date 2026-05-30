@@ -1091,7 +1091,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const otTecnico = document.getElementById('ot-tecnico');
                 otTecnico.innerHTML = '<option value="">No Asignado</option>';
                 techniciansList.forEach(t => {
-                    otTecnico.innerHTML += `<option value="${t.id}">${t.nombre} (${t.especialidad})</option>`;
+                    otTecnico.innerHTML += `<option value="${t.id}">${t.nombre}</option>`;
                 });
 
                 // Load checklists in template selector dropdown
@@ -1342,7 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 techniciansList = tecnicos;
                 assignSelectTecnico.innerHTML = '<option value="">-- Selecciona Técnico --</option>';
                 tecnicos.forEach(t => {
-                    assignSelectTecnico.innerHTML += `<option value="${t.id}">${t.nombre} (${t.especialidad})</option>`;
+                    assignSelectTecnico.innerHTML += `<option value="${t.id}">${t.nombre}</option>`;
                 });
             })
             .catch(err => console.error(err));
@@ -1413,7 +1413,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const otTecnico = document.getElementById('ot-tecnico');
                 otTecnico.innerHTML = '<option value="">No Asignado</option>';
                 techniciansList.forEach(t => {
-                    otTecnico.innerHTML += `<option value="${t.id}">${t.nombre} (${t.especialidad})</option>`;
+                    otTecnico.innerHTML += `<option value="${t.id}">${t.nombre}</option>`;
                 });
 
                 // Load checklists in template selector dropdown
