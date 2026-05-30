@@ -36,6 +36,50 @@ def normalize_code(code):
 
 def seed_database():
     with Session(engine) as session:
+        # Check and update technicians if they do not match the new requested list
+        new_tech_names = [
+            "Javier Pinochet",
+            "Alex Valenzuela",
+            "Simón Monardes",
+            "Víctor Hugo Hurtado",
+            "Víctor Parra"
+        ]
+        try:
+            techs_in_db = session.exec(select(Tecnico).order_by(Tecnico.id)).all()
+            tech_names_in_db = [t.nombre for t in techs_in_db]
+            
+            if tech_names_in_db != new_tech_names:
+                print("Actualizando lista de técnicos en la base de datos...")
+                # Clear references to avoid dangling foreign keys
+                ots = session.exec(select(OrdenTrabajo)).all()
+                for ot in ots:
+                    if ot.tecnico_id:
+                        t = session.get(Tecnico, ot.tecnico_id)
+                        if not t or t.nombre not in new_tech_names:
+                            ot.tecnico_id = None
+                            if ot.estado == "En Proceso":
+                                ot.estado = "Pendiente"
+                            session.add(ot)
+                session.commit()
+
+                # Delete old techs
+                for t in techs_in_db:
+                    session.delete(t)
+                session.commit()
+
+                # Insert new techs
+                t1 = Tecnico(nombre="Javier Pinochet", email="javier.pinochet@emaresa.cl", especialidad="Climatización")
+                t2 = Tecnico(nombre="Alex Valenzuela", email="alex.valenzuela@emaresa.cl", especialidad="Climatización")
+                t3 = Tecnico(nombre="Simón Monardes", email="simon.monardes@emaresa.cl", especialidad="Climatización")
+                t4 = Tecnico(nombre="Víctor Hugo Hurtado", email="victor.hurtado@emaresa.cl", especialidad="Climatización")
+                t5 = Tecnico(nombre="Víctor Parra", email="victor.parra@emaresa.cl", especialidad="Climatización")
+                session.add_all([t1, t2, t3, t4, t5])
+                session.commit()
+                print("Lista de técnicos actualizada exitosamente.")
+        except Exception as e:
+            print(f"Error al verificar/actualizar técnicos: {e}")
+            session.rollback()
+
         # Check if database is already seeded
         statement = select(Planta)
         existing_plants = session.exec(statement).all()
