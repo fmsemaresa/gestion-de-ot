@@ -605,17 +605,56 @@ def descargar_plantilla_importacion(db: Session = Depends(get_db)):
     ]
     ws_plantilla.append(headers_plantilla)
     
-    # Agregar fila de ejemplo
-    ws_plantilla.append([
-        "Santa Adela",
-        "Edificio Corporativo",
-        "Oficina Gerencia [EC-P2-ON-OF1]",
-        "Fancoil Muro Oficina 1",
-        "Climatizacion",
-        "Carrier",
-        "42GW",
-        "FC-SAMPLE-001"
-    ])
+    # Consultar activos existentes en la base de datos (excluyendo inactivos)
+    activos = db.exec(
+        select(Activo)
+        .where(Activo.estado != "Reemplazado")
+        .where(Activo.estado != "Eliminado sin Reemplazo")
+    ).all()
+    
+    activos_data = []
+    for a in activos:
+        ubicacion = db.get(Ubicacion, a.ubicacion_id) if a.ubicacion_id else None
+        edificio = db.get(Edificio, ubicacion.edificio_id) if ubicacion else None
+        planta = db.get(Planta, edificio.planta_id) if edificio else None
+        activos_data.append({
+            "planta": planta.nombre if planta else "",
+            "edificio": edificio.nombre if edificio else "",
+            "ubicacion": ubicacion.nombre if ubicacion else "",
+            "nombre": a.nombre,
+            "tipo": a.tipo,
+            "marca": a.marca or "",
+            "modelo": a.modelo or "",
+            "serie": a.numero_serie or ""
+        })
+        
+    # Ordenar los activos por planta, edificio, ubicacion y nombre
+    activos_data.sort(key=lambda x: (x["planta"], x["edificio"], x["ubicacion"], x["nombre"]))
+    
+    if len(activos_data) > 0:
+        for item in activos_data:
+            ws_plantilla.append([
+                item["planta"],
+                item["edificio"],
+                item["ubicacion"],
+                item["nombre"],
+                item["tipo"],
+                item["marca"],
+                item["modelo"],
+                item["serie"]
+            ])
+    else:
+        # Fila de ejemplo si la base de datos está vacía
+        ws_plantilla.append([
+            "Santa Adela",
+            "Edificio Corporativo",
+            "Oficina Gerencia [EC-P2-ON-OF1]",
+            "Fancoil Muro Oficina 1",
+            "Climatizacion",
+            "Carrier",
+            "42GW",
+            "FC-SAMPLE-001"
+        ])
     
     # Estilo de cabeceras de la Plantilla
     from openpyxl.styles import Font, PatternFill
@@ -743,7 +782,22 @@ async def importar_activos(file: UploadFile = File(...), db: Session = Depends(g
                     
             existing_activo = None
             if serie_val:
-                existing_activo = db.exec(select(Activo).where(Activo.numero_serie == serie_val, Activo.ubicacion_id == ubicacion.id)).first()
+                existing_activo = db.exec(
+                    select(Activo)
+                    .where(Activo.numero_serie == serie_val)
+                    .where(Activo.ubicacion_id == ubicacion.id)
+                    .where(Activo.estado != "Reemplazado")
+                    .where(Activo.estado != "Eliminado sin Reemplazo")
+                ).first()
+            else:
+                # Si no tiene número de serie, validar duplicado usando Nombre y Ubicación (excluyendo retirados)
+                existing_activo = db.exec(
+                    select(Activo)
+                    .where(Activo.nombre == activo_name)
+                    .where(Activo.ubicacion_id == ubicacion.id)
+                    .where(Activo.estado != "Reemplazado")
+                    .where(Activo.estado != "Eliminado sin Reemplazo")
+                ).first()
                 
             if not existing_activo:
                 activo = Activo(
