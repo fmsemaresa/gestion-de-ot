@@ -733,6 +733,7 @@ async def importar_activos(file: UploadFile = File(...), db: Session = Depends(g
         if len(rows) < 2:
             return {"status": "success", "imported": 0, "message": "El archivo está vacío o no contiene filas de datos"}
             
+        seen_in_excel = {}
         for row in rows[1:]:
             if not row or not any(row):
                 continue
@@ -780,26 +781,28 @@ async def importar_activos(file: UploadFile = File(...), db: Session = Depends(g
                     db.commit()
                     db.refresh(ubicacion)
                     
-            existing_activo = None
+            key = (activo_name, serie_val, ubicacion.id)
+            seen_in_excel[key] = seen_in_excel.get(key, 0) + 1
+            
+            db_count = 0
             if serie_val:
-                existing_activo = db.exec(
+                db_count = len(db.exec(
                     select(Activo)
                     .where(Activo.numero_serie == serie_val)
                     .where(Activo.ubicacion_id == ubicacion.id)
                     .where(Activo.estado != "Reemplazado")
                     .where(Activo.estado != "Eliminado sin Reemplazo")
-                ).first()
+                ).all())
             else:
-                # Si no tiene número de serie, validar duplicado usando Nombre y Ubicación (excluyendo retirados)
-                existing_activo = db.exec(
+                db_count = len(db.exec(
                     select(Activo)
                     .where(Activo.nombre == activo_name)
                     .where(Activo.ubicacion_id == ubicacion.id)
                     .where(Activo.estado != "Reemplazado")
                     .where(Activo.estado != "Eliminado sin Reemplazo")
-                ).first()
+                ).all())
                 
-            if not existing_activo:
+            if seen_in_excel[key] > db_count:
                 activo = Activo(
                     nombre=activo_name,
                     tipo=tipo_val,
