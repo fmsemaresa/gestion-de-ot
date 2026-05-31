@@ -919,6 +919,229 @@ async def importar_activos(file: UploadFile = File(...), db: Session = Depends(g
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo Excel: {str(e)}")
 
+@app.get("/api/excel/plantilla-despiece")
+def descargar_plantilla_despiece(db: Session = Depends(get_db)):
+    wb = openpyxl.Workbook()
+    
+    # Hoja 1: Plantilla de importación
+    ws_import = wb.active
+    ws_import.title = "Importar Despieces"
+    
+    headers_import = [
+        "N° Serie Activo * (Recomendado)", 
+        "Planta (Opcional)", 
+        "Edificio (Opcional)", 
+        "Ubicación (Opcional)", 
+        "Nombre Activo (Opcional)", 
+        "Nombre Componente * (Obligatorio)", 
+        "Marca", 
+        "Modelo", 
+        "N° Serie Componente / Obs", 
+        "Estado"
+    ]
+    ws_import.append(headers_import)
+    
+    # Fila de ejemplo
+    ws_import.append([
+        "FC-P1A-E1",
+        "Santa Adela",
+        "Edificio Corporativo",
+        "Oficina RRHH [EC-P1-RecN-#1]",
+        "Fancoil FC-P1A-E1",
+        "Compresor",
+        "Carrier",
+        "42GW",
+        "Obs: Buen estado",
+        "Operativo"
+    ])
+    
+    # Estilos cabecera Hoja 1
+    from openpyxl.styles import Font, PatternFill
+    header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    for col in range(1, len(headers_import) + 1):
+        cell = ws_import.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = header_fill
+        
+    # Hoja 2: Activos de Referencia
+    ws_ref = wb.create_sheet(title="Activos de Referencia")
+    headers_ref = [
+        "ID Activo", "Nombre Activo", "N° Serie Activo", "Planta", "Edificio", "Ubicación"
+    ]
+    ws_ref.append(headers_ref)
+    
+    activos = db.exec(
+        select(Activo)
+        .where(Activo.estado != "Reemplazado")
+        .where(Activo.estado != "Eliminado sin Reemplazo")
+    ).all()
+    
+    # Resolver ubicaciones de referencia
+    activos_ref_data = []
+    for a in activos:
+        ubicacion = db.get(Ubicacion, a.ubicacion_id) if a.ubicacion_id else None
+        edificio = db.get(Edificio, ubicacion.edificio_id) if ubicacion else None
+        planta = db.get(Planta, edificio.planta_id) if edificio else None
+        
+        activos_ref_data.append([
+            f"ACT-{a.id}",
+            a.nombre,
+            a.numero_serie or "",
+            planta.nombre if planta else "",
+            edificio.nombre if edificio else "",
+            ubicacion.nombre if ubicacion else ""
+        ])
+        
+    activos_ref_data.sort(key=lambda x: (x[3], x[4], x[5], x[1]))
+    for row in activos_ref_data:
+        ws_ref.append(row)
+        
+    # Estilos cabecera Hoja 2
+    for col in range(1, len(headers_ref) + 1):
+        cell = ws_ref.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
+        
+    # Autoajuste de columnas
+    for ws in [ws_import, ws_ref]:
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = openpyxl.utils.get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+            
+    file_stream = io.BytesIO()
+    wb.save(file_stream)
+    file_stream.seek(0)
+    
+    return StreamingResponse(
+        file_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=plantilla_importar_despiece.xlsx"}
+    )
+
+@app.post("/api/excel/importar/despiece")
+async def importar_despiece(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Por favor sube un archivo Excel válido (.xlsx)")
+        
+    try:
+        contents = await file.read()
+        file_stream = io.BytesIO(contents)
+        wb = openpyxl.load_workbook(file_stream, read_only=True)
+        
+        # Seleccionar hoja
+        if "Importar Despieces" in wb.sheetnames:
+            sheet = wb["Importar Despieces"]
+        else:
+            sheet = wb.active
+            
+        rows = list(sheet.iter_rows(values_only=True))
+        if len(rows) < 2:
+            return {"status": "success", "imported": 0, "message": "El archivo está vacío o no contiene filas de datos"}
+            
+        imported_count = 0
+        omitted_count = 0
+        unmatched_rows = []
+        
+        for idx, row in enumerate(rows[1:], start=2):
+            if not row or not any(row):
+                continue
+                
+            # Leer columnas
+            serie_activo = str(row[0]).strip() if row[0] is not None else ""
+            planta_name = str(row[1]).strip() if row[1] is not None else ""
+            edificio_name = str(row[2]).strip() if row[2] is not None else ""
+            ubicacion_name = str(row[3]).strip() if row[3] is not None else ""
+            activo_name = str(row[4]).strip() if row[4] is not None else ""
+            comp_name = str(row[5]).strip() if row[5] is not None else ""
+            marca_val = str(row[6]).strip() if row[6] is not None else None
+            modelo_val = str(row[7]).strip() if row[7] is not None else None
+            comp_serie = str(row[8]).strip() if row[8] is not None else None
+            estado_val = str(row[9]).strip() if row[9] is not None else "Operativo"
+            
+            # Fila de ejemplo (ejemplo Compresor Carrier 42GW) se omite
+            if comp_name == "Compresor" and serie_activo == "FC-P1A-E1":
+                continue
+                
+            if not comp_name:
+                continue
+                
+            # Buscar activo
+            activo = None
+            if serie_activo:
+                activo = db.exec(
+                    select(Activo)
+                    .where(Activo.numero_serie == serie_activo)
+                    .where(Activo.estado != "Reemplazado")
+                    .where(Activo.estado != "Eliminado sin Reemplazo")
+                ).first()
+                
+            if not activo and activo_name and planta_name and edificio_name and ubicacion_name:
+                # Buscar por ubicación y nombre
+                planta = db.exec(select(Planta).where(Planta.nombre == planta_name)).first()
+                if planta:
+                    edificio = db.exec(select(Edificio).where(Edificio.nombre == edificio_name, Edificio.planta_id == planta.id)).first()
+                    if edificio:
+                        ubicacion = db.exec(select(Ubicacion).where(Ubicacion.nombre == ubicacion_name, Ubicacion.edificio_id == edificio.id)).first()
+                        if ubicacion:
+                            activo = db.exec(
+                                select(Activo)
+                                .where(Activo.nombre == activo_name)
+                                .where(Activo.ubicacion_id == ubicacion.id)
+                                .where(Activo.estado != "Reemplazado")
+                                .where(Activo.estado != "Eliminado sin Reemplazo")
+                            ).first()
+                            
+            if not activo:
+                unmatched_rows.append(f"Fila {idx}: no se encontró activo para Serie '{serie_activo}' o Nombre '{activo_name}'")
+                continue
+                
+            # Verificar duplicado de componente en el mismo activo
+            existing_comps = db.exec(
+                select(ComponenteActivo)
+                .where(ComponenteActivo.activo_id == activo.id)
+                .where(ComponenteActivo.nombre == comp_name)
+            ).all()
+            
+            is_duplicate = False
+            for ec in existing_comps:
+                if ec.modelo == modelo_val and ec.numero_serie == comp_serie:
+                    is_duplicate = True
+                    break
+                    
+            if is_duplicate:
+                omitted_count += 1
+                continue
+                
+            # Insertar componente
+            new_comp = ComponenteActivo(
+                nombre=comp_name,
+                marca=marca_val,
+                modelo=modelo_val,
+                numero_serie=comp_serie,
+                estado=estado_val,
+                activo_id=activo.id
+            )
+            db.add(new_comp)
+            imported_count += 1
+            
+        db.commit()
+        
+        msg = f"Se importaron {imported_count} componentes de despiece correctamente. Se omitieron {omitted_count} duplicados."
+        if unmatched_rows:
+            msg += f" Omitidos {len(unmatched_rows)} por activos no encontrados: {', '.join(unmatched_rows[:3])}..."
+            
+        return {
+            "status": "success",
+            "imported": imported_count,
+            "omitted": omitted_count,
+            "message": msg
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al procesar archivo Excel: {str(e)}")
+
 # Montar los archivos estáticos para la interfaz de usuario
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

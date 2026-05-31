@@ -1768,6 +1768,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnExportOtsExcel = document.getElementById('btn-export-ots-excel');
     const btnExportActivosExcel = document.getElementById('btn-export-activos-excel');
     const excelImportFile = document.getElementById('excel-import-file');
+    const excelImportDespieceFile = document.getElementById('excel-import-despiece-file');
 
     if (btnExportOtsExcel) {
         btnExportOtsExcel.addEventListener('click', () => {
@@ -1815,6 +1816,43 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .finally(() => {
                 document.querySelector('label[for="excel-import-file"]').innerHTML = originalLabel;
+            });
+        });
+    }
+
+    if (excelImportDespieceFile) {
+        excelImportDespieceFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const originalLabel = document.querySelector('label[for="excel-import-despiece-file"]').innerHTML;
+            document.querySelector('label[for="excel-import-despiece-file"]').innerHTML = '<span>⏳</span> Subiendo...';
+            
+            fetch('/api/excel/importar/despiece', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => {
+                if (!res.ok) return res.json().then(data => { throw new Error(data.detail || 'Error al importar despiece') });
+                return res.json();
+            })
+            .then(data => {
+                alert(`¡Éxito! ${data.message}`);
+                excelImportDespieceFile.value = '';
+                loadAssets();
+                if (assetDrawer && assetDrawer.classList.contains('open') && selectedActivoId) {
+                    openAssetDrawer(selectedActivoId);
+                }
+            })
+            .catch(err => {
+                alert(`Error de Importación: ${err.message}`);
+                excelImportDespieceFile.value = '';
+            })
+            .finally(() => {
+                document.querySelector('label[for="excel-import-despiece-file"]').innerHTML = originalLabel;
             });
         });
     }
