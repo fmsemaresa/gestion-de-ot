@@ -224,11 +224,19 @@ body {
     background: var(--accent-color);
 }
 
-#card-kpi-pendientes.interactive:hover::after {
+#card-kpi-creadas.interactive:hover::after {
+    background: #9ca3af;
+}
+
+#card-kpi-asignadas.interactive:hover::after {
+    background: var(--accent-color);
+}
+
+#card-kpi-programadas.interactive:hover::after {
     background: var(--warning);
 }
 
-#card-kpi-resueltas.interactive:hover::after {
+#card-kpi-realizadas.interactive:hover::after {
     background: var(--success);
 }
 

@@ -441,9 +441,10 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     total = len(ots)
     
     # Calcular estados mapeados
-    pendientes = 0
-    resueltas = 0
-    tiempos_resolucion = []
+    creadas = 0
+    asignadas = 0
+    programadas = 0
+    realizadas = 0
     
     for ot in ots:
         mapped_estado = ot.estado
@@ -458,16 +459,15 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
             else:
                 mapped_estado = "CREADA"
                 
-        if mapped_estado == "REALIZADA":
-            resueltas += 1
-            if ot.fecha_resolucion:
-                diff = ot.fecha_resolucion - ot.fecha_creacion
-                tiempos_resolucion.append(diff.total_seconds() / 3600.0)
-        elif mapped_estado != "Cancelada":
-            pendientes += 1
+        if mapped_estado == "CREADA":
+            creadas += 1
+        elif mapped_estado == "ASIGNADA":
+            asignadas += 1
+        elif mapped_estado == "PROGRAMADA":
+            programadas += 1
+        elif mapped_estado == "REALIZADA":
+            realizadas += 1
             
-    mttr = round(sum(tiempos_resolucion) / len(tiempos_resolucion), 1) if tiempos_resolucion else 0.0
-    
     # Total activos y su estado
     activos = db.exec(select(Activo)).all()
     total_activos = len(activos)
@@ -480,9 +480,10 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     return {
         "kpis": {
             "total_ots": total,
-            "pendientes": pendientes,
-            "resueltas": resueltas,
-            "mttr_horas": mttr,
+            "creadas": creadas,
+            "asignadas": asignadas,
+            "programadas": programadas,
+            "realizadas": realizadas,
             "total_activos": total_activos,
             "activos_operativos": activos_operativos,
             "activos_falla": activos_falla,

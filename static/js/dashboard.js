@@ -10,13 +10,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // DOM Elements
     const kpiTotalOts = document.getElementById('kpi-total-ots');
-    const kpiPendientes = document.getElementById('kpi-pendientes');
-    const kpiResueltas = document.getElementById('kpi-resueltas');
-    const kpiMttr = document.getElementById('kpi-mttr');
+    const kpiCreadas = document.getElementById('kpi-creadas');
+    const kpiAsignadas = document.getElementById('kpi-asignadas');
+    const kpiProgramadas = document.getElementById('kpi-programadas');
+    const kpiRealizadas = document.getElementById('kpi-realizadas');
     const kpiActivos = document.getElementById('kpi-activos');
+    
     const cardKpiTotalOts = document.getElementById('card-kpi-total-ots');
-    const cardKpiPendientes = document.getElementById('card-kpi-pendientes');
-    const cardKpiResueltas = document.getElementById('card-kpi-resueltas');
+    const cardKpiCreadas = document.getElementById('card-kpi-creadas');
+    const cardKpiAsignadas = document.getElementById('card-kpi-asignadas');
+    const cardKpiProgramadas = document.getElementById('card-kpi-programadas');
+    const cardKpiRealizadas = document.getElementById('card-kpi-realizadas');
     const cardKpiActivos = document.getElementById('card-kpi-activos');
     
     const hierarchyTree = document.getElementById('hierarchy-tree');
@@ -114,20 +118,39 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cardKpiTotalOts) {
         cardKpiTotalOts.addEventListener('click', () => {
             filterOtState.value = '';
+            filterOtState.dispatchEvent(new Event('change'));
             tabBtnOts.click();
         });
     }
 
-    if (cardKpiPendientes) {
-        cardKpiPendientes.addEventListener('click', () => {
-            filterOtState.value = 'CREADA'; // Filter by the first active state
+    if (cardKpiCreadas) {
+        cardKpiCreadas.addEventListener('click', () => {
+            filterOtState.value = 'CREADA';
+            filterOtState.dispatchEvent(new Event('change'));
             tabBtnOts.click();
         });
     }
 
-    if (cardKpiResueltas) {
-        cardKpiResueltas.addEventListener('click', () => {
+    if (cardKpiAsignadas) {
+        cardKpiAsignadas.addEventListener('click', () => {
+            filterOtState.value = 'ASIGNADA';
+            filterOtState.dispatchEvent(new Event('change'));
+            tabBtnOts.click();
+        });
+    }
+
+    if (cardKpiProgramadas) {
+        cardKpiProgramadas.addEventListener('click', () => {
+            filterOtState.value = 'PROGRAMADA';
+            filterOtState.dispatchEvent(new Event('change'));
+            tabBtnOts.click();
+        });
+    }
+
+    if (cardKpiRealizadas) {
+        cardKpiRealizadas.addEventListener('click', () => {
             filterOtState.value = 'REALIZADA';
+            filterOtState.dispatchEvent(new Event('change'));
             tabBtnOts.click();
         });
     }
@@ -135,6 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (cardKpiActivos) {
         cardKpiActivos.addEventListener('click', () => {
             filterActivoState.value = 'Operativo';
+            filterActivoState.dispatchEvent(new Event('change'));
             tabBtnActivos.click();
         });
     }
@@ -145,11 +169,12 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(res => res.json())
             .then(data => {
                 const kpis = data.kpis;
-                kpiTotalOts.textContent = kpis.total_ots;
-                kpiPendientes.textContent = kpis.pendientes;
-                kpiResueltas.textContent = kpis.resueltas;
-                kpiMttr.textContent = kpis.mttr_horas.toFixed(1);
-                kpiActivos.innerHTML = `${kpis.activos_operativos} <span style="font-size: 1rem; color: var(--text-muted);">/ ${kpis.total_activos}</span>`;
+                if (kpiTotalOts) kpiTotalOts.textContent = kpis.total_ots;
+                if (kpiCreadas) kpiCreadas.textContent = kpis.creadas;
+                if (kpiAsignadas) kpiAsignadas.textContent = kpis.asignadas;
+                if (kpiProgramadas) kpiProgramadas.textContent = kpis.programadas;
+                if (kpiRealizadas) kpiRealizadas.textContent = kpis.realizadas;
+                if (kpiActivos) kpiActivos.innerHTML = `${kpis.activos_operativos} <span style="font-size: 1rem; color: var(--text-muted);">/ ${kpis.total_activos}</span>`;
             })
             .catch(err => console.error('Error al cargar KPIs:', err));
     }
