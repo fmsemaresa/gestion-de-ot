@@ -1002,7 +1002,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(res => res.json())
             .then(data => {
                 currentAssetData = data;
-                drawerAssetName.textContent = data.nombre;
+                drawerAssetName.textContent = `${data.nombre} (ACT-${data.id})`;
                 drawerAssetMarca.textContent = data.marca || 'Sin Marca';
                 drawerAssetModelo.textContent = data.modelo || 'Sin Modelo';
                 drawerAssetSerie.textContent = data.numero_serie || 'S/N';
@@ -1036,7 +1036,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         compRow.className = 'component-item';
                         compRow.innerHTML = `
                             <div class="component-info" style="flex: 1;">
-                                <h4>${c.nombre}</h4>
+                                <h4>${c.nombre} <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: 0.5rem;">[PZ-${c.id}]</span></h4>
                                 <p>${c.marca || 'S/M'} - ${c.modelo || 'S/M'} ${c.numero_serie ? ' / Serie: ' + c.numero_serie : ''}</p>
                             </div>
                             <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -1186,6 +1186,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 6.1 EDIT ASSET AND COMPONENT LIFE CYCLE LOGIC ---
     function openComponentEditModal(c) {
+        const editTitle = document.getElementById('edit-comp-title');
+        if (editTitle) {
+            editTitle.textContent = `Editar / Reemplazar Componente (PZ-${c.id})`;
+        }
         document.getElementById('edit-comp-id').value = c.id;
         document.getElementById('edit-comp-asset-id').value = c.activo_id;
         document.getElementById('edit-comp-name').value = c.nombre;

@@ -928,6 +928,7 @@ def descargar_plantilla_despiece(db: Session = Depends(get_db)):
     ws_import.title = "Importar Despieces"
     
     headers_import = [
+        "ID Componente (Solo para actualizar, ej: PZ-123)",
         "N° Serie Activo * (Recomendado)", 
         "Planta (Opcional)", 
         "Edificio (Opcional)", 
@@ -941,19 +942,66 @@ def descargar_plantilla_despiece(db: Session = Depends(get_db)):
     ]
     ws_import.append(headers_import)
     
-    # Fila de ejemplo
-    ws_import.append([
-        "FC-P1A-E1",
-        "Santa Adela",
-        "Edificio Corporativo",
-        "Oficina RRHH [EC-P1-RecN-#1]",
-        "Fancoil FC-P1A-E1",
-        "Compresor",
-        "Carrier",
-        "42GW",
-        "Obs: Buen estado",
-        "Operativo"
-    ])
+    # Consultar componentes y sus activos para pre-rellenar plantilla
+    comps = db.exec(
+        select(ComponenteActivo)
+        .join(Activo)
+        .where(Activo.estado != "Reemplazado")
+        .where(Activo.estado != "Eliminado sin Reemplazo")
+    ).all()
+    
+    comps_data = []
+    for c in comps:
+        activo = db.get(Activo, c.activo_id)
+        if not activo:
+            continue
+        ubicacion = db.get(Ubicacion, activo.ubicacion_id) if activo.ubicacion_id else None
+        edificio = db.get(Edificio, ubicacion.edificio_id) if ubicacion else None
+        planta = db.get(Planta, edificio.planta_id) if edificio else None
+        
+        comps_data.append({
+            "comp": c,
+            "activo_serie": activo.numero_serie or "",
+            "planta": planta.nombre if planta else "",
+            "edificio": edificio.nombre if edificio else "",
+            "ubicacion": ubicacion.nombre if ubicacion else "",
+            "activo_nombre": activo.nombre
+        })
+        
+    # Ordenar por planta, edificio, ubicacion, activo, nombre componente
+    comps_data.sort(key=lambda x: (x["planta"], x["edificio"], x["ubicacion"], x["activo_nombre"], x["comp"].nombre))
+    
+    if len(comps_data) > 0:
+        for item in comps_data:
+            c = item["comp"]
+            ws_import.append([
+                f"PZ-{c.id}",
+                item["activo_serie"],
+                item["planta"],
+                item["edificio"],
+                item["ubicacion"],
+                item["activo_nombre"],
+                c.nombre,
+                c.marca or "",
+                c.modelo or "",
+                c.numero_serie or "",
+                c.estado
+            ])
+    else:
+        # Fila de ejemplo si no hay componentes en la DB
+        ws_import.append([
+            "PZ-1",
+            "FC-P1A-E1",
+            "Santa Adela",
+            "Edificio Corporativo",
+            "Oficina RRHH [EC-P1-RecN-#1]",
+            "Fancoil FC-P1A-E1",
+            "Compresor",
+            "Carrier",
+            "42GW",
+            "Obs: Buen estado",
+            "Operativo"
+        ])
     
     # Estilos cabecera Hoja 1
     from openpyxl.styles import Font, PatternFill
@@ -1041,6 +1089,7 @@ async def importar_despiece(file: UploadFile = File(...), db: Session = Depends(
             return {"status": "success", "imported": 0, "message": "El archivo está vacío o no contiene filas de datos"}
             
         imported_count = 0
+        updated_count = 0
         omitted_count = 0
         unmatched_rows = []
         
@@ -1049,25 +1098,82 @@ async def importar_despiece(file: UploadFile = File(...), db: Session = Depends(
                 continue
                 
             # Leer columnas
-            serie_activo = str(row[0]).strip() if row[0] is not None else ""
-            planta_name = str(row[1]).strip() if row[1] is not None else ""
-            edificio_name = str(row[2]).strip() if row[2] is not None else ""
-            ubicacion_name = str(row[3]).strip() if row[3] is not None else ""
-            activo_name = str(row[4]).strip() if row[4] is not None else ""
-            comp_name = str(row[5]).strip() if row[5] is not None else ""
-            marca_val = str(row[6]).strip() if row[6] is not None else None
-            modelo_val = str(row[7]).strip() if row[7] is not None else None
-            comp_serie = str(row[8]).strip() if row[8] is not None else None
-            estado_val = str(row[9]).strip() if row[9] is not None else "Operativo"
+            id_comp_str = str(row[0]).strip() if row[0] is not None else ""
+            serie_activo = str(row[1]).strip() if row[1] is not None else ""
+            planta_name = str(row[2]).strip() if row[2] is not None else ""
+            edificio_name = str(row[3]).strip() if row[3] is not None else ""
+            ubicacion_name = str(row[4]).strip() if row[4] is not None else ""
+            activo_name = str(row[5]).strip() if row[5] is not None else ""
+            comp_name = str(row[6]).strip() if row[6] is not None else ""
+            marca_val = str(row[7]).strip() if row[7] is not None else None
+            modelo_val = str(row[8]).strip() if row[8] is not None else None
+            comp_serie = str(row[9]).strip() if row[9] is not None else None
+            estado_val = str(row[10]).strip() if row[10] is not None else "Operativo"
             
             # Fila de ejemplo (ejemplo Compresor Carrier 42GW) se omite
-            if comp_name == "Compresor" and serie_activo == "FC-P1A-E1":
+            if comp_name == "Compresor" and (serie_activo == "FC-P1A-E1" or id_comp_str == "PZ-1"):
                 continue
                 
             if not comp_name:
                 continue
                 
-            # Buscar activo
+            # Limpiar ID si se provee
+            comp_id = None
+            if id_comp_str:
+                clean_id = id_comp_str.upper().replace("PZ-", "").replace("PZ", "").strip()
+                if clean_id.isdigit():
+                    comp_id = int(clean_id)
+                    
+            # Si se provee ID, intentar actualizar
+            existing_comp = None
+            if comp_id:
+                existing_comp = db.get(ComponenteActivo, comp_id)
+                
+            if existing_comp:
+                # Buscar y asociar activo
+                activo = None
+                if serie_activo:
+                    activo = db.exec(
+                        select(Activo)
+                        .where(Activo.numero_serie == serie_activo)
+                        .where(Activo.estado != "Reemplazado")
+                        .where(Activo.estado != "Eliminado sin Reemplazo")
+                    ).first()
+                    
+                if not activo and activo_name and planta_name and edificio_name and ubicacion_name:
+                    planta = db.exec(select(Planta).where(Planta.nombre == planta_name)).first()
+                    if planta:
+                        edificio = db.exec(select(Edificio).where(Edificio.nombre == edificio_name, Edificio.planta_id == planta.id)).first()
+                        if edificio:
+                            ubicacion = db.exec(select(Ubicacion).where(Ubicacion.nombre == ubicacion_name, Ubicacion.edificio_id == edificio.id)).first()
+                            if ubicacion:
+                                activo = db.exec(
+                                    select(Activo)
+                                    .where(Activo.nombre == activo_name)
+                                    .where(Activo.ubicacion_id == ubicacion.id)
+                                    .where(Activo.estado != "Reemplazado")
+                                    .where(Activo.estado != "Eliminado sin Reemplazo")
+                                ).first()
+                
+                # Actualizar datos
+                existing_comp.nombre = comp_name
+                existing_comp.marca = marca_val
+                existing_comp.modelo = modelo_val
+                existing_comp.numero_serie = comp_serie
+                existing_comp.estado = estado_val
+                if activo:
+                    existing_comp.activo_id = activo.id
+                    
+                db.add(existing_comp)
+                updated_count += 1
+                continue
+                
+            # Si se especificó un ID pero no se encontró en base de datos
+            if comp_id and not existing_comp:
+                unmatched_rows.append(f"Fila {idx}: no se encontró componente con ID '{id_comp_str}'")
+                continue
+                
+            # Buscar activo para nuevo componente
             activo = None
             if serie_activo:
                 activo = db.exec(
@@ -1078,7 +1184,6 @@ async def importar_despiece(file: UploadFile = File(...), db: Session = Depends(
                 ).first()
                 
             if not activo and activo_name and planta_name and edificio_name and ubicacion_name:
-                # Buscar por ubicación y nombre
                 planta = db.exec(select(Planta).where(Planta.nombre == planta_name)).first()
                 if planta:
                     edificio = db.exec(select(Edificio).where(Edificio.nombre == edificio_name, Edificio.planta_id == planta.id)).first()
@@ -1128,16 +1233,20 @@ async def importar_despiece(file: UploadFile = File(...), db: Session = Depends(
             
         db.commit()
         
-        msg = f"Se importaron {imported_count} componentes de despiece correctamente. Se omitieron {omitted_count} duplicados."
+        msg = f"Se importaron {imported_count} componentes y se actualizaron {updated_count} correctamente. Se omitieron {omitted_count} duplicados."
         if unmatched_rows:
-            msg += f" Omitidos {len(unmatched_rows)} por activos no encontrados: {', '.join(unmatched_rows[:3])}..."
+            msg += f" Omitidos {len(unmatched_rows)} por no encontrados: {', '.join(unmatched_rows[:3])}..."
             
         return {
             "status": "success",
             "imported": imported_count,
+            "updated": updated_count,
             "omitted": omitted_count,
             "message": msg
         }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al procesar archivo Excel: {str(e)}")
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo Excel: {str(e)}")
