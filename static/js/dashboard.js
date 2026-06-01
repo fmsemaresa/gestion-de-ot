@@ -1771,8 +1771,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- EXCEL EXPORT & IMPORT EVENTS ---
     const btnExportOtsExcel = document.getElementById('btn-export-ots-excel');
     const btnExportActivosExcel = document.getElementById('btn-export-activos-excel');
-    const excelImportFile = document.getElementById('excel-import-file');
-    const excelImportDespieceFile = document.getElementById('excel-import-despiece-file');
+    const excelImportUnifiedFile = document.getElementById('excel-import-unified-file');
 
     if (btnExportOtsExcel) {
         btnExportOtsExcel.addEventListener('click', () => {
@@ -1786,77 +1785,47 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (excelImportFile) {
-        excelImportFile.addEventListener('change', (e) => {
+    if (excelImportUnifiedFile) {
+        excelImportUnifiedFile.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
             
             const formData = new FormData();
             formData.append('file', file);
             
-            const originalLabel = document.querySelector('label[for="excel-import-file"]').innerHTML;
-            document.querySelector('label[for="excel-import-file"]').innerHTML = '<span>⏳</span> Subiendo...';
+            const originalLabel = document.querySelector('label[for="excel-import-unified-file"]').innerHTML;
+            document.querySelector('label[for="excel-import-unified-file"]').innerHTML = '<span>⏳</span> Subiendo...';
             
-            fetch('/api/excel/importar/activos', {
+            fetch('/api/excel/importar-unificado', {
                 method: 'POST',
                 body: formData
             })
             .then(res => {
-                if (!res.ok) return res.json().then(data => { throw new Error(data.detail || 'Error al importar Excel') });
+                if (!res.ok) return res.json().then(data => { throw new Error(data.detail || 'Error al procesar carga masiva') });
                 return res.json();
             })
             .then(data => {
-                alert(`¡Éxito! ${data.message}`);
-                excelImportFile.value = '';
+                alert(`¡Carga Masiva Exitosa!\n${data.message}`);
+                excelImportUnifiedFile.value = '';
+                
+                // Refresh all views
                 loadKPIs();
                 loadHierarchy();
                 loadWorkOrders();
                 loadAssets();
                 preloadSearchList();
-            })
-            .catch(err => {
-                alert(`Error de Importación: ${err.message}`);
-                excelImportFile.value = '';
-            })
-            .finally(() => {
-                document.querySelector('label[for="excel-import-file"]').innerHTML = originalLabel;
-            });
-        });
-    }
-
-    if (excelImportDespieceFile) {
-        excelImportDespieceFile.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const formData = new FormData();
-            formData.append('file', file);
-            
-            const originalLabel = document.querySelector('label[for="excel-import-despiece-file"]').innerHTML;
-            document.querySelector('label[for="excel-import-despiece-file"]').innerHTML = '<span>⏳</span> Subiendo...';
-            
-            fetch('/api/excel/importar/despiece', {
-                method: 'POST',
-                body: formData
-            })
-            .then(res => {
-                if (!res.ok) return res.json().then(data => { throw new Error(data.detail || 'Error al importar despiece') });
-                return res.json();
-            })
-            .then(data => {
-                alert(`¡Éxito! ${data.message}`);
-                excelImportDespieceFile.value = '';
-                loadAssets();
+                
+                // If asset drawer is open, refresh it in case its components were modified
                 if (assetDrawer && assetDrawer.classList.contains('open') && selectedActivoId) {
                     openAssetDrawer(selectedActivoId);
                 }
             })
             .catch(err => {
                 alert(`Error de Importación: ${err.message}`);
-                excelImportDespieceFile.value = '';
+                excelImportUnifiedFile.value = '';
             })
             .finally(() => {
-                document.querySelector('label[for="excel-import-despiece-file"]').innerHTML = originalLabel;
+                document.querySelector('label[for="excel-import-unified-file"]').innerHTML = originalLabel;
             });
         });
     }

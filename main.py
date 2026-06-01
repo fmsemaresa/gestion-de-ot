@@ -1247,6 +1247,522 @@ async def importar_despiece(file: UploadFile = File(...), db: Session = Depends(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo Excel: {str(e)}")
+
+@app.get("/api/excel/plantilla-unificada")
+def descargar_plantilla_unificada(db: Session = Depends(get_db)):
+    wb = openpyxl.Workbook()
+    
+    # -------------------------------------------------------------
+    # HOJA 1: Importar Activos (Editable)
+    # -------------------------------------------------------------
+    ws_activos = wb.active
+    ws_activos.title = "Importar Activos"
+    
+    headers_activos = [
+        "Planta *", "Edificio *", "Ubicación *", "Nombre Activo *", "Tipo *", "Marca", "Modelo", "N° Serie"
+    ]
+    ws_activos.append(headers_activos)
+    
+    # Pre-llenar con activos operativos
+    activos = db.exec(
+        select(Activo)
+        .where(Activo.estado != "Reemplazado")
+        .where(Activo.estado != "Eliminado sin Reemplazo")
+    ).all()
+    
+    activos_data = []
+    for a in activos:
+        ubicacion = db.get(Ubicacion, a.ubicacion_id) if a.ubicacion_id else None
+        edificio = db.get(Edificio, ubicacion.edificio_id) if ubicacion else None
+        planta = db.get(Planta, edificio.planta_id) if edificio else None
+        
+        activos_data.append({
+            "planta": planta.nombre if planta else "",
+            "edificio": edificio.nombre if edificio else "",
+            "ubicacion": ubicacion.nombre if ubicacion else "",
+            "nombre": a.nombre,
+            "tipo": a.tipo,
+            "marca": a.marca or "",
+            "modelo": a.modelo or "",
+            "serie": a.numero_serie or ""
+        })
+    activos_data.sort(key=lambda x: (x["planta"], x["edificio"], x["ubicacion"], x["nombre"]))
+    
+    for item in activos_data:
+        ws_activos.append([
+            item["planta"],
+            item["edificio"],
+            item["ubicacion"],
+            item["nombre"],
+            item["tipo"],
+            item["marca"],
+            item["modelo"],
+            item["serie"]
+        ])
+        
+    # Estilos cabecera Hoja 1
+    from openpyxl.styles import Font, PatternFill
+    header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+    header_fill_act = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    for col in range(1, len(headers_activos) + 1):
+        cell = ws_activos.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = header_fill_act
+        
+    # -------------------------------------------------------------
+    # HOJA 2: Importar Despieces (Editable)
+    # -------------------------------------------------------------
+    ws_despieces = wb.create_sheet(title="Importar Despieces")
+    headers_despieces = [
+        "ID Componente (Solo para actualizar, ej: PZ-123)",
+        "N° Serie Activo * (Recomendado)", 
+        "Planta (Opcional)", 
+        "Edificio (Opcional)", 
+        "Ubicación (Opcional)", 
+        "Nombre Activo (Opcional)", 
+        "Nombre Componente * (Obligatorio)", 
+        "Marca", 
+        "Modelo", 
+        "N° Serie Componente / Obs", 
+        "Estado"
+    ]
+    ws_despieces.append(headers_despieces)
+    
+    comps = db.exec(
+        select(ComponenteActivo)
+        .join(Activo)
+        .where(Activo.estado != "Reemplazado")
+        .where(Activo.estado != "Eliminado sin Reemplazo")
+    ).all()
+    
+    comps_data = []
+    for c in comps:
+        activo = db.get(Activo, c.activo_id)
+        if not activo:
+            continue
+        ubicacion = db.get(Ubicacion, activo.ubicacion_id) if activo.ubicacion_id else None
+        edificio = db.get(Edificio, ubicacion.edificio_id) if ubicacion else None
+        planta = db.get(Planta, edificio.planta_id) if edificio else None
+        
+        comps_data.append({
+            "comp": c,
+            "activo_serie": activo.numero_serie or "",
+            "planta": planta.nombre if planta else "",
+            "edificio": edificio.nombre if edificio else "",
+            "ubicacion": ubicacion.nombre if ubicacion else "",
+            "activo_nombre": activo.nombre
+        })
+    comps_data.sort(key=lambda x: (x["planta"], x["edificio"], x["ubicacion"], x["activo_nombre"], x["comp"].nombre))
+    
+    for item in comps_data:
+        c = item["comp"]
+        ws_despieces.append([
+            f"PZ-{c.id}",
+            item["activo_serie"],
+            item["planta"],
+            item["edificio"],
+            item["ubicacion"],
+            item["activo_nombre"],
+            c.nombre,
+            c.marca or "",
+            c.modelo or "",
+            c.numero_serie or "",
+            c.estado
+        ])
+        
+    # Estilos cabecera Hoja 2
+    header_fill_desp = PatternFill(start_color="365F91", end_color="365F91", fill_type="solid")
+    for col in range(1, len(headers_despieces) + 1):
+        cell = ws_despieces.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = header_fill_desp
+        
+    # -------------------------------------------------------------
+    # HOJA 3: Ubicaciones de Referencia (Solo Lectura)
+    # -------------------------------------------------------------
+    ws_ref_locs = wb.create_sheet(title="Ubicaciones de Referencia")
+    headers_ref_locs = ["Planta", "Edificio", "Ubicación"]
+    ws_ref_locs.append(headers_ref_locs)
+    
+    ubicaciones = db.exec(select(Ubicacion)).all()
+    ref_locs_data = []
+    for u in ubicaciones:
+        edificio = db.get(Edificio, u.edificio_id) if u.edificio_id else None
+        planta = db.get(Planta, edificio.planta_id) if edificio else None
+        ref_locs_data.append([
+            planta.nombre if planta else "",
+            edificio.nombre if edificio else "",
+            u.nombre
+        ])
+    ref_locs_data.sort(key=lambda x: (x[0], x[1], x[2]))
+    for row in ref_locs_data:
+        ws_ref_locs.append(row)
+        
+    # Estilos cabecera Hoja 3
+    header_fill_ref_locs = PatternFill(start_color="595959", end_color="595959", fill_type="solid")
+    for col in range(1, len(headers_ref_locs) + 1):
+        cell = ws_ref_locs.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = header_fill_ref_locs
+        
+    # -------------------------------------------------------------
+    # HOJA 4: Activos de Referencia (Solo Lectura)
+    # -------------------------------------------------------------
+    ws_ref_act = wb.create_sheet(title="Activos de Referencia")
+    headers_ref_act = ["ID Activo", "Nombre Activo", "N° Serie Activo", "Planta", "Edificio", "Ubicación"]
+    ws_ref_act.append(headers_ref_act)
+    
+    activos_ref_data = []
+    for a in activos:
+        ubicacion = db.get(Ubicacion, a.ubicacion_id) if a.ubicacion_id else None
+        edificio = db.get(Edificio, ubicacion.edificio_id) if ubicacion else None
+        planta = db.get(Planta, edificio.planta_id) if edificio else None
+        
+        activos_ref_data.append([
+            f"ACT-{a.id}",
+            a.nombre,
+            a.numero_serie or "",
+            planta.nombre if planta else "",
+            edificio.nombre if edificio else "",
+            ubicacion.nombre if ubicacion else ""
+        ])
+    activos_ref_data.sort(key=lambda x: (x[3], x[4], x[5], x[1]))
+    for row in activos_ref_data:
+        ws_ref_act.append(row)
+        
+    # Estilos cabecera Hoja 4
+    header_fill_ref_act = PatternFill(start_color="7F7F7F", end_color="7F7F7F", fill_type="solid")
+    for col in range(1, len(headers_ref_act) + 1):
+        cell = ws_ref_act.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = header_fill_ref_act
+        
+    # Autoajuste de columnas en todas las hojas
+    for ws in [ws_activos, ws_despieces, ws_ref_locs, ws_ref_act]:
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = openpyxl.utils.get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+            
+    file_stream = io.BytesIO()
+    wb.save(file_stream)
+    file_stream.seek(0)
+    
+    return StreamingResponse(
+        file_stream,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=plantilla_carga_masiva.xlsx"}
+    )
+
+@app.post("/api/excel/importar-unificado")
+async def importar_unificado(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Por favor sube un archivo Excel válido (.xlsx)")
+        
+    try:
+        contents = await file.read()
+        file_stream = io.BytesIO(contents)
+        wb = openpyxl.load_workbook(file_stream, read_only=True)
+        
+        # 1. PROCESAR HOJA DE ACTIVOS
+        assets_imported = 0
+        assets_omitted = 0
+        
+        sheet_activos = None
+        if "Importar Activos" in wb.sheetnames:
+            sheet_activos = wb["Importar Activos"]
+        else:
+            sheet_activos = wb.active
+            
+        rows_activos = list(sheet_activos.iter_rows(values_only=True))
+        
+        # Guardar conteo de activos en el Excel para resolver duplicados por cantidad
+        seen_in_excel = {}
+        valid_activo_rows = []
+        
+        for idx, row in enumerate(rows_activos[1:], start=2):
+            if not row or not any(row):
+                continue
+                
+            planta_name = str(row[0]).strip() if row[0] is not None else ""
+            edificio_name = str(row[1]).strip() if row[1] is not None else ""
+            ubicacion_name = str(row[2]).strip() if row[2] is not None else ""
+            activo_name = str(row[3]).strip() if row[3] is not None else ""
+            tipo_val = str(row[4]).strip() if row[4] is not None else "Climatización"
+            marca_val = str(row[5]).strip() if row[5] is not None else None
+            modelo_val = str(row[6]).strip() if row[6] is not None else None
+            serie_val = str(row[7]).strip() if row[7] is not None else None
+            
+            # Fila de ejemplo (Santa Adela / Fancoil Muro Oficina 1) se omite
+            if (planta_name == "Santa Adela" and edificio_name == "Edificio Corporativo" and 
+                "Oficina Gerencia" in ubicacion_name and activo_name == "Fancoil Muro Oficina 1"):
+                continue
+                
+            if not planta_name or not edificio_name or not ubicacion_name or not activo_name:
+                continue
+                
+            valid_activo_rows.append({
+                "idx": idx,
+                "planta": planta_name,
+                "edificio": edificio_name,
+                "ubicacion": ubicacion_name,
+                "nombre": activo_name,
+                "tipo": tipo_val,
+                "marca": marca_val,
+                "modelo": modelo_val,
+                "serie": serie_val
+            })
+            
+            # Contabilizar apariciones en Excel
+            key = (planta_name, edificio_name, ubicacion_name, activo_name, serie_val)
+            seen_in_excel[key] = seen_in_excel.get(key, 0) + 1
+            
+        # Procesar los activos
+        processed_keys = set()
+        for item in valid_activo_rows:
+            key = (item["planta"], item["edificio"], item["ubicacion"], item["nombre"], item["serie"])
+            if key in processed_keys:
+                continue
+            processed_keys.add(key)
+            
+            # Resolver jerarquía de ubicación
+            planta = db.exec(select(Planta).where(Planta.nombre == item["planta"])).first()
+            if not planta:
+                planta = Planta(nombre=item["planta"])
+                db.add(planta)
+                db.commit()
+                db.refresh(planta)
+                
+            edificio = db.exec(select(Edificio).where(Edificio.nombre == item["edificio"], Edificio.planta_id == planta.id)).first()
+            if not edificio:
+                edificio = Edificio(nombre=item["edificio"], planta_id=planta.id)
+                db.add(edificio)
+                db.commit()
+                db.refresh(edificio)
+                
+            ubicacion = db.exec(select(Ubicacion).where(Ubicacion.nombre == item["ubicacion"], Ubicacion.edificio_id == edificio.id)).first()
+            if not ubicacion:
+                # Buscar coincidencia parcial (ej. código)
+                statement = select(Ubicacion).where(Ubicacion.edificio_id == edificio.id)
+                all_ubics = db.exec(statement).all()
+                matched_u = None
+                for u in all_ubics:
+                    if u.nombre.startswith(item["ubicacion"]):
+                        matched_u = u
+                        break
+                if matched_u:
+                    ubicacion = matched_u
+                else:
+                    ubicacion = Ubicacion(nombre=item["ubicacion"], edificio_id=edificio.id)
+                    db.add(ubicacion)
+                    db.commit()
+                    db.refresh(ubicacion)
+                    
+            # Conteo en la base de datos
+            db_count = 0
+            if item["serie"]:
+                db_count = len(db.exec(
+                    select(Activo)
+                    .where(Activo.numero_serie == item["serie"])
+                    .where(Activo.ubicacion_id == ubicacion.id)
+                    .where(Activo.estado != "Reemplazado")
+                    .where(Activo.estado != "Eliminado sin Reemplazo")
+                ).all())
+            else:
+                db_count = len(db.exec(
+                    select(Activo)
+                    .where(Activo.nombre == item["nombre"])
+                    .where(Activo.ubicacion_id == ubicacion.id)
+                    .where(Activo.estado != "Reemplazado")
+                    .where(Activo.estado != "Eliminado sin Reemplazo")
+                ).all())
+                
+            excel_count = seen_in_excel[key]
+            
+            # Crear la diferencia
+            to_import = excel_count - db_count
+            if to_import > 0:
+                for _ in range(to_import):
+                    new_activo = Activo(
+                        nombre=item["nombre"],
+                        tipo=item["tipo"],
+                        marca=item["marca"],
+                        modelo=item["modelo"],
+                        numero_serie=item["serie"],
+                        estado="Operativo",
+                        ubicacion_id=ubicacion.id
+                    )
+                    db.add(new_activo)
+                assets_imported += to_import
+            else:
+                assets_omitted += excel_count
+                
+        db.commit()
+        
+        # 2. PROCESAR HOJA DE DESPIECES
+        comps_imported = 0
+        comps_updated = 0
+        comps_omitted = 0
+        unmatched_comps = []
+        
+        if "Importar Despieces" in wb.sheetnames:
+            sheet_despieces = wb["Importar Despieces"]
+            rows_despieces = list(sheet_despieces.iter_rows(values_only=True))
+            
+            for idx, row in enumerate(rows_despieces[1:], start=2):
+                if not row or not any(row):
+                    continue
+                    
+                # Leer columnas
+                id_comp_str = str(row[0]).strip() if row[0] is not None else ""
+                serie_activo = str(row[1]).strip() if row[1] is not None else ""
+                planta_name = str(row[2]).strip() if row[2] is not None else ""
+                edificio_name = str(row[3]).strip() if row[3] is not None else ""
+                ubicacion_name = str(row[4]).strip() if row[4] is not None else ""
+                activo_name = str(row[5]).strip() if row[5] is not None else ""
+                comp_name = str(row[6]).strip() if row[6] is not None else ""
+                marca_val = str(row[7]).strip() if row[7] is not None else None
+                modelo_val = str(row[8]).strip() if row[8] is not None else None
+                comp_serie = str(row[9]).strip() if row[9] is not None else None
+                estado_val = str(row[10]).strip() if row[10] is not None else "Operativo"
+                
+                # Fila de ejemplo (ejemplo Compresor Carrier 42GW o PZ-1) se omite
+                if comp_name == "Compresor" and (serie_activo == "FC-P1A-E1" or id_comp_str == "PZ-1"):
+                    continue
+                    
+                if not comp_name:
+                    continue
+                    
+                # Limpiar ID si se provee
+                comp_id = None
+                if id_comp_str:
+                    clean_id = id_comp_str.upper().replace("PZ-", "").replace("PZ", "").strip()
+                    if clean_id.isdigit():
+                        comp_id = int(clean_id)
+                        
+                # Si se provee ID, intentar actualizar
+                existing_comp = None
+                if comp_id:
+                    existing_comp = db.get(ComponenteActivo, comp_id)
+                    
+                if existing_comp:
+                    # Buscar y asociar activo
+                    activo = None
+                    if serie_activo:
+                        activo = db.exec(
+                            select(Activo)
+                            .where(Activo.numero_serie == serie_activo)
+                            .where(Activo.estado != "Reemplazado")
+                            .where(Activo.estado != "Eliminado sin Reemplazo")
+                        ).first()
+                        
+                    if not activo and activo_name and planta_name and edificio_name and ubicacion_name:
+                        planta = db.exec(select(Planta).where(Planta.nombre == planta_name)).first()
+                        if planta:
+                            edificio = db.exec(select(Edificio).where(Edificio.nombre == edificio_name, Edificio.planta_id == planta.id)).first()
+                            if edificio:
+                                ubicacion = db.exec(select(Ubicacion).where(Ubicacion.nombre == ubicacion_name, Ubicacion.edificio_id == edificio.id)).first()
+                                if ubicacion:
+                                    activo = db.exec(
+                                        select(Activo)
+                                        .where(Activo.nombre == activo_name)
+                                        .where(Activo.ubicacion_id == ubicacion.id)
+                                        .where(Activo.estado != "Reemplazado")
+                                        .where(Activo.estado != "Eliminado sin Reemplazo")
+                                    ).first()
+                    
+                    # Actualizar datos
+                    existing_comp.nombre = comp_name
+                    existing_comp.marca = marca_val
+                    existing_comp.modelo = modelo_val
+                    existing_comp.numero_serie = comp_serie
+                    existing_comp.estado = estado_val
+                    if activo:
+                        existing_comp.activo_id = activo.id
+                        
+                    db.add(existing_comp)
+                    comps_updated += 1
+                    continue
+                    
+                # Si se especificó un ID pero no se encontró en base de datos
+                if comp_id and not existing_comp:
+                    unmatched_comps.append(f"Fila {idx}: no se encontró componente con ID '{id_comp_str}'")
+                    continue
+                    
+                # Buscar activo para nuevo componente
+                activo = None
+                if serie_activo:
+                    activo = db.exec(
+                        select(Activo)
+                        .where(Activo.numero_serie == serie_activo)
+                        .where(Activo.estado != "Reemplazado")
+                        .where(Activo.estado != "Eliminado sin Reemplazo")
+                    ).first()
+                    
+                if not activo and activo_name and planta_name and edificio_name and ubicacion_name:
+                    planta = db.exec(select(Planta).where(Planta.nombre == planta_name)).first()
+                    if planta:
+                        edificio = db.exec(select(Edificio).where(Edificio.nombre == edificio_name, Edificio.planta_id == planta.id)).first()
+                        if edificio:
+                            ubicacion = db.exec(select(Ubicacion).where(Ubicacion.nombre == ubicacion_name, Ubicacion.edificio_id == edificio.id)).first()
+                            if ubicacion:
+                                activo = db.exec(
+                                    select(Activo)
+                                    .where(Activo.nombre == activo_name)
+                                    .where(Activo.ubicacion_id == ubicacion.id)
+                                    .where(Activo.estado != "Reemplazado")
+                                    .where(Activo.estado != "Eliminado sin Reemplazo")
+                                ).first()
+                                
+                if not activo:
+                    unmatched_comps.append(f"Fila {idx}: no se encontró activo para Serie '{serie_activo}' o Nombre '{activo_name}'")
+                    continue
+                    
+                # Verificar duplicado de componente en el mismo activo
+                existing_comps = db.exec(
+                    select(ComponenteActivo)
+                    .where(ComponenteActivo.activo_id == activo.id)
+                    .where(ComponenteActivo.nombre == comp_name)
+                ).all()
+                
+                is_duplicate = False
+                for ec in existing_comps:
+                    if ec.modelo == modelo_val and ec.numero_serie == comp_serie:
+                        is_duplicate = True
+                        break
+                        
+                if is_duplicate:
+                    comps_omitted += 1
+                    continue
+                    
+                # Insertar componente
+                new_comp = ComponenteActivo(
+                    nombre=comp_name,
+                    marca=marca_val,
+                    modelo=modelo_val,
+                    numero_serie=comp_serie,
+                    estado=estado_val,
+                    activo_id=activo.id
+                )
+                db.add(new_comp)
+                comps_imported += 1
+                
+            db.commit()
+            
+        # Mensaje de resultado
+        msg = f"Activos: {assets_imported} creados, {assets_omitted} omitidos. Despieces: {comps_imported} creados, {comps_updated} actualizados, {comps_omitted} omitidos."
+        if unmatched_comps:
+            msg += f" Omitidos {len(unmatched_comps)} por activo o ID no encontrado: {', '.join(unmatched_comps[:2])}..."
+            
+        return {
+            "status": "success",
+            "assets_imported": assets_imported,
+            "assets_omitted": assets_omitted,
+            "comps_imported": comps_imported,
+            "comps_updated": comps_updated,
+            "comps_omitted": comps_omitted,
+            "message": msg
+        }
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo Excel: {str(e)}")

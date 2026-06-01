@@ -155,19 +155,12 @@
                             <button class="btn-secondary" id="btn-export-activos-excel" style="background: #107c41; color: white; border-color: #107c41; display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.85rem;">
                                 <span>📥</span> Exportar Excel
                             </button>
-                            <a href="/api/excel/plantilla-importacion" class="btn-secondary" style="text-decoration: none; color: var(--text-color); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.85rem; border-radius: 6px; background: var(--bg-secondary);">
-                                <span>📋</span> Plantilla Importar
+                            <a href="/api/excel/plantilla-unificada" class="btn-secondary" style="text-decoration: none; color: var(--text-color); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.85rem; border-radius: 6px; background: var(--bg-secondary);">
+                                <span>📋</span> Plantilla Carga Masiva
                             </a>
-                            <label for="excel-import-file" class="btn-secondary" style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; padding: 0.45rem 0.85rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px;">
-                                <span>📤</span> Importar Excel
-                                <input type="file" id="excel-import-file" accept=".xlsx, .xls" style="display: none;">
-                            </label>
-                            <a href="/api/excel/plantilla-despiece" class="btn-secondary" style="text-decoration: none; color: var(--text-color); border: 1px solid var(--border-color); display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.85rem; border-radius: 6px; background: var(--bg-secondary);">
-                                <span>🔧</span> Plantilla Despiece
-                            </a>
-                            <label for="excel-import-despiece-file" class="btn-secondary" style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; padding: 0.45rem 0.85rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px;">
-                                <span>⚙️</span> Importar Despiece
-                                <input type="file" id="excel-import-despiece-file" accept=".xlsx, .xls" style="display: none;">
+                            <label for="excel-import-unified-file" class="btn-secondary" style="cursor: pointer; display: flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; padding: 0.45rem 0.85rem; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px;">
+                                <span>📤</span> Subir Carga Masiva
+                                <input type="file" id="excel-import-unified-file" accept=".xlsx, .xls" style="display: none;">
                             </label>
                             <button class="btn-primary" id="btn-create-activo" disabled>
                                 <span>+</span> Registrar Activo
