@@ -378,6 +378,16 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
         else:
             ot.fecha_inicio = None
 
+    # Validate: fecha_programada cannot be posterior to fecha_inicio
+    if ot.fecha_programada and ot.fecha_inicio:
+        p_dt = ot.fecha_programada.replace(tzinfo=None)
+        i_dt = ot.fecha_inicio.replace(tzinfo=None)
+        if p_dt > i_dt:
+            raise HTTPException(
+                status_code=400,
+                detail="La fecha programada no puede ser posterior a la fecha y hora de inicio de los trabajos."
+            )
+
     if "prioridad" in updated_ot:
         ot.prioridad = updated_ot["prioridad"]
     if "comentarios_tecnicos" in updated_ot:

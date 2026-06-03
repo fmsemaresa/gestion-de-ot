@@ -1526,7 +1526,10 @@ document.addEventListener('DOMContentLoaded', () => {
             })
         })
         .then(res => {
-            if (!res.ok) throw new Error('Error al asignar técnico');
+            if (!res.ok) return res.json().then(data => { throw new Error(data.detail || 'Error al asignar técnico') });
+            return res.json();
+        })
+        .then(() => {
             assignModal.style.display = 'none';
             loadKPIs();
             loadWorkOrders();
