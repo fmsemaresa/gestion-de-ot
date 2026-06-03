@@ -718,6 +718,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             month: '2-digit',
                             year: 'numeric'
                         });
+                        if (ot.fecha_programada.includes('T')) {
+                            const timePart = ot.fecha_programada.substring(11, 16);
+                            if (timePart !== '00:00') {
+                                progDateStr += ` a las ${timePart}`;
+                            }
+                        }
                         progColor = 'var(--warning)';
                     }
 
@@ -1466,16 +1472,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const ot = loadedWorkOrdersList.find(o => o.id === parseInt(otId));
         
         const dateInput = document.getElementById('assign-fecha-programada');
+        const timeInput = document.getElementById('assign-hora-programada');
         if (ot) {
             assignSelectTecnico.value = ot.tecnico_id || '';
             if (ot.fecha_programada) {
                 dateInput.value = ot.fecha_programada.substring(0, 10);
+                if (ot.fecha_programada.includes('T')) {
+                    timeInput.value = ot.fecha_programada.substring(11, 16);
+                } else {
+                    timeInput.value = '';
+                }
             } else {
                 dateInput.value = '';
+                timeInput.value = '';
             }
         } else {
             assignSelectTecnico.value = '';
             dateInput.value = '';
+            timeInput.value = '';
         }
         assignModal.style.display = 'flex';
     }
@@ -1489,6 +1503,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const otId = assignOtId.value;
         const techId = parseInt(assignSelectTecnico.value) || null;
         const fechaProgramadaVal = document.getElementById('assign-fecha-programada').value || null;
+        const horaProgramadaVal = document.getElementById('assign-hora-programada').value || '';
+
+        let fullFechaProgramada = fechaProgramadaVal;
+        if (fechaProgramadaVal) {
+            fullFechaProgramada = fechaProgramadaVal + 'T' + (horaProgramadaVal || '00:00') + ':00';
+        }
 
         // Calcular estado mapeado
         let targetState = 'CREADA';
@@ -1501,7 +1521,7 @@ document.addEventListener('DOMContentLoaded', () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 tecnico_id: techId,
-                fecha_programada: fechaProgramadaVal,
+                fecha_programada: fullFechaProgramada,
                 estado: targetState
             })
         })
@@ -1677,6 +1697,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const plantillaId = plantillaIdVal ? parseInt(plantillaIdVal) : null;
 
         const fechaProgramadaVal = document.getElementById('ot-fecha-programada').value || null;
+        const horaProgramadaVal = document.getElementById('ot-hora-programada') ? document.getElementById('ot-hora-programada').value : '';
+        
+        let fullFechaProgramada = fechaProgramadaVal;
+        if (fechaProgramadaVal) {
+            fullFechaProgramada = fechaProgramadaVal + 'T' + (horaProgramadaVal || '00:00') + ':00';
+        }
+
         const payload = {
             descripcion,
             tipo,
@@ -1689,7 +1716,7 @@ document.addEventListener('DOMContentLoaded', () => {
             activo_id: activoId,
             tecnico_id: tecnicoId,
             plantilla_id: plantillaId,
-            fecha_programada: fechaProgramadaVal
+            fecha_programada: fullFechaProgramada
         };
 
         fetch('/api/ordenes', {

@@ -333,9 +333,15 @@
                                 <option value="">No Asignado</option>
                             </select>
                         </div>
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label for="ot-fecha-programada">Fecha Programada (Opcional)</label>
-                            <input type="date" id="ot-fecha-programada" class="form-control">
+                        <div style="flex: 1.2; display: flex; gap: 0.5rem; margin-bottom: 0;">
+                            <div class="form-group" style="flex: 1.5; margin-bottom: 0;">
+                                <label for="ot-fecha-programada">Fecha Programada (Opcional)</label>
+                                <input type="date" id="ot-fecha-programada" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label for="ot-hora-programada">Hora</label>
+                                <input type="time" id="ot-hora-programada" class="form-control">
+                            </div>
                         </div>
                     </div>
 
@@ -459,11 +465,17 @@
                         <label for="assign-select-tecnico">Selecciona el Técnico *</label>
                         <select id="assign-select-tecnico" class="form-control" required></select>
                     </div>
-                    <div class="form-group">
-                        <label for="assign-fecha-programada">Fecha Programada de Ejecución (Opcional)</label>
-                        <input type="date" id="assign-fecha-programada" class="form-control">
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group" style="flex: 1.5; margin-bottom: 0;">
+                            <label for="assign-fecha-programada">Fecha Programada (Opcional)</label>
+                            <input type="date" id="assign-fecha-programada" class="form-control">
+                        </div>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label for="assign-hora-programada">Hora</label>
+                            <input type="time" id="assign-hora-programada" class="form-control">
+                        </div>
                     </div>
-                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 1rem;">
                         Guardar
                     </button>
                 </form>
