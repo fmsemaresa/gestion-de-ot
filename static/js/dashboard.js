@@ -4,14 +4,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedEdificioId = null;
     let selectedUbicacionId = null;
     let selectedActivoId = null;
-    let activeTab = 'ots'; // 'ots' or 'activos'
+    let activeTab = 'ots'; // 'ots', 'activos', or 'ubicaciones'
     let techniciansList = [];
     let loadedWorkOrdersList = [];
+    let currentSelectedPlantName = null;
+    let allLoadedOts = [];
 
     // DOM Elements
     const kpiTotalOts = document.getElementById('kpi-total-ots');
     const kpiCreadas = document.getElementById('kpi-creadas');
-    const kpiAsignadas = document.getElementById('kpi-asignadas');
+    const kpiAsignadas = document.getElementById('kpi-assigned') || document.getElementById('kpi-asignadas');
     const kpiProgramadas = document.getElementById('kpi-programadas');
     const kpiRealizadas = document.getElementById('kpi-realizadas');
     const kpiActivos = document.getElementById('kpi-activos');
@@ -27,8 +29,35 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const tabBtnOts = document.getElementById('tab-btn-ots');
     const tabBtnActivos = document.getElementById('tab-btn-activos');
+    const tabBtnUbicaciones = document.getElementById('tab-btn-ubicaciones');
     const tabOts = document.getElementById('tab-ots');
     const tabActivos = document.getElementById('tab-activos');
+    const tabUbicaciones = document.getElementById('tab-ubicaciones');
+    
+    const plantSummaryView = document.getElementById('plant-summary-view');
+    const plantDetailView = document.getElementById('plant-detail-view');
+    const plantOtGrid = document.getElementById('plant-ot-grid');
+    const btnBackToPlants = document.getElementById('btn-back-to-plants');
+    const plantDetailTitle = document.getElementById('plant-detail-title');
+
+    // Plant count selector mappings
+    const plantCounts = {
+        'Santa Adela': {
+            corrective: document.getElementById('plant-corrective-santa-adela'),
+            preventive: document.getElementById('plant-preventive-santa-adela'),
+            total: document.getElementById('plant-total-santa-adela')
+        },
+        'La Divisa': {
+            corrective: document.getElementById('plant-corrective-la-divisa'),
+            preventive: document.getElementById('plant-preventive-la-divisa'),
+            total: document.getElementById('plant-total-la-divisa')
+        },
+        'Sta. A. 10.000': {
+            corrective: document.getElementById('plant-corrective-sta-a-10000'),
+            preventive: document.getElementById('plant-preventive-sta-a-10000'),
+            total: document.getElementById('plant-total-sta-a-10000')
+        }
+    };
     
     const otGrid = document.getElementById('ot-grid');
     const filterOtState = document.getElementById('filter-ot-state');
@@ -107,8 +136,10 @@ document.addEventListener('DOMContentLoaded', () => {
         activeTab = 'ots';
         tabBtnOts.style.borderBottomColor = 'var(--accent-color)';
         tabBtnActivos.style.borderBottomColor = 'transparent';
+        tabBtnUbicaciones.style.borderBottomColor = 'transparent';
         tabOts.style.display = 'block';
         tabActivos.style.display = 'none';
+        tabUbicaciones.style.display = 'none';
         loadWorkOrders();
     });
 
@@ -116,9 +147,28 @@ document.addEventListener('DOMContentLoaded', () => {
         activeTab = 'activos';
         tabBtnActivos.style.borderBottomColor = 'var(--accent-color)';
         tabBtnOts.style.borderBottomColor = 'transparent';
+        tabBtnUbicaciones.style.borderBottomColor = 'transparent';
         tabActivos.style.display = 'block';
         tabOts.style.display = 'none';
+        tabUbicaciones.style.display = 'none';
         loadAssets();
+    });
+
+    tabBtnUbicaciones.addEventListener('click', () => {
+        activeTab = 'ubicaciones';
+        tabBtnUbicaciones.style.borderBottomColor = 'var(--accent-color)';
+        tabBtnOts.style.borderBottomColor = 'transparent';
+        tabBtnActivos.style.borderBottomColor = 'transparent';
+        tabUbicaciones.style.display = 'block';
+        tabOts.style.display = 'none';
+        tabActivos.style.display = 'none';
+        
+        // Reset sub-view to plants summary by default
+        plantSummaryView.style.display = 'block';
+        plantDetailView.style.display = 'none';
+        currentSelectedPlantName = null;
+        
+        loadPlantSummaries();
     });
 
     // --- 1.5. KPI INTERACTION ---
@@ -517,9 +567,24 @@ document.addEventListener('DOMContentLoaded', () => {
                         const content = document.getElementById(`plant-content-${p.id}`);
                         const isVisible = content.style.display === 'block';
                         
-                        // Close other plants visually (optional, we just toggle here)
-                        content.style.display = isVisible ? 'none' : 'block';
-                        header.querySelector('.arrow').textContent = isVisible ? '▶' : '▼';
+                        if (!isVisible) {
+                            // Close other plants visually
+                            document.querySelectorAll('.hierarchy-content').forEach(c => {
+                                c.style.display = 'none';
+                            });
+                            document.querySelectorAll('.hierarchy-header .arrow').forEach(a => {
+                                a.textContent = '▶';
+                            });
+                            
+                            // Open this plant
+                            content.style.display = 'block';
+                            header.querySelector('.arrow').textContent = '▼';
+                            loadBuildings(p.id, content);
+                        } else {
+                            // Close this plant
+                            content.style.display = 'none';
+                            header.querySelector('.arrow').textContent = '▶';
+                        }
                         
                         selectedPlantaId = p.id;
                         selectedEdificioId = null;
@@ -529,11 +594,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.querySelectorAll('.hierarchy-header').forEach(h => h.classList.remove('active'));
                         document.querySelectorAll('.sub-item').forEach(s => s.classList.remove('active'));
                         header.classList.add('active');
-                        
-                        // Load buildings for this plant if not loaded
-                        if (!isVisible) {
-                            loadBuildings(p.id, content);
-                        }
                         
                         // Update views
                         loadWorkOrders();
@@ -653,6 +713,263 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.error(err));
     }
 
+    // --- 3.5. RENDER WORK ORDERS ---
+    function renderWorkOrders(filteredOts, targetGrid) {
+        targetGrid.innerHTML = '';
+        if (filteredOts.length === 0) {
+            targetGrid.innerHTML = '<p style="color: var(--text-muted); padding: 1rem;">No se encontraron órdenes de trabajo.</p>';
+            return;
+        }
+
+        filteredOts.forEach(ot => {
+            const isCreated = ot.estado === 'CREADA';
+            const isAssigned = ot.estado === 'ASIGNADA';
+            const isScheduled = ot.estado === 'PROGRAMADA';
+            const isDone = ot.estado === 'REALIZADA' || ot.estado === 'Resuelta';
+
+            let statusLabel = 'Creada';
+            let statusClass = 'status-created';
+
+            if (isDone) {
+                statusLabel = 'Realizada';
+                statusClass = 'status-done';
+            } else if (ot.fecha_inicio) {
+                if (ot.estado_ejecucion === 'PAUSADA' || ot.estado_ejecucion === 'DETENIDA') {
+                    statusLabel = 'Pausada';
+                    statusClass = 'status-scheduled';
+                } else {
+                    statusLabel = 'Iniciada';
+                    statusClass = 'status-progress';
+                }
+            } else if (isScheduled) {
+                statusLabel = 'Programada';
+                statusClass = 'status-scheduled';
+            } else if (isAssigned) {
+                statusLabel = 'Asignada';
+                statusClass = 'status-assigned';
+            } else if (isCreated) {
+                statusLabel = 'Creada';
+                statusClass = 'status-created';
+            } else {
+                statusLabel = ot.estado;
+                statusClass = 'status-created';
+            }
+
+            // Format scheduled date
+            let progDateStr = 'Pendiente';
+            let progColor = 'var(--text-muted)';
+            if (ot.fecha_programada) {
+                const pDate = new Date(ot.fecha_programada);
+                progDateStr = pDate.toLocaleDateString('es-CL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+                if (ot.fecha_programada.includes('T')) {
+                    const timePart = ot.fecha_programada.substring(11, 16);
+                    if (timePart !== '00:00') {
+                        progDateStr += ` a las ${timePart}`;
+                    }
+                }
+                progColor = 'var(--warning)';
+            }
+
+            // Format start date/time
+            let startTimeFormatted = '';
+            if (ot.fecha_inicio) {
+                const sDate = new Date(ot.fecha_inicio);
+                const day = String(sDate.getDate()).padStart(2, '0');
+                const month = String(sDate.getMonth() + 1).padStart(2, '0');
+                const hrs = String(sDate.getHours()).padStart(2, '0');
+                const mins = String(sDate.getMinutes()).padStart(2, '0');
+                startTimeFormatted = `${day}/${month} a las ${hrs}:${mins}`;
+            }
+
+            let completionDateStr = '';
+            if (ot.fecha_resolucion) {
+                const dateObj = new Date(ot.fecha_resolucion);
+                completionDateStr = ` el ${dateObj.toLocaleDateString()}`;
+            }
+
+            // Build assign/reassign button
+            let assignBtnHtml = '';
+            if (!isDone) {
+                if (ot.tecnico_nombre) {
+                    assignBtnHtml = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Reasignar</button>`;
+                } else {
+                    assignBtnHtml = `<button class="btn-primary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--primary-color); line-height: 1;">Asignar</button>`;
+                }
+            }
+
+            // Build program/reprogram button
+            let programBtnHtml = '';
+            if (!isDone) {
+                if (ot.fecha_programada) {
+                    programBtnHtml = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Reprogramar</button>`;
+                } else {
+                    programBtnHtml = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Programar</button>`;
+                }
+            }
+
+            // Build gestion HTML (with Iniciar button or start details + action buttons)
+            let gestionContentHtml = '';
+            if (isDone) {
+                gestionContentHtml = `<span style="color: var(--success); font-weight: 500;">✓ Realizada${completionDateStr}</span>`;
+                if (ot.fecha_inicio) {
+                    gestionContentHtml += ` <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(Iniciada: ${startTimeFormatted})</span>`;
+                }
+            } else {
+                if (ot.fecha_inicio) {
+                    if (ot.estado_ejecucion === 'PAUSADA' || ot.estado_ejecucion === 'DETENIDA') {
+                        gestionContentHtml = `
+                            <span style="color: var(--warning); font-weight: 500;">Pausada (Iniciada el ${startTimeFormatted})</span>
+                            <button class="btn-resume" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; background: var(--accent-color); color: white; border: none; line-height: 1;">Retomar</button>
+                            <button class="btn-complete-direct" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.25rem; cursor: pointer; border-radius: 4px; background: var(--success); color: white; border: none; line-height: 1;">Terminar</button>
+                        `;
+                    } else {
+                        gestionContentHtml = `
+                            <span style="color: #38bdf8; font-weight: 500;">Iniciada el ${startTimeFormatted}</span>
+                            <button class="btn-pause" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Detener</button>
+                            <button class="btn-complete-direct" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.25rem; cursor: pointer; border-radius: 4px; background: var(--success); color: white; border: none; line-height: 1;">Terminar</button>
+                        `;
+                    }
+                } else {
+                    gestionContentHtml = `<button class="btn-primary btn-start" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; line-height: 1;">Iniciar</button>`;
+                }
+            }
+
+            let checklistBtn = '';
+            if (isDone && ot.plantilla_id) {
+                checklistBtn = `
+                    <div style="margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem; text-align: left;">
+                        <button class="btn-view-checklist" data-ot-id="${ot.id}" style="background: transparent; border: none; color: var(--accent-color); padding: 0; font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline;">
+                            Ver Checklist de Inspección
+                        </button>
+                        <div id="checklist-results-${ot.id}" style="display: none; margin-top: 0.5rem; background: rgba(0,0,0,0.15); padding: 0.5rem; border-radius: 6px; font-size: 0.8rem; border-left: 2px solid var(--success); flex-direction: column; gap: 0.35rem;">
+                            Cargando resultados...
+                        </div>
+                    </div>
+                `;
+            }
+
+            const card = document.createElement('div');
+            card.className = `entity-card priority-${ot.prioridad.toLowerCase()}`;
+            card.innerHTML = `
+                <div class="card-tag ${statusClass}">${statusLabel}</div>
+                <h4 class="entity-title" style="font-weight: bold;"><span style="font-weight: normal;">#OT-${ot.id}</span> - ${ot.tipo}</h4>
+                <div class="entity-subtitle" style="font-weight: bold; color: var(--text-color); margin-bottom: 0.5rem;">${ot.planta_nombre} / ${ot.edificio_nombre} ${ot.ubicacion_nombre ? '/ ' + ot.ubicacion_nombre : ''}</div>
+                <p style="font-size:0.85rem; background:rgba(0,0,0,0.1); padding:0.5rem; border-radius:6px; margin-bottom:0.4rem; color:#cbd5e1;">${ot.descripcion}</p>
+                
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; display: flex; align-items: center; flex-wrap: wrap;">
+                    Asignado a: <strong style="color: var(--text-color); margin-left: 0.25rem;">${ot.tecnico_nombre || 'Sin asignar'}</strong> ${assignBtnHtml}
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; display: flex; align-items: center; flex-wrap: wrap;">
+                    Prog: <strong style="color: ${progColor}; margin-left: 0.25rem;">${progDateStr}</strong> ${programBtnHtml}
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                    Gestión: <span>${gestionContentHtml}</span>
+                </div>
+                
+                ${checklistBtn}
+                
+                <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <span>Reportado por: <strong style="color: var(--text-color);">${ot.reportado_por || 'Sistema'}</strong></span>
+                    <span>Creación: ${new Date(ot.fecha_creacion).toLocaleDateString()}</span>
+                </div>
+            `;
+            targetGrid.appendChild(card);
+
+            card.querySelectorAll('.btn-assign').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openAssignModalDialog(ot.id);
+                });
+            });
+
+            card.querySelectorAll('.btn-start').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    startWorkOrder(ot.id);
+                });
+            });
+
+            card.querySelectorAll('.btn-pause').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    pauseWorkOrder(ot.id);
+                });
+            });
+
+            card.querySelectorAll('.btn-resume').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    resumeWorkOrder(ot.id);
+                });
+            });
+
+            card.querySelectorAll('.btn-complete-direct').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    completeWorkOrderDirect(ot.id);
+                });
+            });
+
+            // Checklist trigger bound relative to card DOM
+            card.querySelectorAll('.btn-view-checklist').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const container = card.querySelector(`#checklist-results-${ot.id}`);
+                    const isVisible = container.style.display === 'flex' || container.style.display === 'block';
+                    
+                    if (isVisible) {
+                        container.style.display = 'none';
+                        btn.textContent = 'Ver Checklist de Inspección';
+                    } else {
+                        container.style.display = 'flex';
+                        container.style.flexDirection = 'column';
+                        container.innerHTML = '<span style="color:var(--text-muted);">Cargando...</span>';
+                        btn.textContent = 'Ocultar Checklist';
+                        
+                        fetch(`/api/ordenes/${ot.id}/respuestas`)
+                            .then(res => res.json())
+                            .then(respuestas => {
+                                if (respuestas.length === 0) {
+                                    container.innerHTML = '<span style="color:var(--text-muted);">Sin respuestas registradas.</span>';
+                                    return;
+                                }
+                                container.innerHTML = '';
+                                respuestas.forEach(r => {
+                                    let valStr = '';
+                                    if (r.tipo_respuesta === 'booleano') {
+                                        valStr = r.valor_booleano ? 
+                                            '<span style="color: var(--success); font-weight: 600;">Pasa (OK)</span>' : 
+                                            '<span style="color: var(--danger); font-weight: 600;">Falla (No OK)</span>';
+                                    } else if (r.tipo_respuesta === 'numerico') {
+                                        valStr = `<strong style="color:var(--accent-color);">${r.valor_numerico}</strong> <span style="font-size:0.75rem; color:var(--text-muted);">${r.unidad_medida || ''}</span>`;
+                                    } else {
+                                        valStr = `<span style="color:#cbd5e1;">${r.valor_texto || ''}</span>`;
+                                    }
+                                    
+                                    container.innerHTML += `
+                                        <div style="border-bottom:1px solid rgba(255,255,255,0.03); padding-bottom:0.3rem; margin-bottom:0.3rem; font-size:0.8rem;">
+                                            <div style="font-weight: 600; color: #94a3b8; font-size: 0.78rem;">${r.texto_pregunta}</div>
+                                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.15rem;">
+                                                <div>${valStr}</div>
+                                                ${r.observacion ? `<span style="font-size:0.75rem; color:var(--warning); font-style:italic;">"${r.observacion}"</span>` : ''}
+                                            </div>
+                                        </div>
+                                    `;
+                                });
+                            })
+                            .catch(err => {
+                                container.innerHTML = `<span style="color:var(--danger);">Error: ${err.message}</span>`;
+                            });
+                    }
+                });
+            });
+        });
+    }
+
     // --- 4. LOAD WORK ORDERS ---
     function loadWorkOrders() {
         let url = '/api/ordenes';
@@ -682,263 +999,99 @@ document.addEventListener('DOMContentLoaded', () => {
                     filteredOts = ots.filter(ot => ot.ubicacion_nombre === document.querySelector(`[data-ubicacion-id="${selectedUbicacionId}"] span`).textContent.replace('📍 ', ''));
                 }
 
-                if (filteredOts.length === 0) {
-                    otGrid.innerHTML = '<p style="color: var(--text-muted);">No se encontraron órdenes de trabajo para este filtro.</p>';
-                    return;
-                }
+                // Add or update to allLoadedOts
+                ots.forEach(ot => {
+                    if (!allLoadedOts.some(o => o.id === ot.id)) {
+                        allLoadedOts.push(ot);
+                    } else {
+                        const idx = allLoadedOts.findIndex(o => o.id === ot.id);
+                        allLoadedOts[idx] = ot;
+                    }
+                });
 
-                otGrid.innerHTML = '';
                 loadedWorkOrdersList = filteredOts;
-                filteredOts.forEach(ot => {
-                    const isCreated = ot.estado === 'CREADA';
-                    const isAssigned = ot.estado === 'ASIGNADA';
-                    const isScheduled = ot.estado === 'PROGRAMADA';
-                    const isDone = ot.estado === 'REALIZADA' || ot.estado === 'Resuelta';
+                renderWorkOrders(filteredOts, otGrid);
 
-                    let statusLabel = 'Creada';
-                    let statusClass = 'status-created';
-
-                    if (isDone) {
-                        statusLabel = 'Realizada';
-                        statusClass = 'status-done';
-                    } else if (ot.fecha_inicio) {
-                        if (ot.estado_ejecucion === 'PAUSADA' || ot.estado_ejecucion === 'DETENIDA') {
-                            statusLabel = 'Pausada';
-                            statusClass = 'status-scheduled';
-                        } else {
-                            statusLabel = 'Iniciada';
-                            statusClass = 'status-progress';
-                        }
-                    } else if (isScheduled) {
-                        statusLabel = 'Programada';
-                        statusClass = 'status-scheduled';
-                    } else if (isAssigned) {
-                        statusLabel = 'Asignada';
-                        statusClass = 'status-assigned';
-                    } else if (isCreated) {
-                        statusLabel = 'Creada';
-                        statusClass = 'status-created';
-                    } else {
-                        statusLabel = ot.estado;
-                        statusClass = 'status-created';
-                    }
-
-                    // Format scheduled date
-                    let progDateStr = 'Pendiente';
-                    let progColor = 'var(--text-muted)';
-                    if (ot.fecha_programada) {
-                        const pDate = new Date(ot.fecha_programada);
-                        progDateStr = pDate.toLocaleDateString('es-CL', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                        });
-                        if (ot.fecha_programada.includes('T')) {
-                            const timePart = ot.fecha_programada.substring(11, 16);
-                            if (timePart !== '00:00') {
-                                progDateStr += ` a las ${timePart}`;
-                            }
-                        }
-                        progColor = 'var(--warning)';
-                    }
-
-                    // Format start date/time
-                    let startTimeFormatted = '';
-                    if (ot.fecha_inicio) {
-                        const sDate = new Date(ot.fecha_inicio);
-                        const day = String(sDate.getDate()).padStart(2, '0');
-                        const month = String(sDate.getMonth() + 1).padStart(2, '0');
-                        const hrs = String(sDate.getHours()).padStart(2, '0');
-                        const mins = String(sDate.getMinutes()).padStart(2, '0');
-                        startTimeFormatted = `${day}/${month} a las ${hrs}:${mins}`;
-                    }
-
-                    let completionDateStr = '';
-                    if (ot.fecha_resolucion) {
-                        const dateObj = new Date(ot.fecha_resolucion);
-                        completionDateStr = ` el ${dateObj.toLocaleDateString()}`;
-                    }
-
-                    // Build assign/reassign button
-                    let assignBtnHtml = '';
-                    if (!isDone) {
-                        if (ot.tecnico_nombre) {
-                            assignBtnHtml = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Reasignar</button>`;
-                        } else {
-                            assignBtnHtml = `<button class="btn-primary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--primary-color); line-height: 1;">Asignar</button>`;
-                        }
-                    }
-
-                    // Build program/reprogram button
-                    let programBtnHtml = '';
-                    if (!isDone) {
-                        if (ot.fecha_programada) {
-                            programBtnHtml = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Reprogramar</button>`;
-                        } else {
-                            programBtnHtml = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Programar</button>`;
-                        }
-                    }
-
-                    // Build gestion HTML (with Iniciar button or start details + action buttons)
-                    let gestionContentHtml = '';
-                    if (isDone) {
-                        gestionContentHtml = `<span style="color: var(--success); font-weight: 500;">✓ Realizada${completionDateStr}</span>`;
-                        if (ot.fecha_inicio) {
-                            gestionContentHtml += ` <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(Iniciada: ${startTimeFormatted})</span>`;
-                        }
-                    } else {
-                        if (ot.fecha_inicio) {
-                            if (ot.estado_ejecucion === 'PAUSADA' || ot.estado_ejecucion === 'DETENIDA') {
-                                gestionContentHtml = `
-                                    <span style="color: var(--warning); font-weight: 500;">Pausada (Iniciada el ${startTimeFormatted})</span>
-                                    <button class="btn-resume" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; background: var(--accent-color); color: white; border: none; line-height: 1;">Retomar</button>
-                                    <button class="btn-complete-direct" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.25rem; cursor: pointer; border-radius: 4px; background: var(--success); color: white; border: none; line-height: 1;">Terminar</button>
-                                `;
-                            } else {
-                                gestionContentHtml = `
-                                    <span style="color: #38bdf8; font-weight: 500;">Iniciada el ${startTimeFormatted}</span>
-                                    <button class="btn-pause" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Detener</button>
-                                    <button class="btn-complete-direct" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.25rem; cursor: pointer; border-radius: 4px; background: var(--success); color: white; border: none; line-height: 1;">Terminar</button>
-                                `;
-                            }
-                        } else {
-                            gestionContentHtml = `<button class="btn-primary btn-start" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; line-height: 1;">Iniciar</button>`;
-                        }
-                    }
-
-                    let checklistBtn = '';
-                    if (isDone && ot.plantilla_id) {
-                        checklistBtn = `
-                            <div style="margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem; text-align: left;">
-                                <button class="btn-view-checklist" data-ot-id="${ot.id}" style="background: transparent; border: none; color: var(--accent-color); padding: 0; font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline;">
-                                    Ver Checklist de Inspección
-                                </button>
-                                <div id="checklist-results-${ot.id}" style="display: none; margin-top: 0.5rem; background: rgba(0,0,0,0.15); padding: 0.5rem; border-radius: 6px; font-size: 0.8rem; border-left: 2px solid var(--success); flex-direction: column; gap: 0.35rem;">
-                                    Cargando resultados...
-                                </div>
-                            </div>
-                        `;
-                    }
-
-                    const card = document.createElement('div');
-                    card.className = `entity-card priority-${ot.prioridad.toLowerCase()}`;
-                    card.innerHTML = `
-                        <div class="card-tag ${statusClass}">${statusLabel}</div>
-                        <h4 class="entity-title" style="font-weight: bold;"><span style="font-weight: normal;">#OT-${ot.id}</span> - ${ot.tipo}</h4>
-                        <div class="entity-subtitle" style="font-weight: bold; color: var(--text-color); margin-bottom: 0.5rem;">${ot.planta_nombre} / ${ot.edificio_nombre} ${ot.ubicacion_nombre ? '/ ' + ot.ubicacion_nombre : ''}</div>
-                        <p style="font-size:0.85rem; background:rgba(0,0,0,0.1); padding:0.5rem; border-radius:6px; margin-bottom:0.4rem; color:#cbd5e1;">${ot.descripcion}</p>
-                        
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; display: flex; align-items: center; flex-wrap: wrap;">
-                            Asignado a: <strong style="color: var(--text-color); margin-left: 0.25rem;">${ot.tecnico_nombre || 'Sin asignar'}</strong> ${assignBtnHtml}
-                        </div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; display: flex; align-items: center; flex-wrap: wrap;">
-                            Prog: <strong style="color: ${progColor}; margin-left: 0.25rem;">${progDateStr}</strong> ${programBtnHtml}
-                        </div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-                            Gestión: <span>${gestionContentHtml}</span>
-                        </div>
-                        
-                        ${checklistBtn}
-                        
-                        <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                            <span>Reportado por: <strong style="color: var(--text-color);">${ot.reportado_por || 'Sistema'}</strong></span>
-                            <span>Creación: ${new Date(ot.fecha_creacion).toLocaleDateString()}</span>
-                        </div>
-                    `;
-                    otGrid.appendChild(card);
-
-                    card.querySelectorAll('.btn-assign').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            openAssignModalDialog(ot.id);
-                        });
-                    });
-
-                    card.querySelectorAll('.btn-start').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            startWorkOrder(ot.id);
-                        });
-                    });
-
-                    card.querySelectorAll('.btn-pause').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            pauseWorkOrder(ot.id);
-                        });
-                    });
-
-                    card.querySelectorAll('.btn-resume').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            resumeWorkOrder(ot.id);
-                        });
-                    });
-
-                    card.querySelectorAll('.btn-complete-direct').forEach(btn => {
-                        btn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            completeWorkOrderDirect(ot.id);
-                        });
-                    });
-                });
-
-                // Attach event listeners for checklist toggles
-                document.querySelectorAll('.btn-view-checklist').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const otId = btn.getAttribute('data-ot-id');
-                        const container = document.getElementById(`checklist-results-${otId}`);
-                        const isVisible = container.style.display === 'flex' || container.style.display === 'block';
-                        
-                        if (isVisible) {
-                            container.style.display = 'none';
-                            btn.textContent = 'Ver Checklist de Inspección';
-                        } else {
-                            container.style.display = 'flex';
-                            container.style.flexDirection = 'column';
-                            container.innerHTML = '<span style="color:var(--text-muted);">Cargando...</span>';
-                            btn.textContent = 'Ocultar Checklist';
-                            
-                            fetch(`/api/ordenes/${otId}/respuestas`)
-                                .then(res => res.json())
-                                .then(respuestas => {
-                                    if (respuestas.length === 0) {
-                                        container.innerHTML = '<span style="color:var(--text-muted);">Sin respuestas registradas.</span>';
-                                        return;
-                                    }
-                                    container.innerHTML = '';
-                                    respuestas.forEach(r => {
-                                        let valStr = '';
-                                        if (r.tipo_respuesta === 'booleano') {
-                                            valStr = r.valor_booleano ? 
-                                                '<span style="color: var(--success); font-weight: 600;">Pasa (OK)</span>' : 
-                                                '<span style="color: var(--danger); font-weight: 600;">Falla (No OK)</span>';
-                                        } else if (r.tipo_respuesta === 'numerico') {
-                                            valStr = `<strong style="color:var(--accent-color);">${r.valor_numerico}</strong> <span style="font-size:0.75rem; color:var(--text-muted);">${r.unidad_medida || ''}</span>`;
-                                        } else {
-                                            valStr = `<span style="color:#cbd5e1;">${r.valor_texto || ''}</span>`;
-                                        }
-                                        
-                                        container.innerHTML += `
-                                            <div style="border-bottom:1px solid rgba(255,255,255,0.03); padding-bottom:0.3rem; margin-bottom:0.3rem; font-size:0.8rem;">
-                                                <div style="font-weight: 600; color: #94a3b8; font-size: 0.78rem;">${r.texto_pregunta}</div>
-                                                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.15rem;">
-                                                    <div>${valStr}</div>
-                                                    ${r.observacion ? `<span style="font-size:0.75rem; color:var(--warning); font-style:italic;">"${r.observacion}"</span>` : ''}
-                                                </div>
-                                            </div>
-                                        `;
-                                    });
-                                })
-                                .catch(err => {
-                                    container.innerHTML = `<span style="color:var(--danger);">Error: ${err.message}</span>`;
-                                });
-                        }
-                    });
-                });
+                // Update location summaries and detail panel reactively
+                loadPlantSummaries();
             })
             .catch(err => console.error('Error al cargar OTs:', err));
+    }
+
+    // --- 4.5. LOAD PLANT SUMMARIES & DETAILS ---
+    function loadPlantSummaries() {
+        fetch('/api/ordenes')
+            .then(res => res.json())
+            .then(ots => {
+                allLoadedOts = ots;
+                
+                const counts = {
+                    'Santa Adela': { corrective: 0, preventive: 0, total: 0 },
+                    'La Divisa': { corrective: 0, preventive: 0, total: 0 },
+                    'Sta. A. 10.000': { corrective: 0, preventive: 0, total: 0 }
+                };
+
+                ots.forEach(ot => {
+                    const plant = ot.planta_nombre;
+                    if (counts[plant] !== undefined) {
+                        counts[plant].total++;
+                        if (ot.tipo === 'Correctiva') {
+                            counts[plant].corrective++;
+                        } else if (ot.tipo === 'Preventiva') {
+                            counts[plant].preventive++;
+                        }
+                    }
+                });
+
+                for (const plant in counts) {
+                    const c = counts[plant];
+                    const selectors = plantCounts[plant];
+                    if (selectors) {
+                        if (selectors.corrective) selectors.corrective.textContent = `${c.corrective} OTs`;
+                        if (selectors.preventive) selectors.preventive.textContent = `${c.preventive} OTs`;
+                        if (selectors.total) selectors.total.textContent = `${c.total} OTs`;
+                    }
+                }
+
+                // If currently viewing a plant's details, refresh that list as well
+                if (plantDetailView && plantDetailView.style.display === 'block' && currentSelectedPlantName) {
+                    renderPlantDetail(currentSelectedPlantName);
+                }
+            })
+            .catch(err => console.error('Error cargando resúmenes de planta:', err));
+    }
+
+    function renderPlantDetail(plantName) {
+        currentSelectedPlantName = plantName;
+        if (plantDetailTitle) {
+            plantDetailTitle.textContent = `Órdenes de Trabajo en ${plantName}`;
+        }
+        
+        const filteredOts = allLoadedOts.filter(ot => ot.planta_nombre === plantName);
+        
+        if (plantOtGrid) {
+            renderWorkOrders(filteredOts, plantOtGrid);
+        }
+    }
+
+    // Click handlers for plant overview cards
+    document.querySelectorAll('.plant-kpi-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const plantName = card.getAttribute('data-planta-nombre');
+            if (plantSummaryView) plantSummaryView.style.display = 'none';
+            if (plantDetailView) plantDetailView.style.display = 'block';
+            renderPlantDetail(plantName);
+        });
+    });
+
+    // Back button listener
+    if (btnBackToPlants) {
+        btnBackToPlants.addEventListener('click', () => {
+            currentSelectedPlantName = null;
+            if (plantDetailView) plantDetailView.style.display = 'none';
+            if (plantSummaryView) plantSummaryView.style.display = 'block';
+            loadPlantSummaries();
+        });
     }
 
     filterOtState.addEventListener('change', loadWorkOrders);
@@ -1517,7 +1670,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 8. ASSIGN TECHNICIAN MODAL ACTIONS ---
     function openAssignModalDialog(otId) {
         assignOtId.value = otId;
-        const ot = loadedWorkOrdersList.find(o => o.id === parseInt(otId));
+        const ot = allLoadedOts.find(o => o.id === parseInt(otId)) || loadedWorkOrdersList.find(o => o.id === parseInt(otId));
         
         const dateInput = document.getElementById('assign-fecha-programada');
         const timeInput = document.getElementById('assign-hora-programada');
@@ -1558,7 +1711,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fullFechaProgramada = fechaProgramadaVal + 'T' + (horaProgramadaVal || '00:00') + ':00';
         }
 
-        const ot = loadedWorkOrdersList.find(o => o.id === parseInt(otId));
+        const ot = allLoadedOts.find(o => o.id === parseInt(otId)) || loadedWorkOrdersList.find(o => o.id === parseInt(otId));
         if (ot && ot.fecha_inicio && fullFechaProgramada) {
             const startDt = new Date(ot.fecha_inicio);
             const progDt = new Date(fullFechaProgramada);
