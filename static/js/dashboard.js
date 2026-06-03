@@ -579,7 +579,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             // Open this plant
                             content.style.display = 'block';
                             header.querySelector('.arrow').textContent = '▼';
-                            loadBuildings(p.id, content);
+                            loadBuildings(p.id, content, p.nombre);
                         } else {
                             // Close this plant
                             content.style.display = 'none';
@@ -604,18 +604,26 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.error('Error al cargar jerarquía:', err));
     }
 
-    function loadBuildings(plantaId, containerElement) {
+    function loadBuildings(plantaId, containerElement, plantaNombre) {
         fetch(`/api/plantas/${plantaId}/edificios`)
             .then(res => res.json())
             .then(edificios => {
                 containerElement.innerHTML = '';
                 edificios.forEach(e => {
+                    const activeOtsCount = allLoadedOts.filter(ot => 
+                        ot.edificio_nombre === e.nombre && 
+                        ot.planta_nombre === plantaNombre && 
+                        ot.estado !== 'REALIZADA' && 
+                        ot.estado !== 'Resuelta' &&
+                        ot.estado !== 'Cancelada'
+                    ).length;
+
                     const buildingItem = document.createElement('div');
                     buildingItem.className = 'building-item';
                     buildingItem.style.margin = '0.4rem 0';
                     buildingItem.innerHTML = `
                         <div class="sub-item" data-edificio-id="${e.id}" style="font-weight: 500; cursor: pointer; padding: 0.4rem 0.5rem; display: flex; justify-content: space-between;">
-                            <span>📦 ${e.nombre}</span>
+                            <span>📦 ${e.nombre} <span class="building-ot-count" data-building-name="${e.nombre}" data-plant-name="${plantaNombre}" style="font-weight: normal; color: var(--text-muted); font-size: 0.8rem; margin-left: 0.25rem;">(${activeOtsCount})</span></span>
                             <span class="sub-arrow">▶</span>
                         </div>
                         <div class="location-container" id="building-locations-${e.id}" style="display: none; padding-left: 1.2rem; flex-direction: column; gap: 0.25rem; border-left: 1px dashed var(--border-color); margin-top: 0.25rem;">
@@ -1057,8 +1065,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (plantDetailView && plantDetailView.style.display === 'block' && currentSelectedPlantName) {
                     renderPlantDetail(currentSelectedPlantName);
                 }
+
+                // Update building counts in the sidebar
+                updateBuildingOtCounts();
             })
             .catch(err => console.error('Error cargando resúmenes de planta:', err));
+    }
+
+    function updateBuildingOtCounts() {
+        document.querySelectorAll('.building-ot-count').forEach(span => {
+            const buildingName = span.getAttribute('data-building-name');
+            const plantName = span.getAttribute('data-plant-name');
+            const count = allLoadedOts.filter(ot => 
+                ot.edificio_nombre === buildingName && 
+                ot.planta_nombre === plantName && 
+                ot.estado !== 'REALIZADA' && 
+                ot.estado !== 'Resuelta' &&
+                ot.estado !== 'Cancelada'
+            ).length;
+            span.textContent = `(${count})`;
+        });
     }
 
     function renderPlantDetail(plantName) {
