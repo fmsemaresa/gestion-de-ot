@@ -36,6 +36,13 @@ def create_db_and_tables():
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE ordentrabajo ADD COLUMN fecha_inicio TIMESTAMP"))
             print("Columna 'fecha_inicio' agregada exitosamente.")
+        if 'estado_ejecucion' not in columns:
+            print("Migrando base de datos: agregando columna 'estado_ejecucion' a la tabla 'ordentrabajo'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE ordentrabajo ADD COLUMN estado_ejecucion VARCHAR(50) DEFAULT 'NO_INICIADA'"))
+                conn.execute(text("UPDATE ordentrabajo SET estado_ejecucion = 'REALIZADA' WHERE fecha_resolucion IS NOT NULL"))
+                conn.execute(text("UPDATE ordentrabajo SET estado_ejecucion = 'EN_PROCESO' WHERE fecha_inicio IS NOT NULL AND fecha_resolucion IS NULL"))
+            print("Columna 'estado_ejecucion' agregada exitosamente.")
     except Exception as e:
         print(f"Error al verificar/migrar columnas de ordentrabajo: {e}")
 

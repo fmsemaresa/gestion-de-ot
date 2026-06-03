@@ -288,6 +288,7 @@ def get_ordenes(
             "fecha_resolucion": ot.fecha_resolucion.isoformat() + "Z" if ot.fecha_resolucion else None,
             "fecha_programada": ot.fecha_programada.isoformat() if ot.fecha_programada else None,
             "fecha_inicio": ot.fecha_inicio.isoformat() + "Z" if ot.fecha_inicio else None,
+            "estado_ejecucion": ot.estado_ejecucion,
             "reportado_por": ot.reportado_por,
             "comentarios_tecnicos": ot.comentarios_tecnicos,
             "planta_nombre": planta.nombre if planta else None,
@@ -375,8 +376,12 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
                     ot.fecha_inicio = datetime.fromisoformat(val)
             else:
                 ot.fecha_inicio = val
+            if "estado_ejecucion" not in updated_ot:
+                ot.estado_ejecucion = "EN_PROCESO"
         else:
             ot.fecha_inicio = None
+            if "estado_ejecucion" not in updated_ot:
+                ot.estado_ejecucion = "NO_INICIADA"
 
     # Validate: fecha_programada cannot be posterior to fecha_inicio (when rescheduling)
     if "fecha_programada" in updated_ot and ot.fecha_programada and ot.fecha_inicio:
@@ -408,6 +413,7 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
         if req_estado in ("REALIZADA", "Resuelta"):
             ot.estado = "REALIZADA"
             ot.fecha_resolucion = datetime.utcnow()
+            ot.estado_ejecucion = "REALIZADA"
             if ot.activo_id:
                 activo = db.get(Activo, ot.activo_id)
                 if activo:
@@ -415,6 +421,18 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
                     db.add(activo)
         elif req_estado == "Cancelada":
             ot.estado = "Cancelada"
+
+    if "estado_ejecucion" in updated_ot:
+        val_ej = updated_ot["estado_ejecucion"]
+        ot.estado_ejecucion = val_ej
+        if val_ej == "REALIZADA" and ot.estado != "REALIZADA":
+            ot.estado = "REALIZADA"
+            ot.fecha_resolucion = datetime.utcnow()
+            if ot.activo_id:
+                activo = db.get(Activo, ot.activo_id)
+                if activo:
+                    activo.estado = "Operativo"
+                    db.add(activo)
         else:
             # Re-evaluate non-terminal state
             if ot.tecnico_id:
@@ -606,7 +624,7 @@ def exportar_ordenes(db: Session = Depends(get_db)):
     ws.title = "Ordenes de Trabajo"
     
     headers = [
-        "ID OT", "Descripción", "Tipo Mantenimiento", "Estado", "Prioridad",
+        "ID OT", "Descripción", "Tipo Mantenimiento", "Estado", "Estado Ejecución", "Prioridad",
         "Fecha Creación", "Fecha Programada", "Fecha Inicio", "Fecha Realización", "Reportado Por", "Comentarios Técnicos",
         "Planta", "Edificio", "Ubicación", "Activo Afectado", "Técnico Asignado"
     ]
@@ -637,6 +655,7 @@ def exportar_ordenes(db: Session = Depends(get_db)):
             ot.descripcion,
             ot.tipo,
             mapped_estado,
+            ot.estado_ejecucion,
             ot.prioridad,
             ot.fecha_creacion.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_creacion else "",
             ot.fecha_programada.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_programada else "",

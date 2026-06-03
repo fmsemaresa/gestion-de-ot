@@ -691,18 +691,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     let statusLabel = 'Creada';
                     let statusClass = 'status-created';
 
-                    if (isCreated) {
-                        statusLabel = 'Creada';
-                        statusClass = 'status-created';
-                    } else if (isAssigned) {
-                        statusLabel = 'Asignada';
-                        statusClass = 'status-assigned';
+                    if (isDone) {
+                        statusLabel = 'Realizada';
+                        statusClass = 'status-done';
+                    } else if (ot.fecha_inicio) {
+                        if (ot.estado_ejecucion === 'PAUSADA' || ot.estado_ejecucion === 'DETENIDA') {
+                            statusLabel = 'Pausada';
+                            statusClass = 'status-scheduled';
+                        } else {
+                            statusLabel = 'Iniciada';
+                            statusClass = 'status-progress';
+                        }
                     } else if (isScheduled) {
                         statusLabel = 'Programada';
                         statusClass = 'status-scheduled';
-                    } else if (isDone) {
-                        statusLabel = 'Realizada';
-                        statusClass = 'status-done';
+                    } else if (isAssigned) {
+                        statusLabel = 'Asignada';
+                        statusClass = 'status-assigned';
+                    } else if (isCreated) {
+                        statusLabel = 'Creada';
+                        statusClass = 'status-created';
                     } else {
                         statusLabel = ot.estado;
                         statusClass = 'status-created';
@@ -764,7 +772,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
-                    // Build gestion HTML (with Iniciar button or start details)
+                    // Build gestion HTML (with Iniciar button or start details + action buttons)
                     let gestionContentHtml = '';
                     if (isDone) {
                         gestionContentHtml = `<span style="color: var(--success); font-weight: 500;">✓ Realizada${completionDateStr}</span>`;
@@ -773,7 +781,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     } else {
                         if (ot.fecha_inicio) {
-                            gestionContentHtml = `<span style="color: #38bdf8; font-weight: 500;">Iniciada el ${startTimeFormatted}</span>`;
+                            if (ot.estado_ejecucion === 'PAUSADA' || ot.estado_ejecucion === 'DETENIDA') {
+                                gestionContentHtml = `
+                                    <span style="color: var(--warning); font-weight: 500;">Pausada (Iniciada el ${startTimeFormatted})</span>
+                                    <button class="btn-resume" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; background: var(--accent-color); color: white; border: none; line-height: 1;">Retomar</button>
+                                    <button class="btn-complete-direct" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.25rem; cursor: pointer; border-radius: 4px; background: var(--success); color: white; border: none; line-height: 1;">Terminar</button>
+                                `;
+                            } else {
+                                gestionContentHtml = `
+                                    <span style="color: #38bdf8; font-weight: 500;">Iniciada el ${startTimeFormatted}</span>
+                                    <button class="btn-pause" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Detener</button>
+                                    <button class="btn-complete-direct" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.25rem; cursor: pointer; border-radius: 4px; background: var(--success); color: white; border: none; line-height: 1;">Terminar</button>
+                                `;
+                            }
                         } else {
                             gestionContentHtml = `<button class="btn-primary btn-start" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; line-height: 1;">Iniciar</button>`;
                         }
@@ -831,6 +851,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
                             startWorkOrder(ot.id);
+                        });
+                    });
+
+                    card.querySelectorAll('.btn-pause').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            pauseWorkOrder(ot.id);
+                        });
+                    });
+
+                    card.querySelectorAll('.btn-resume').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            resumeWorkOrder(ot.id);
+                        });
+                    });
+
+                    card.querySelectorAll('.btn-complete-direct').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            completeWorkOrderDirect(ot.id);
                         });
                     });
                 });
@@ -1561,6 +1602,68 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .then(() => {
             alert('Orden de trabajo iniciada con éxito.');
+            loadKPIs();
+            loadWorkOrders();
+        })
+        .catch(err => alert(err.message));
+    }
+
+    function pauseWorkOrder(otId) {
+        fetch(`/api/ordenes/${otId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                estado_ejecucion: 'PAUSADA'
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al detener la orden de trabajo');
+            return res.json();
+        })
+        .then(() => {
+            loadKPIs();
+            loadWorkOrders();
+        })
+        .catch(err => alert(err.message));
+    }
+
+    function resumeWorkOrder(otId) {
+        fetch(`/api/ordenes/${otId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                estado_ejecucion: 'EN_PROCESO'
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al retomar la orden de trabajo');
+            return res.json();
+        })
+        .then(() => {
+            loadKPIs();
+            loadWorkOrders();
+        })
+        .catch(err => alert(err.message));
+    }
+
+    function completeWorkOrderDirect(otId) {
+        const comments = prompt("Ingrese comentarios técnicos de resolución (opcional):");
+        if (comments === null) return; // User cancelled
+
+        fetch(`/api/ordenes/${otId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                estado: 'REALIZADA',
+                estado_ejecucion: 'REALIZADA',
+                comentarios_tecnicos: comments
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al terminar la orden de trabajo');
+            return res.json();
+        })
+        .then(() => {
             loadKPIs();
             loadWorkOrders();
         })

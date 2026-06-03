@@ -95,6 +95,7 @@ class OrdenTrabajo(SQLModel, table=True):
     fecha_resolucion: Optional[datetime] = None
     reportado_por: Optional[str] = None  # Nombre o email de quien reporta
     comentarios_tecnicos: Optional[str] = None
+    estado_ejecucion: str = Field(default="NO_INICIADA")  # NO_INICIADA, EN_PROCESO, PAUSADA, REALIZADA
     
     # Location fields (to know where it is, even if no asset is selected)
     planta_id: int = Field(foreign_key="planta.id")
