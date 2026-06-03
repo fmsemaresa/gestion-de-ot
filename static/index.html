@@ -107,11 +107,11 @@
                     <button class="btn-secondary active" id="tab-btn-ots" style="border: none; background: transparent; padding: 0.5rem 1rem; border-bottom: 2px solid var(--accent-color); border-radius: 0; font-weight: 600;">
                         Órdenes de Trabajo (OT)
                     </button>
-                    <button class="btn-secondary" id="tab-btn-activos" style="border: none; background: transparent; padding: 0.5rem 1rem; border-bottom: 2px solid transparent; border-radius: 0; font-weight: 600;">
-                        Activos (Equipos)
-                    </button>
                     <button class="btn-secondary" id="tab-btn-ubicaciones" style="border: none; background: transparent; padding: 0.5rem 1rem; border-bottom: 2px solid transparent; border-radius: 0; font-weight: 600;">
                         Ubicaciones (Plantas)
+                    </button>
+                    <button class="btn-secondary" id="tab-btn-activos" style="border: none; background: transparent; padding: 0.5rem 1rem; border-bottom: 2px solid transparent; border-radius: 0; font-weight: 600;">
+                        Activos (Equipos)
                     </button>
                 </div>
 
@@ -120,6 +120,17 @@
                     <div class="card-header-actions">
                         <h2 style="font-size: 1.25rem;">Gestión de Órdenes de Trabajo</h2>
                         <div style="display: flex; gap: 0.75rem; align-items: center;">
+                            <div style="display: flex; gap: 0.5rem; background: var(--bg-secondary); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border-color);" id="ot-view-selectors">
+                                <button class="btn-secondary" id="btn-ot-view-flat" style="padding: 0.4rem 0.75rem; font-size: 0.85rem; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; background: var(--accent-color); color: white; font-weight: 500;">
+                                    📋 Lista Plana
+                                </button>
+                                <button class="btn-secondary" id="btn-ot-view-building" style="padding: 0.4rem 0.75rem; font-size: 0.85rem; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; background: transparent; color: var(--text-muted); font-weight: 500;">
+                                    🏢 Por Edificio
+                                </button>
+                                <button class="btn-secondary" id="btn-ot-view-type" style="padding: 0.4rem 0.75rem; font-size: 0.85rem; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; background: transparent; color: var(--text-muted); font-weight: 500;">
+                                    🔧 Por Tipo
+                                </button>
+                            </div>
                             <button class="btn-secondary" id="btn-export-ots-excel" style="background: #107c41; color: white; border-color: #107c41; display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.85rem;">
                                 <span>📥</span> Exportar Excel
                             </button>

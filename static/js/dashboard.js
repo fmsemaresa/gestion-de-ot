@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSelectedPlantName = null;
     let allLoadedOts = [];
     let currentPlantViewMode = 'flat'; // 'flat', 'building', or 'type'
+    let currentOtViewMode = 'flat'; // 'flat', 'building', or 'type'
 
     // DOM Elements
     const kpiTotalOts = document.getElementById('kpi-total-ots');
@@ -43,6 +44,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnPlantViewFlat = document.getElementById('btn-plant-view-flat');
     const btnPlantViewBuilding = document.getElementById('btn-plant-view-building');
     const btnPlantViewType = document.getElementById('btn-plant-view-type');
+    const btnOtViewFlat = document.getElementById('btn-ot-view-flat');
+    const btnOtViewBuilding = document.getElementById('btn-ot-view-building');
+    const btnOtViewType = document.getElementById('btn-ot-view-type');
 
     // Plant count selector mappings
     const plantCounts = {
@@ -1027,8 +1031,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 loadedWorkOrdersList = filteredOts;
-                renderWorkOrders(filteredOts, otGrid);
-
+                
+                if (otGrid) {
+                    if (currentOtViewMode === 'flat') {
+                        otGrid.style.display = 'grid';
+                        otGrid.style.flexDirection = '';
+                        otGrid.style.gap = '1.25rem';
+                        otGrid.style.overflowX = '';
+                        renderWorkOrders(filteredOts, otGrid);
+                    } else if (currentOtViewMode === 'type') {
+                        otGrid.style.display = 'flex';
+                        otGrid.style.flexDirection = 'row';
+                        otGrid.style.gap = '1.25rem';
+                        otGrid.style.overflowX = 'auto';
+                        renderTypeGroupedView(filteredOts, otGrid);
+                    } else if (currentOtViewMode === 'building') {
+                        otGrid.style.display = 'flex';
+                        otGrid.style.flexDirection = 'column';
+                        otGrid.style.gap = '2rem';
+                        otGrid.style.overflowX = '';
+                        renderBuildingGroupedView(filteredOts, otGrid);
+                    }
+                }
+                
                 // Update location summaries and detail panel reactively
                 loadPlantSummaries();
             })
@@ -1113,6 +1138,25 @@ document.addEventListener('DOMContentLoaded', () => {
             { btn: btnPlantViewFlat, mode: 'flat' },
             { btn: btnPlantViewBuilding, mode: 'building' },
             { btn: btnPlantViewType, mode: 'type' }
+        ];
+        buttons.forEach(item => {
+            if (item.btn) {
+                if (item.btn === activeBtn) {
+                    item.btn.style.background = 'var(--accent-color)';
+                    item.btn.style.color = 'white';
+                } else {
+                    item.btn.style.background = 'transparent';
+                    item.btn.style.color = 'var(--text-muted)';
+                }
+            }
+        });
+    }
+
+    function setActiveOtViewButton(activeBtn) {
+        const buttons = [
+            { btn: btnOtViewFlat, mode: 'flat' },
+            { btn: btnOtViewBuilding, mode: 'building' },
+            { btn: btnOtViewType, mode: 'type' }
         ];
         buttons.forEach(item => {
             if (item.btn) {
@@ -1395,6 +1439,28 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentSelectedPlantName) {
                 renderPlantDetail(currentSelectedPlantName);
             }
+        });
+    }
+
+    if (btnOtViewFlat) {
+        btnOtViewFlat.addEventListener('click', () => {
+            currentOtViewMode = 'flat';
+            setActiveOtViewButton(btnOtViewFlat);
+            loadWorkOrders();
+        });
+    }
+    if (btnOtViewBuilding) {
+        btnOtViewBuilding.addEventListener('click', () => {
+            currentOtViewMode = 'building';
+            setActiveOtViewButton(btnOtViewBuilding);
+            loadWorkOrders();
+        });
+    }
+    if (btnOtViewType) {
+        btnOtViewType.addEventListener('click', () => {
+            currentOtViewMode = 'type';
+            setActiveOtViewButton(btnOtViewType);
+            loadWorkOrders();
         });
     }
 
@@ -2553,6 +2619,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- INITIALIZE APPLICATION ---
+    if (btnOtViewFlat) setActiveOtViewButton(btnOtViewFlat);
     loadKPIs();
     loadHierarchy();
     loadWorkOrders();
