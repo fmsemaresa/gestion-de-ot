@@ -690,26 +690,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     let statusLabel = 'Creada';
                     let statusClass = 'status-created';
-                    let assignBtn = '';
+                    let actionBtn = '';
 
                     if (isCreated) {
                         statusLabel = 'Creada';
                         statusClass = 'status-created';
-                        assignBtn = `<button class="btn-primary btn-assign" data-ot-id="${ot.id}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">Asignar Técnico</button>`;
+                        actionBtn = `<button class="btn-primary btn-assign" data-ot-id="${ot.id}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; cursor: pointer;">Asignar Técnico</button>`;
                     } else if (isAssigned) {
                         statusLabel = 'Asignada';
                         statusClass = 'status-assigned';
-                        assignBtn = `<div style="display:flex; flex-direction:column; gap:0.25rem;">
-                            <span style="font-size:0.8rem; color: var(--text-muted);">Asignado a: <strong>${ot.tecnico_nombre}</strong></span>
-                            <button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-top: 0.15rem; width: fit-content;">Programar / Reasignar</button>
-                        </div>`;
+                        actionBtn = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; cursor: pointer;">Programar / Reasignar</button>`;
                     } else if (isScheduled) {
                         statusLabel = 'Programada';
                         statusClass = 'status-scheduled';
-                        assignBtn = `<div style="display:flex; flex-direction:column; gap:0.25rem;">
-                            <span style="font-size:0.8rem; color: var(--text-muted);">Asignado a: <strong>${ot.tecnico_nombre}</strong></span>
-                            <button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-top: 0.15rem; width: fit-content;">Reprogramar / Reasignar</button>
-                        </div>`;
+                        actionBtn = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; cursor: pointer;">Reprogramar / Reasignar</button>`;
                     } else if (isDone) {
                         statusLabel = 'Realizada';
                         statusClass = 'status-done';
@@ -718,29 +712,30 @@ document.addEventListener('DOMContentLoaded', () => {
                             const dateObj = new Date(ot.fecha_resolucion);
                             completionDateStr = ` el ${dateObj.toLocaleDateString()}`;
                         }
-                        assignBtn = `<span style="font-size:0.8rem; color: var(--success); font-weight: 500;">✓ Realizada por ${ot.tecnico_nombre}${completionDateStr}</span>`;
+                        actionBtn = `<span style="color: var(--success); font-weight: 500;">✓ Realizada${completionDateStr}</span>`;
                     } else {
                         statusLabel = ot.estado;
                         statusClass = 'status-created';
+                        actionBtn = ot.estado;
                     }
 
-                    let progDateHtml = '';
+                    // Format dates
+                    let progDateStr = 'Pendiente';
+                    let progColor = 'var(--text-muted)';
                     if (ot.fecha_programada) {
                         const pDate = new Date(ot.fecha_programada);
-                        const formatted = pDate.toLocaleDateString('es-CL', {
+                        progDateStr = pDate.toLocaleDateString('es-CL', {
                             day: '2-digit',
                             month: '2-digit',
                             year: 'numeric'
                         });
-                        progDateHtml = `<div style="margin-top: 0.4rem; font-size: 0.8rem; color: var(--warning); display: flex; align-items: center; gap: 0.25rem;">
-                            <span>📅</span> <strong>Prog:</strong> ${formatted}
-                        </div>`;
+                        progColor = 'var(--warning)';
                     }
 
                     let checklistBtn = '';
                     if (isDone && ot.plantilla_id) {
                         checklistBtn = `
-                            <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem; text-align: left;">
+                            <div style="margin-top: 0.4rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.4rem; text-align: left;">
                                 <button class="btn-view-checklist" data-ot-id="${ot.id}" style="background: transparent; border: none; color: var(--accent-color); padding: 0; font-size: 0.8rem; font-weight: 600; cursor: pointer; text-decoration: underline;">
                                     Ver Checklist de Inspección
                                 </button>
@@ -755,20 +750,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     card.className = `entity-card priority-${ot.prioridad.toLowerCase()}`;
                     card.innerHTML = `
                         <div class="card-tag ${statusClass}">${statusLabel}</div>
-                        <h4 class="entity-title">#OT-${ot.id} - ${ot.tipo}</h4>
-                        <div class="entity-subtitle">${ot.planta_nombre} / ${ot.edificio_nombre} ${ot.ubicacion_nombre ? '/ ' + ot.ubicacion_nombre : ''}</div>
-                        <p style="font-size:0.85rem; background:rgba(0,0,0,0.1); padding:0.5rem; border-radius:6px; margin-bottom:0.25rem; color:#cbd5e1;">${ot.descripcion}</p>
-                        ${progDateHtml}
+                        <h4 class="entity-title" style="font-weight: bold;"><span style="font-weight: normal;">#OT-${ot.id}</span> - ${ot.tipo}</h4>
+                        <div class="entity-subtitle" style="font-weight: bold; color: var(--text-color); margin-bottom: 0.5rem;">${ot.planta_nombre} / ${ot.edificio_nombre} ${ot.ubicacion_nombre ? '/ ' + ot.ubicacion_nombre : ''}</div>
+                        <p style="font-size:0.85rem; background:rgba(0,0,0,0.1); padding:0.5rem; border-radius:6px; margin-bottom:0.4rem; color:#cbd5e1;">${ot.descripcion}</p>
+                        
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">
+                            Asignado a: <strong style="color: var(--text-color);">${ot.tecnico_nombre || 'Sin asignar'}</strong>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">
+                            Prog: <strong style="color: ${progColor};">${progDateStr}</strong>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                            Gestión: <span>${actionBtn}</span>
+                        </div>
+                        
                         ${checklistBtn}
-                        <div class="entity-meta" style="margin-top: 0.75rem;">
-                            <div class="meta-row">
-                                <span class="meta-icon">👤</span>
-                                <span>Reportado por: ${ot.reportado_por || 'Sistema'}</span>
-                            </div>
-                            <div class="meta-row" style="margin-top: 0.4rem; justify-content: space-between; align-items: center;">
-                                ${assignBtn}
-                                <span style="font-size:0.75rem; color: var(--text-muted);">${new Date(ot.fecha_creacion).toLocaleDateString()}</span>
-                            </div>
+                        
+                        <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <span>Reportado por: <strong style="color: var(--text-color);">${ot.reportado_por || 'Sistema'}</strong></span>
+                            <span>Creación: ${new Date(ot.fecha_creacion).toLocaleDateString()}</span>
                         </div>
                     `;
                     otGrid.appendChild(card);
