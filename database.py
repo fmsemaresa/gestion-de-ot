@@ -43,8 +43,20 @@ def create_db_and_tables():
                 conn.execute(text("UPDATE ordentrabajo SET estado_ejecucion = 'REALIZADA' WHERE fecha_resolucion IS NOT NULL"))
                 conn.execute(text("UPDATE ordentrabajo SET estado_ejecucion = 'EN_PROCESO' WHERE fecha_inicio IS NOT NULL AND fecha_resolucion IS NULL"))
             print("Columna 'estado_ejecucion' agregada exitosamente.")
+
+        # Check and migrate plantillachequeo table
+        columns_pc = [col['name'] for col in inspector.get_columns('plantillachequeo')]
+        if 'tipo_revision' not in columns_pc:
+            print("Migrando base de datos: agregando columna 'tipo_revision' a la tabla 'plantillachequeo'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE plantillachequeo ADD COLUMN tipo_revision VARCHAR(100) DEFAULT 'Chequeo Preventivo'"))
+            print("Columna 'tipo_revision' agregada exitosamente.")
+        
+        # Ensure existing templates are categorized correctly
+        with engine.begin() as conn:
+            conn.execute(text("UPDATE plantillachequeo SET tipo_revision = 'Ronda' WHERE nombre LIKE '%Ronda%'"))
     except Exception as e:
-        print(f"Error al verificar/migrar columnas de ordentrabajo: {e}")
+        print(f"Error al verificar/migrar columnas de base de datos: {e}")
 
 
 def normalize_code(code):
@@ -314,7 +326,8 @@ def seed_database():
         print("Cargando plantillas de chequeo...")
         t_split = PlantillaChequeo(
             nombre="Mantenimiento Preventivo de Aire Acondicionado Split",
-            descripcion="Inspección de rutina y mantenimiento preventivo para unidades Split de aire acondicionado."
+            descripcion="Inspección de rutina y mantenimiento preventivo para unidades Split de aire acondicionado.",
+            tipo_revision="Chequeo Preventivo"
         )
         session.add(t_split)
         session.commit()
@@ -333,7 +346,8 @@ def seed_database():
         
         t_gen = PlantillaChequeo(
             nombre="Mantenimiento Preventivo de Generador Eléctrico",
-            descripcion="Protocolo mensual de inspección y puesta en marcha para generadores de respaldo."
+            descripcion="Protocolo mensual de inspección y puesta en marcha para generadores de respaldo.",
+            tipo_revision="Chequeo Preventivo"
         )
         session.add(t_gen)
         session.commit()
@@ -352,7 +366,8 @@ def seed_database():
         
         t_insp = PlantillaChequeo(
             nombre="Ronda de Inspección Semanal (Disperfectos Generales)",
-            descripcion="Recorrido de inspección periódica de infraestructura y servicios de la planta."
+            descripcion="Recorrido de inspección periódica de infraestructura y servicios de la planta.",
+            tipo_revision="Ronda"
         )
         session.add(t_insp)
         session.commit()

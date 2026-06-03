@@ -1306,6 +1306,251 @@ async def importar_despiece(file: UploadFile = File(...), db: Session = Depends(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al procesar archivo Excel: {str(e)}")
 
+@app.get("/api/excel/plantilla-checklists")
+def descargar_plantilla_checklists(db: Session = Depends(get_db)):
+    wb = openpyxl.Workbook()
+    
+    # Hoja 1: Importar Checklists
+    ws_import = wb.active
+    ws_import.title = "Importar Checklists"
+    
+    headers = [
+        "ID Plantilla (Solo para actualizar, ej: PL-12)",
+        "Nombre de la Plantilla * (Obligatorio)",
+        "Descripción de la Plantilla",
+        "Tipo de Revisión * (Ronda o Chequeo Preventivo)",
+        "Pregunta / Ítem * (Obligatorio)",
+        "Tipo de Respuesta * (booleano, numerico, o texto)",
+        "Unidad de Medida (Opcional, ej: V, A, psi, C)"
+    ]
+    ws_import.append(headers)
+    
+    # Consultar plantillas existentes para pre-llenar plantilla
+    plantillas = db.exec(select(PlantillaChequeo)).all()
+    
+    rows_written = 0
+    for p in plantillas:
+        items = db.exec(select(ItemPlantillaChequeo).where(ItemPlantillaChequeo.plantilla_id == p.id)).all()
+        for item in items:
+            ws_import.append([
+                f"PL-{p.id}",
+                p.nombre,
+                p.descripcion or "",
+                p.tipo_revision or "Chequeo Preventivo",
+                item.texto_pregunta,
+                item.tipo_respuesta,
+                item.unidad_medida or ""
+            ])
+            rows_written += 1
+            
+    if rows_written == 0:
+        # Fila de ejemplo
+        ws_import.append([
+            "PL-Ejemplo",
+            "Mantenimiento Preventivo Fancoil",
+            "Inspección de mantención mensual de fancoils",
+            "Chequeo Preventivo",
+            "Limpieza de filtros de aire de unidad evaporadora",
+            "booleano",
+            ""
+        ])
+        ws_import.append([
+            "PL-Ejemplo",
+            "Mantenimiento Preventivo Fancoil",
+            "Inspección de mantención mensual de fancoils",
+            "Chequeo Preventivo",
+            "Medición de consumo eléctrico del motor",
+            "numerico",
+            "A"
+        ])
+        ws_import.append([
+            "PL-Ejemplo",
+            "Ronda Diaria de Calderas",
+            "Recorrido visual diario por sala de calderas",
+            "Ronda",
+            "Comprobar fugas de agua o vapor",
+            "booleano",
+            ""
+        ])
+        
+    # Hoja 2: Instrucciones
+    ws_instr = wb.create_sheet(title="Instrucciones")
+    ws_instr.append(["Guía de Llenado para Importación de Checklists"])
+    ws_instr.append([])
+    ws_instr.append(["1. Columnas obligatorias:"])
+    ws_instr.append(["   - Nombre de la Plantilla: El nombre que identifica al checklist entero."])
+    ws_instr.append(["   - Tipo de Revisión: Debe ser exacto: 'Ronda' o 'Chequeo Preventivo'."])
+    ws_instr.append(["   - Pregunta / Ítem: La pregunta de la inspección."])
+    ws_instr.append(["   - Tipo de Respuesta: Debe ser: 'booleano' (si es OK/Falla), 'numerico' (para ingresar un valor decimal) o 'texto' (para notas)."])
+    ws_instr.append([])
+    ws_instr.append(["2. Modificación de Plantillas Existentes:"])
+    ws_instr.append(["   - Para modificar o añadir ítems a una plantilla existente, mantén el 'ID Plantilla' (ej. PL-1)."])
+    ws_instr.append(["   - Si dejas el 'ID Plantilla' vacío, el sistema buscará la plantilla por su nombre, y si no existe la creará."])
+    
+    # Stream file
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    headers_response = {
+        'Content-Disposition': 'attachment; filename="plantilla_importar_checklists.xlsx"'
+    }
+    return StreamingResponse(
+        buffer,
+        headers=headers_response,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+@app.post("/api/excel/importar/checklists")
+async def importar_checklists(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Por favor sube un archivo Excel válido (.xlsx)")
+        
+    try:
+        contents = await file.read()
+        file_stream = io.BytesIO(contents)
+        wb = openpyxl.load_workbook(file_stream, read_only=True)
+        
+        # Seleccionar hoja
+        if "Importar Checklists" in wb.sheetnames:
+            sheet = wb["Importar Checklists"]
+        else:
+            sheet = wb.active
+            
+        rows = list(sheet.iter_rows(values_only=True))
+        if len(rows) < 2:
+            return {"status": "success", "imported_templates": 0, "imported_items": 0, "message": "El archivo está vacío o no contiene filas de datos"}
+            
+        templates_created = 0
+        templates_updated = 0
+        items_created = 0
+        items_updated = 0
+        
+        resolved_templates = {}
+        
+        for idx, row in enumerate(rows[1:], start=2):
+            if not row or not any(row):
+                continue
+                
+            id_plantilla_str = str(row[0]).strip() if row[0] is not None else ""
+            nombre_plantilla = str(row[1]).strip() if row[1] is not None else ""
+            descripcion_plantilla = str(row[2]).strip() if row[2] is not None else ""
+            tipo_rev_val = str(row[3]).strip() if row[3] is not None else "Chequeo Preventivo"
+            pregunta = str(row[4]).strip() if row[4] is not None else ""
+            tipo_resp_val = str(row[5]).strip() if row[5] is not None else "booleano"
+            unidad_medida = str(row[6]).strip() if row[6] is not None else ""
+            
+            # Omitir filas de ejemplo
+            if id_plantilla_str == "PL-Ejemplo" or nombre_plantilla == "Mantenimiento Preventivo Fancoil" and pregunta == "Limpieza de filtros de aire de unidad evaporadora":
+                continue
+                
+            if not nombre_plantilla or not pregunta:
+                continue
+                
+            # Normalizar tipo de revision
+            if tipo_rev_val.lower() in ["ronda", "rondas"]:
+                tipo_rev = "Ronda"
+            else:
+                tipo_rev = "Chequeo Preventivo"
+                
+            # Normalizar tipo de respuesta
+            if tipo_resp_val.lower() in ["numerico", "numérico", "numero", "número"]:
+                tipo_resp = "numerico"
+            elif tipo_resp_val.lower() in ["texto", "string", "observaciones"]:
+                tipo_resp = "texto"
+            else:
+                tipo_resp = "booleano"
+                
+            plantilla = None
+            
+            # 1. Por ID si se provee
+            if id_plantilla_str and id_plantilla_str.upper() not in ["PL-EJEMPLO", ""]:
+                clean_id = id_plantilla_str.upper().replace("PL-", "").replace("PL", "").strip()
+                if clean_id.isdigit():
+                    p_id = int(clean_id)
+                    plantilla = db.get(PlantillaChequeo, p_id)
+                    
+            # 2. Si no se encontró o no se proveyó ID, buscar por nombre
+            if not plantilla:
+                if nombre_plantilla in resolved_templates:
+                    plantilla = resolved_templates[nombre_plantilla]
+                else:
+                    plantilla = db.exec(select(PlantillaChequeo).where(PlantillaChequeo.nombre == nombre_plantilla)).first()
+            
+            if plantilla:
+                has_changed = False
+                if descripcion_plantilla and plantilla.descripcion != descripcion_plantilla:
+                    plantilla.descripcion = descripcion_plantilla
+                    has_changed = True
+                if tipo_rev and plantilla.tipo_revision != tipo_rev:
+                    plantilla.tipo_revision = tipo_rev
+                    has_changed = True
+                if has_changed:
+                    db.add(plantilla)
+                    db.commit()
+                    db.refresh(plantilla)
+                    templates_updated += 1
+                
+                resolved_templates[nombre_plantilla] = plantilla
+            else:
+                plantilla = PlantillaChequeo(
+                    nombre=nombre_plantilla,
+                    descripcion=descripcion_plantilla or None,
+                    tipo_revision=tipo_rev
+                )
+                db.add(plantilla)
+                db.commit()
+                db.refresh(plantilla)
+                templates_created += 1
+                resolved_templates[nombre_plantilla] = plantilla
+                
+            # Procesar el item de la plantilla
+            existing_item = db.exec(
+                select(ItemPlantillaChequeo)
+                .where(ItemPlantillaChequeo.plantilla_id == plantilla.id)
+                .where(ItemPlantillaChequeo.texto_pregunta == pregunta)
+            ).first()
+            
+            if existing_item:
+                has_item_changed = False
+                if existing_item.tipo_respuesta != tipo_resp:
+                    existing_item.tipo_respuesta = tipo_resp
+                    has_item_changed = True
+                if unidad_medida and existing_item.unidad_medida != unidad_medida:
+                    existing_item.unidad_medida = unidad_medida
+                    has_item_changed = True
+                elif not unidad_medida and existing_item.unidad_medida:
+                    existing_item.unidad_medida = None
+                    has_item_changed = True
+                    
+                if has_item_changed:
+                    db.add(existing_item)
+                    db.commit()
+                    items_updated += 1
+            else:
+                new_item = ItemPlantillaChequeo(
+                    texto_pregunta=pregunta,
+                    tipo_respuesta=tipo_resp,
+                    unidad_medida=unidad_medida if unidad_medida else None,
+                    plantilla_id=plantilla.id
+                )
+                db.add(new_item)
+                db.commit()
+                items_created += 1
+                
+        db.commit()
+        
+        msg = f"Importación exitosa. Plantillas: {templates_created} creadas, {templates_updated} actualizadas. Preguntas: {items_created} creadas, {items_updated} actualizadas."
+        return {
+            "status": "success",
+            "imported_templates": templates_created + templates_updated,
+            "imported_items": items_created + items_updated,
+            "message": msg
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al procesar el archivo Excel: {str(e)}")
+
 @app.get("/api/excel/plantilla-unificada")
 def descargar_plantilla_unificada(db: Session = Depends(get_db)):
     wb = openpyxl.Workbook()

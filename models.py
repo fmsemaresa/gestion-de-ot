@@ -55,6 +55,7 @@ class PlantillaChequeo(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     nombre: str = Field(index=True)
     descripcion: Optional[str] = None
+    tipo_revision: Optional[str] = Field(default="Chequeo Preventivo", index=True)
 
     items: List["ItemPlantillaChequeo"] = Relationship(
         back_populates="plantilla",

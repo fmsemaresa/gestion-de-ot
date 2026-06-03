@@ -2459,6 +2459,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnExportOtsExcel = document.getElementById('btn-export-ots-excel');
     const btnExportActivosExcel = document.getElementById('btn-export-activos-excel');
     const excelImportUnifiedFile = document.getElementById('excel-import-unified-file');
+    const excelImportChecklistsFile = document.getElementById('excel-import-checklists-file');
 
     if (btnExportOtsExcel) {
         btnExportOtsExcel.addEventListener('click', () => {
@@ -2513,6 +2514,40 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .finally(() => {
                 document.querySelector('label[for="excel-import-unified-file"]').innerHTML = originalLabel;
+            });
+        });
+    }
+
+    if (excelImportChecklistsFile) {
+        excelImportChecklistsFile.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            const label = document.querySelector('label[for="excel-import-checklists-file"]');
+            const originalLabel = label.innerHTML;
+            label.innerHTML = '<span>⏳</span> Subiendo...';
+            
+            fetch('/api/excel/importar/checklists', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => {
+                if (!res.ok) return res.json().then(data => { throw new Error(data.detail || 'Error al procesar carga de checklists') });
+                return res.json();
+            })
+            .then(data => {
+                alert(`¡Carga de Checklists Exitosa!\n${data.message}`);
+                excelImportChecklistsFile.value = '';
+            })
+            .catch(err => {
+                alert(`Error de Importación: ${err.message}`);
+                excelImportChecklistsFile.value = '';
+            })
+            .finally(() => {
+                label.innerHTML = originalLabel;
             });
         });
     }
