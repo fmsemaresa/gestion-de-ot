@@ -622,7 +622,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     buildingItem.className = 'building-item';
                     buildingItem.style.margin = '0.4rem 0';
                     buildingItem.innerHTML = `
-                        <div class="sub-item" data-edificio-id="${e.id}" style="font-weight: 500; cursor: pointer; padding: 0.4rem 0.5rem; display: flex; justify-content: space-between;">
+                        <div class="sub-item" data-edificio-id="${e.id}" data-edificio-nombre="${e.nombre}" style="font-weight: 500; cursor: pointer; padding: 0.4rem 0.5rem; display: flex; justify-content: space-between;">
                             <span>📦 ${e.nombre} <span class="building-ot-count" data-building-name="${e.nombre}" data-plant-name="${plantaNombre}" style="font-weight: normal; color: var(--text-muted); font-size: 0.8rem; margin-left: 0.25rem;">(${activeOtsCount})</span></span>
                             <span class="sub-arrow">▶</span>
                         </div>
@@ -697,6 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     locItem.className = 'sub-item';
                     locItem.style.fontSize = '0.85rem';
                     locItem.setAttribute('data-ubicacion-id', u.id);
+                    locItem.setAttribute('data-ubicacion-nombre', u.nombre);
                     locItem.innerHTML = `<span>📍 ${u.nombre}</span>`;
                     containerElement.appendChild(locItem);
 
@@ -1002,9 +1003,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Filter OTs in javascript for edificio_id or ubicacion_id
                 let filteredOts = ots;
                 if (selectedEdificioId && !selectedUbicacionId) {
-                    filteredOts = ots.filter(ot => ot.edificio_nombre === document.querySelector(`[data-edificio-id="${selectedEdificioId}"] span`).textContent.replace('📦 ', ''));
+                    const bEl = document.querySelector(`[data-edificio-id="${selectedEdificioId}"]`);
+                    const bName = bEl ? bEl.getAttribute('data-edificio-nombre') : '';
+                    filteredOts = ots.filter(ot => ot.edificio_nombre === bName);
                 } else if (selectedUbicacionId) {
-                    filteredOts = ots.filter(ot => ot.ubicacion_nombre === document.querySelector(`[data-ubicacion-id="${selectedUbicacionId}"] span`).textContent.replace('📍 ', ''));
+                    const uEl = document.querySelector(`[data-ubicacion-id="${selectedUbicacionId}"]`);
+                    const uName = uEl ? uEl.getAttribute('data-ubicacion-nombre') : '';
+                    filteredOts = ots.filter(ot => ot.ubicacion_nombre === uName);
                 }
 
                 // Add or update to allLoadedOts
