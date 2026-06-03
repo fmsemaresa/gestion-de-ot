@@ -31,8 +31,13 @@ def create_db_and_tables():
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE ordentrabajo ADD COLUMN fecha_programada TIMESTAMP"))
             print("Columna 'fecha_programada' agregada exitosamente.")
+        if 'fecha_inicio' not in columns:
+            print("Migrando base de datos: agregando columna 'fecha_inicio' a la tabla 'ordentrabajo'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE ordentrabajo ADD COLUMN fecha_inicio TIMESTAMP"))
+            print("Columna 'fecha_inicio' agregada exitosamente.")
     except Exception as e:
-        print(f"Error al verificar/migrar la columna 'fecha_programada': {e}")
+        print(f"Error al verificar/migrar columnas de ordentrabajo: {e}")
 
 
 def normalize_code(code):

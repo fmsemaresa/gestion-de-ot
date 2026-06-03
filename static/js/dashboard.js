@@ -690,36 +690,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     let statusLabel = 'Creada';
                     let statusClass = 'status-created';
-                    let actionBtn = '';
 
                     if (isCreated) {
                         statusLabel = 'Creada';
                         statusClass = 'status-created';
-                        actionBtn = `<button class="btn-primary btn-assign" data-ot-id="${ot.id}" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; cursor: pointer;">Asignar Técnico</button>`;
                     } else if (isAssigned) {
                         statusLabel = 'Asignada';
                         statusClass = 'status-assigned';
-                        actionBtn = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; cursor: pointer;">Programar / Reasignar</button>`;
                     } else if (isScheduled) {
                         statusLabel = 'Programada';
                         statusClass = 'status-scheduled';
-                        actionBtn = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; cursor: pointer;">Reprogramar / Reasignar</button>`;
                     } else if (isDone) {
                         statusLabel = 'Realizada';
                         statusClass = 'status-done';
-                        let completionDateStr = '';
-                        if (ot.fecha_resolucion) {
-                            const dateObj = new Date(ot.fecha_resolucion);
-                            completionDateStr = ` el ${dateObj.toLocaleDateString()}`;
-                        }
-                        actionBtn = `<span style="color: var(--success); font-weight: 500;">✓ Realizada${completionDateStr}</span>`;
                     } else {
                         statusLabel = ot.estado;
                         statusClass = 'status-created';
-                        actionBtn = ot.estado;
                     }
 
-                    // Format dates
+                    // Format scheduled date
                     let progDateStr = 'Pendiente';
                     let progColor = 'var(--text-muted)';
                     if (ot.fecha_programada) {
@@ -730,6 +719,58 @@ document.addEventListener('DOMContentLoaded', () => {
                             year: 'numeric'
                         });
                         progColor = 'var(--warning)';
+                    }
+
+                    // Format start date/time
+                    let startTimeFormatted = '';
+                    if (ot.fecha_inicio) {
+                        const sDate = new Date(ot.fecha_inicio);
+                        const day = String(sDate.getDate()).padStart(2, '0');
+                        const month = String(sDate.getMonth() + 1).padStart(2, '0');
+                        const hrs = String(sDate.getHours()).padStart(2, '0');
+                        const mins = String(sDate.getMinutes()).padStart(2, '0');
+                        startTimeFormatted = `${day}/${month} a las ${hrs}:${mins}`;
+                    }
+
+                    let completionDateStr = '';
+                    if (ot.fecha_resolucion) {
+                        const dateObj = new Date(ot.fecha_resolucion);
+                        completionDateStr = ` el ${dateObj.toLocaleDateString()}`;
+                    }
+
+                    // Build assign/reassign button
+                    let assignBtnHtml = '';
+                    if (!isDone) {
+                        if (ot.tecnico_nombre) {
+                            assignBtnHtml = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Reasignar</button>`;
+                        } else {
+                            assignBtnHtml = `<button class="btn-primary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--primary-color); line-height: 1;">Asignar</button>`;
+                        }
+                    }
+
+                    // Build program/reprogram button
+                    let programBtnHtml = '';
+                    if (!isDone) {
+                        if (ot.fecha_programada) {
+                            programBtnHtml = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Reprogramar</button>`;
+                        } else {
+                            programBtnHtml = `<button class="btn-secondary btn-assign" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; margin-left: 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); line-height: 1;">Programar</button>`;
+                        }
+                    }
+
+                    // Build gestion HTML (with Iniciar button or start details)
+                    let gestionContentHtml = '';
+                    if (isDone) {
+                        gestionContentHtml = `<span style="color: var(--success); font-weight: 500;">✓ Realizada${completionDateStr}</span>`;
+                        if (ot.fecha_inicio) {
+                            gestionContentHtml += ` <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(Iniciada: ${startTimeFormatted})</span>`;
+                        }
+                    } else {
+                        if (ot.fecha_inicio) {
+                            gestionContentHtml = `<span style="color: #38bdf8; font-weight: 500;">Iniciada el ${startTimeFormatted}</span>`;
+                        } else {
+                            gestionContentHtml = `<button class="btn-primary btn-start" data-ot-id="${ot.id}" style="padding: 0.15rem 0.35rem; font-size: 0.7rem; background: var(--accent-color); color: white; border: none; border-radius: 4px; cursor: pointer; line-height: 1;">Iniciar</button>`;
+                        }
                     }
 
                     let checklistBtn = '';
@@ -754,14 +795,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="entity-subtitle" style="font-weight: bold; color: var(--text-color); margin-bottom: 0.5rem;">${ot.planta_nombre} / ${ot.edificio_nombre} ${ot.ubicacion_nombre ? '/ ' + ot.ubicacion_nombre : ''}</div>
                         <p style="font-size:0.85rem; background:rgba(0,0,0,0.1); padding:0.5rem; border-radius:6px; margin-bottom:0.4rem; color:#cbd5e1;">${ot.descripcion}</p>
                         
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">
-                            Asignado a: <strong style="color: var(--text-color);">${ot.tecnico_nombre || 'Sin asignar'}</strong>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; display: flex; align-items: center; flex-wrap: wrap;">
+                            Asignado a: <strong style="color: var(--text-color); margin-left: 0.25rem;">${ot.tecnico_nombre || 'Sin asignar'}</strong> ${assignBtnHtml}
                         </div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">
-                            Prog: <strong style="color: ${progColor};">${progDateStr}</strong>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; display: flex; align-items: center; flex-wrap: wrap;">
+                            Prog: <strong style="color: ${progColor}; margin-left: 0.25rem;">${progDateStr}</strong> ${programBtnHtml}
                         </div>
                         <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-                            Gestión: <span>${actionBtn}</span>
+                            Gestión: <span>${gestionContentHtml}</span>
                         </div>
                         
                         ${checklistBtn}
@@ -777,6 +818,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         btn.addEventListener('click', (e) => {
                             e.stopPropagation();
                             openAssignModalDialog(ot.id);
+                        });
+                    });
+
+                    card.querySelectorAll('.btn-start').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            startWorkOrder(ot.id);
                         });
                     });
                 });
@@ -1465,6 +1513,26 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(err => alert(err.message));
     });
+
+    function startWorkOrder(otId) {
+        fetch(`/api/ordenes/${otId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                fecha_inicio: new Date().toISOString()
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al iniciar la orden de trabajo');
+            return res.json();
+        })
+        .then(() => {
+            alert('Orden de trabajo iniciada con éxito.');
+            loadKPIs();
+            loadWorkOrders();
+        })
+        .catch(err => alert(err.message));
+    }
 
     // --- 9. MANUAL OT CREATION MODAL ---
     btnCreateOt.addEventListener('click', () => {

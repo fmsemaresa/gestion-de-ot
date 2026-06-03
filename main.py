@@ -287,6 +287,7 @@ def get_ordenes(
             "fecha_creacion": ot.fecha_creacion,
             "fecha_resolucion": ot.fecha_resolucion,
             "fecha_programada": ot.fecha_programada,
+            "fecha_inicio": ot.fecha_inicio,
             "reportado_por": ot.reportado_por,
             "comentarios_tecnicos": ot.comentarios_tecnicos,
             "planta_nombre": planta.nombre if planta else None,
@@ -359,6 +360,23 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
                 ot.fecha_programada = val
         else:
             ot.fecha_programada = None
+
+    # Process start date
+    if "fecha_inicio" in updated_ot:
+        val = updated_ot["fecha_inicio"]
+        if val:
+            if isinstance(val, str):
+                try:
+                    if "T" in val:
+                        ot.fecha_inicio = datetime.fromisoformat(val.replace("Z", "+00:00"))
+                    else:
+                        ot.fecha_inicio = datetime.strptime(val, "%Y-%m-%d")
+                except Exception:
+                    ot.fecha_inicio = datetime.fromisoformat(val)
+            else:
+                ot.fecha_inicio = val
+        else:
+            ot.fecha_inicio = None
 
     if "prioridad" in updated_ot:
         ot.prioridad = updated_ot["prioridad"]
@@ -570,7 +588,7 @@ def exportar_ordenes(db: Session = Depends(get_db)):
     
     headers = [
         "ID OT", "Descripción", "Tipo Mantenimiento", "Estado", "Prioridad",
-        "Fecha Creación", "Fecha Programada", "Fecha Realización", "Reportado Por", "Comentarios Técnicos",
+        "Fecha Creación", "Fecha Programada", "Fecha Inicio", "Fecha Realización", "Reportado Por", "Comentarios Técnicos",
         "Planta", "Edificio", "Ubicación", "Activo Afectado", "Técnico Asignado"
     ]
     ws.append(headers)
@@ -603,6 +621,7 @@ def exportar_ordenes(db: Session = Depends(get_db)):
             ot.prioridad,
             ot.fecha_creacion.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_creacion else "",
             ot.fecha_programada.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_programada else "",
+            ot.fecha_inicio.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_inicio else "",
             ot.fecha_resolucion.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_resolucion else "",
             ot.reportado_por or "",
             ot.comentarios_tecnicos or "",
