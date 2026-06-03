@@ -378,11 +378,20 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
         else:
             ot.fecha_inicio = None
 
-    # Validate: fecha_programada cannot be posterior to fecha_inicio
-    if ot.fecha_programada and ot.fecha_inicio:
+    # Validate: fecha_programada cannot be posterior to fecha_inicio (when rescheduling)
+    if "fecha_programada" in updated_ot and ot.fecha_programada and ot.fecha_inicio:
         p_dt = ot.fecha_programada.replace(tzinfo=None)
-        i_dt = ot.fecha_inicio.replace(tzinfo=None)
-        if p_dt > i_dt:
+        
+        from zoneinfo import ZoneInfo
+        from datetime import timezone
+        
+        i_dt = ot.fecha_inicio
+        if i_dt.tzinfo is None:
+            i_dt = i_dt.replace(tzinfo=timezone.utc)
+            
+        i_local = i_dt.astimezone(ZoneInfo("America/Santiago")).replace(tzinfo=None)
+        
+        if p_dt > i_local:
             raise HTTPException(
                 status_code=400,
                 detail="La fecha programada no puede ser posterior a la fecha y hora de inicio de los trabajos."

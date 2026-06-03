@@ -1510,6 +1510,16 @@ document.addEventListener('DOMContentLoaded', () => {
             fullFechaProgramada = fechaProgramadaVal + 'T' + (horaProgramadaVal || '00:00') + ':00';
         }
 
+        const ot = loadedWorkOrdersList.find(o => o.id === parseInt(otId));
+        if (ot && ot.fecha_inicio && fullFechaProgramada) {
+            const startDt = new Date(ot.fecha_inicio);
+            const progDt = new Date(fullFechaProgramada);
+            if (progDt > startDt) {
+                alert("La fecha programada no puede ser posterior a la fecha y hora de inicio de los trabajos.");
+                return;
+            }
+        }
+
         // Calcular estado mapeado
         let targetState = 'CREADA';
         if (techId) {
