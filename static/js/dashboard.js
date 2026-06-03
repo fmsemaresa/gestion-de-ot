@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let loadedWorkOrdersList = [];
     let currentSelectedPlantName = null;
     let allLoadedOts = [];
+    let currentPlantViewMode = 'flat'; // 'flat', 'building', or 'type'
 
     // DOM Elements
     const kpiTotalOts = document.getElementById('kpi-total-ots');
@@ -39,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const plantOtGrid = document.getElementById('plant-ot-grid');
     const btnBackToPlants = document.getElementById('btn-back-to-plants');
     const plantDetailTitle = document.getElementById('plant-detail-title');
+    const btnPlantViewFlat = document.getElementById('btn-plant-view-flat');
+    const btnPlantViewBuilding = document.getElementById('btn-plant-view-building');
+    const btnPlantViewType = document.getElementById('btn-plant-view-type');
 
     // Plant count selector mappings
     const plantCounts = {
@@ -1092,6 +1096,223 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function getSpecializationIcon(type) {
+        switch (type) {
+            case 'Climatización': return '❄️';
+            case 'Gasfitería': return '💧';
+            case 'Electricidad': return '⚡';
+            case 'Dispensadores': return '🧻';
+            case 'Mobiliario': return '🪑';
+            case 'Quincallería': return '🔑';
+            default: return '📦';
+        }
+    }
+
+    function setActiveViewButton(activeBtn) {
+        const buttons = [
+            { btn: btnPlantViewFlat, mode: 'flat' },
+            { btn: btnPlantViewBuilding, mode: 'building' },
+            { btn: btnPlantViewType, mode: 'type' }
+        ];
+        buttons.forEach(item => {
+            if (item.btn) {
+                if (item.btn === activeBtn) {
+                    item.btn.style.background = 'var(--accent-color)';
+                    item.btn.style.color = 'white';
+                } else {
+                    item.btn.style.background = 'transparent';
+                    item.btn.style.color = 'var(--text-muted)';
+                }
+            }
+        });
+    }
+
+    function renderTypeGroupedView(ots, targetGrid) {
+        targetGrid.innerHTML = '';
+        const types = ['Climatización', 'Gasfitería', 'Electricidad', 'Dispensadores', 'Mobiliario', 'Quincallería', 'Otros'];
+        
+        types.forEach(type => {
+            const typeOts = ots.filter(ot => {
+                const normalized = normalizeType(ot.activo_tipo);
+                if (type === 'Otros') {
+                    return normalized === 'Otros' || !types.includes(normalized);
+                }
+                return normalized === type;
+            });
+            
+            const col = document.createElement('div');
+            col.className = 'kanban-column';
+            col.style.flex = '1';
+            col.style.minWidth = '290px';
+            col.style.maxWidth = '360px';
+            col.style.background = 'rgba(19, 27, 46, 0.4)';
+            col.style.border = '1px solid var(--border-color)';
+            col.style.borderRadius = '10px';
+            col.style.padding = '1rem';
+            col.style.display = 'flex';
+            col.style.flexDirection = 'column';
+            col.style.gap = '0.75rem';
+            
+            const header = document.createElement('h3');
+            header.style.fontSize = '1rem';
+            header.style.fontWeight = '600';
+            header.style.marginBottom = '0.5rem';
+            header.style.borderBottom = `2px solid ${typeColors[type] || 'var(--border-color)'}`;
+            header.style.paddingBottom = '0.5rem';
+            header.style.display = 'flex';
+            header.style.justifyContent = 'space-between';
+            header.style.alignItems = 'center';
+            header.style.color = 'var(--text-main)';
+            
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = `${getSpecializationIcon(type)} ${type}`;
+            
+            const badge = document.createElement('span');
+            badge.style.background = typeColors[type] || 'var(--border-color)';
+            badge.style.color = '#white';
+            badge.style.fontSize = '0.75rem';
+            badge.style.padding = '0.15rem 0.45rem';
+            badge.style.borderRadius = '20px';
+            badge.style.fontWeight = '700';
+            badge.textContent = typeOts.length;
+            
+            header.appendChild(titleSpan);
+            header.appendChild(badge);
+            col.appendChild(header);
+            
+            const cardsContainer = document.createElement('div');
+            cardsContainer.style.display = 'flex';
+            cardsContainer.style.flexDirection = 'column';
+            cardsContainer.style.gap = '0.75rem';
+            cardsContainer.style.maxHeight = '70vh';
+            cardsContainer.style.overflowY = 'auto';
+            cardsContainer.style.paddingRight = '0.25rem';
+            
+            col.appendChild(cardsContainer);
+            targetGrid.appendChild(col);
+            
+            renderWorkOrders(typeOts, cardsContainer);
+        });
+    }
+
+    function renderBuildingGroupedView(ots, targetGrid) {
+        targetGrid.innerHTML = '';
+        if (ots.length === 0) {
+            targetGrid.innerHTML = '<p style="color: var(--text-muted); padding: 1rem;">No se encontraron órdenes de trabajo.</p>';
+            return;
+        }
+
+        const buildingNames = [...new Set(ots.map(ot => ot.edificio_nombre || 'Sin Edificio'))].sort();
+        
+        buildingNames.forEach(bName => {
+            const buildingOts = ots.filter(ot => (ot.edificio_nombre || 'Sin Edificio') === bName);
+            
+            const section = document.createElement('div');
+            section.className = 'building-section';
+            section.style.background = 'rgba(19, 27, 46, 0.2)';
+            section.style.border = '1px solid var(--border-color)';
+            section.style.borderRadius = '12px';
+            section.style.padding = '1.25rem';
+            section.style.display = 'flex';
+            section.style.flexDirection = 'column';
+            section.style.gap = '1rem';
+            section.style.width = '100%';
+            
+            const header = document.createElement('h3');
+            header.style.color = 'var(--accent-color)';
+            header.style.fontSize = '1.15rem';
+            header.style.fontWeight = '600';
+            header.style.borderBottom = '1px solid rgba(255, 255, 255, 0.08)';
+            header.style.paddingBottom = '0.5rem';
+            header.style.display = 'flex';
+            header.style.alignItems = 'center';
+            header.style.gap = '0.5rem';
+            header.style.margin = '0';
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = `🏢 ${bName}`;
+            
+            const badge = document.createElement('span');
+            badge.style.fontSize = '0.85rem';
+            badge.style.color = 'var(--text-muted)';
+            badge.style.fontWeight = 'normal';
+            badge.textContent = `(${buildingOts.length} OT${buildingOts.length === 1 ? '' : 's'})`;
+            
+            header.appendChild(nameSpan);
+            header.appendChild(badge);
+            section.appendChild(header);
+            
+            const colsContainer = document.createElement('div');
+            colsContainer.style.display = 'flex';
+            colsContainer.style.gap = '1rem';
+            colsContainer.style.overflowX = 'auto';
+            colsContainer.style.paddingBottom = '0.5rem';
+            colsContainer.style.alignItems = 'flex-start';
+            
+            const types = ['Climatización', 'Gasfitería', 'Electricidad', 'Dispensadores', 'Mobiliario', 'Quincallería', 'Otros'];
+            
+            types.forEach(type => {
+                const typeOts = buildingOts.filter(ot => {
+                    const normalized = normalizeType(ot.activo_tipo);
+                    if (type === 'Otros') {
+                        return normalized === 'Otros' || !types.includes(normalized);
+                    }
+                    return normalized === type;
+                });
+                
+                if (typeOts.length > 0) {
+                    const col = document.createElement('div');
+                    col.style.flex = '0 0 280px';
+                    col.style.background = 'rgba(255, 255, 255, 0.02)';
+                    col.style.border = '1px solid var(--border-color)';
+                    col.style.borderRadius = '8px';
+                    col.style.padding = '0.75rem';
+                    col.style.display = 'flex';
+                    col.style.flexDirection = 'column';
+                    col.style.gap = '0.75rem';
+                    
+                    const colHeader = document.createElement('h4');
+                    colHeader.style.fontSize = '0.9rem';
+                    colHeader.style.fontWeight = '600';
+                    colHeader.style.borderBottom = `2px solid ${typeColors[type] || 'var(--border-color)'}`;
+                    colHeader.style.paddingBottom = '0.4rem';
+                    colHeader.style.margin = '0';
+                    colHeader.style.display = 'flex';
+                    colHeader.style.justifyContent = 'space-between';
+                    colHeader.style.alignItems = 'center';
+                    
+                    const colTitleSpan = document.createElement('span');
+                    colTitleSpan.textContent = `${getSpecializationIcon(type)} ${type}`;
+                    
+                    const colBadge = document.createElement('span');
+                    colBadge.style.background = typeColors[type] || 'var(--border-color)';
+                    colBadge.style.color = '#white';
+                    colBadge.style.fontSize = '0.75rem';
+                    colBadge.style.padding = '0.1rem 0.35rem';
+                    colBadge.style.borderRadius = '10px';
+                    colBadge.textContent = typeOts.length;
+                    
+                    colHeader.appendChild(colTitleSpan);
+                    colHeader.appendChild(colBadge);
+                    col.appendChild(colHeader);
+                    
+                    const cardsContainer = document.createElement('div');
+                    cardsContainer.style.display = 'flex';
+                    cardsContainer.style.flexDirection = 'column';
+                    cardsContainer.style.gap = '0.75rem';
+                    
+                    col.appendChild(cardsContainer);
+                    colsContainer.appendChild(col);
+                    
+                    renderWorkOrders(typeOts, cardsContainer);
+                }
+            });
+            
+            section.appendChild(colsContainer);
+            targetGrid.appendChild(section);
+        });
+    }
+
     function renderPlantDetail(plantName) {
         currentSelectedPlantName = plantName;
         if (plantDetailTitle) {
@@ -1101,7 +1322,25 @@ document.addEventListener('DOMContentLoaded', () => {
         const filteredOts = allLoadedOts.filter(ot => ot.planta_nombre === plantName);
         
         if (plantOtGrid) {
-            renderWorkOrders(filteredOts, plantOtGrid);
+            if (currentPlantViewMode === 'flat') {
+                plantOtGrid.style.display = 'grid';
+                plantOtGrid.style.flexDirection = '';
+                plantOtGrid.style.gap = '1.25rem';
+                plantOtGrid.style.overflowX = '';
+                renderWorkOrders(filteredOts, plantOtGrid);
+            } else if (currentPlantViewMode === 'type') {
+                plantOtGrid.style.display = 'flex';
+                plantOtGrid.style.flexDirection = 'row';
+                plantOtGrid.style.gap = '1.25rem';
+                plantOtGrid.style.overflowX = 'auto';
+                renderTypeGroupedView(filteredOts, plantOtGrid);
+            } else if (currentPlantViewMode === 'building') {
+                plantOtGrid.style.display = 'flex';
+                plantOtGrid.style.flexDirection = 'column';
+                plantOtGrid.style.gap = '2rem';
+                plantOtGrid.style.overflowX = '';
+                renderBuildingGroupedView(filteredOts, plantOtGrid);
+            }
         }
     }
 
@@ -1111,6 +1350,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const plantName = card.getAttribute('data-planta-nombre');
             if (plantSummaryView) plantSummaryView.style.display = 'none';
             if (plantDetailView) plantDetailView.style.display = 'block';
+            
+            if (currentPlantViewMode === 'flat') setActiveViewButton(btnPlantViewFlat);
+            else if (currentPlantViewMode === 'building') setActiveViewButton(btnPlantViewBuilding);
+            else if (currentPlantViewMode === 'type') setActiveViewButton(btnPlantViewType);
+            
             renderPlantDetail(plantName);
         });
     });
@@ -1122,6 +1366,35 @@ document.addEventListener('DOMContentLoaded', () => {
             if (plantDetailView) plantDetailView.style.display = 'none';
             if (plantSummaryView) plantSummaryView.style.display = 'block';
             loadPlantSummaries();
+        });
+    }
+
+    // Layout selectors listeners
+    if (btnPlantViewFlat) {
+        btnPlantViewFlat.addEventListener('click', () => {
+            currentPlantViewMode = 'flat';
+            setActiveViewButton(btnPlantViewFlat);
+            if (currentSelectedPlantName) {
+                renderPlantDetail(currentSelectedPlantName);
+            }
+        });
+    }
+    if (btnPlantViewBuilding) {
+        btnPlantViewBuilding.addEventListener('click', () => {
+            currentPlantViewMode = 'building';
+            setActiveViewButton(btnPlantViewBuilding);
+            if (currentSelectedPlantName) {
+                renderPlantDetail(currentSelectedPlantName);
+            }
+        });
+    }
+    if (btnPlantViewType) {
+        btnPlantViewType.addEventListener('click', () => {
+            currentPlantViewMode = 'type';
+            setActiveViewButton(btnPlantViewType);
+            if (currentSelectedPlantName) {
+                renderPlantDetail(currentSelectedPlantName);
+            }
         });
     }
 
