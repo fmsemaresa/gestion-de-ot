@@ -59,6 +59,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const assignSelectTecnico = document.getElementById('assign-select-tecnico');
     const assignOtId = document.getElementById('assign-ot-id');
 
+    // Complete OT Modal
+    const otCompleteModal = document.getElementById('ot-complete-modal');
+    const otCompleteForm = document.getElementById('ot-complete-form');
+    const closeOtCompleteModal = document.getElementById('close-ot-complete-modal');
+    const otCompleteId = document.getElementById('ot-complete-id');
+    const otCompleteComments = document.getElementById('ot-complete-comments');
+
     // Edit Modals (Asset and Component lifecycle)
     const assetEditModal = document.getElementById('asset-edit-modal');
     const assetEditForm = document.getElementById('asset-edit-form');
@@ -1647,8 +1654,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function completeWorkOrderDirect(otId) {
-        const comments = prompt("Ingrese comentarios técnicos de resolución (opcional):");
-        if (comments === null) return; // User cancelled
+        otCompleteId.value = otId;
+        otCompleteComments.value = '';
+        otCompleteModal.style.display = 'flex';
+    }
+
+    closeOtCompleteModal.addEventListener('click', () => {
+        otCompleteModal.style.display = 'none';
+    });
+
+    otCompleteForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const otId = otCompleteId.value;
+        const comments = otCompleteComments.value;
 
         fetch(`/api/ordenes/${otId}`, {
             method: 'PUT',
@@ -1664,11 +1682,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return res.json();
         })
         .then(() => {
+            otCompleteModal.style.display = 'none';
             loadKPIs();
             loadWorkOrders();
         })
         .catch(err => alert(err.message));
-    }
+    });
 
     // --- 9. MANUAL OT CREATION MODAL ---
     btnCreateOt.addEventListener('click', () => {
