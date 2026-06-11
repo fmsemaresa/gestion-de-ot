@@ -152,6 +152,28 @@ def create_db_and_tables():
         except Exception as ex_mig:
             print(f"Error durante la migración de datos de ubicaciones: {ex_mig}")
 
+        # Repair any misclassified bathrooms (e.g. Gte General [EC-P2-OS-bñ-6])
+        try:
+            with Session(engine) as session:
+                misclassified_bathrooms = session.exec(
+                    select(Ubicacion)
+                    .where(Ubicacion.uso == "Oficina")
+                    .where(Ubicacion.nombre.like("%bñ%") | Ubicacion.codigo.like("%bñ%") | Ubicacion.nombre.like("%bn%") | Ubicacion.codigo.like("%bn%"))
+                ).all()
+                if misclassified_bathrooms:
+                    print(f"Reparando {len(misclassified_bathrooms)} baños mal clasificados...")
+                    for u in misclassified_bathrooms:
+                        u.uso = "Baño"
+                        if "Gte" in u.nombre:
+                            u.cargo = "Gte General"
+                        if u.codigo:
+                            u.nombre = f"Baño [{u.codigo}]"
+                        session.add(u)
+                    session.commit()
+                    print("Baños reparados con éxito.")
+        except Exception as ex_rep:
+            print(f"Error al reparar baños: {ex_rep}")
+
     except Exception as e:
         print(f"Error al verificar/migrar columnas de base de datos: {e}")
 

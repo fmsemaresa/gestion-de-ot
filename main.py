@@ -1811,7 +1811,7 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
     # HOJA 3: Ubicaciones de Referencia (Solo Lectura)
     # -------------------------------------------------------------
     ws_ref_locs = wb.create_sheet(title="Ubicaciones de Referencia")
-    headers_ref_locs = ["Planta", "Edificio", "Ubicación"]
+    headers_ref_locs = ["Planta", "Edificio", "Ubicación (Nombre Completo)", "Código", "Uso", "Cargo", "Ocupantes"]
     ws_ref_locs.append(headers_ref_locs)
     
     ubicaciones = db.exec(select(Ubicacion)).all()
@@ -1819,10 +1819,15 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
     for u in ubicaciones:
         edificio = db.get(Edificio, u.edificio_id) if u.edificio_id else None
         planta = db.get(Planta, edificio.planta_id) if edificio else None
+        ocupantes_str = ", ".join([o.nombre for o in u.ocupantes])
         ref_locs_data.append([
             planta.nombre if planta else "",
             edificio.nombre if edificio else "",
-            u.nombre
+            u.nombre,
+            u.codigo or "",
+            u.uso or "Oficina",
+            u.cargo or "",
+            ocupantes_str
         ])
     ref_locs_data.sort(key=lambda x: (x[0], x[1], x[2]))
     for row in ref_locs_data:
