@@ -26,6 +26,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const newLocationName = document.getElementById('new-location-name');
     const closeLocationModal = document.getElementById('close-location-modal');
     
+    // Photo Modal DOM Elements
+    const photoModal = document.getElementById('photo-modal');
+    const photoUploadForm = document.getElementById('photo-upload-form');
+    const photoOtId = document.getElementById('photo-ot-id');
+    const photoComment = document.getElementById('photo-comment');
+    const photoPreviewContainer = document.getElementById('photo-preview-container');
+    const photoPreviewImg = document.getElementById('photo-preview-img');
+    const closePhotoModal = document.getElementById('close-photo-modal');
+    let selectedPhotoFile = null;
+    
     let currentTechId = localStorage.getItem('selected_tech_id') || null;
 
     // --- 1. TABS MANAGEMENT ---
@@ -98,21 +108,39 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     let statusClass = 'assigned';
                     let statusLabel = 'Asignada';
-                    let actionBtn = '';
+                    let actionBtnHtml = '';
                     
                     if (isDone) {
                         statusClass = 'status-ok';
                         statusLabel = 'Realizada';
-                        actionBtn = '<span style="color: var(--success); font-size: 0.85rem; font-weight: 600;">✓ Realizada</span>';
+                        actionBtnHtml = '<span style="color: var(--success); font-size: 0.85rem; font-weight: 600;">✓ Realizada</span>';
                     } else {
-                        if (isScheduled) {
-                            statusClass = 'scheduled';
-                            statusLabel = 'Programada';
+                        if (ot.fecha_inicio) {
+                            if (ot.estado_ejecucion === 'PAUSADA' || ot.estado_ejecucion === 'DETENIDA') {
+                                statusClass = 'pending';
+                                statusLabel = 'Pausada';
+                                actionBtnHtml = `
+                                    <button class="btn-secondary btn-tech-resume" data-id="${ot.id}" style="font-size: 0.8rem; background: var(--accent-color); color: white; border: none; padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer; font-weight: 500;">Retomar</button>
+                                    <button class="btn-primary btn-tech-complete" data-id="${ot.id}" data-plantilla-id="${ot.plantilla_id || ''}" style="font-size: 0.8rem; background: var(--success); color: white; border: none; padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer; margin-left: 0.25rem; font-weight: 500;">Terminar</button>
+                                `;
+                            } else {
+                                statusClass = 'in-progress';
+                                statusLabel = 'Iniciada';
+                                actionBtnHtml = `
+                                    <button class="btn-secondary btn-tech-pause" data-id="${ot.id}" style="font-size: 0.8rem; background: var(--bg-primary); color: var(--text-color); border: 1px solid var(--border-color); padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer; font-weight: 500;">Detener</button>
+                                    <button class="btn-primary btn-tech-complete" data-id="${ot.id}" data-plantilla-id="${ot.plantilla_id || ''}" style="font-size: 0.8rem; background: var(--success); color: white; border: none; padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer; margin-left: 0.25rem; font-weight: 500;">Terminar</button>
+                                `;
+                            }
                         } else {
-                            statusClass = 'assigned';
-                            statusLabel = 'Asignada';
+                            if (isScheduled) {
+                                statusClass = 'scheduled';
+                                statusLabel = 'Programada';
+                            } else {
+                                statusClass = 'assigned';
+                                statusLabel = 'Asignada';
+                            }
+                            actionBtnHtml = `<button class="btn-primary btn-tech-start" data-id="${ot.id}" style="font-size: 0.8rem; background: var(--accent-color); color: white; border: none; padding: 0.35rem 0.65rem; border-radius: 4px; cursor: pointer; font-weight: 500;">Iniciar</button>`;
                         }
-                        actionBtn = `<button class="btn-primary btn-complete-task" data-id="${ot.id}" data-plantilla-id="${ot.plantilla_id || ''}" style="font-size: 0.8rem; background: var(--success);">Finalizar</button>`;
                     }
 
                     const activeName = ot.activo_nombre ? `<strong>Activo:</strong> ${ot.activo_nombre}` : '<span style="color: var(--warning);">Reporte general de área</span>';
@@ -120,19 +148,55 @@ document.addEventListener('DOMContentLoaded', () => {
                     let dateHtml = '';
                     if (ot.fecha_programada) {
                         const dateObj = new Date(ot.fecha_programada);
-                        const formattedDate = dateObj.toLocaleDateString('es-CL', {
+                        let formattedDate = dateObj.toLocaleDateString('es-CL', {
                             day: '2-digit',
                             month: '2-digit',
                             year: 'numeric'
                         });
+                        if (ot.fecha_programada.includes('T')) {
+                            const timePart = ot.fecha_programada.substring(11, 16);
+                            if (timePart !== '00:00') {
+                                formattedDate += ` a las ${timePart}`;
+                            }
+                        }
                         dateHtml = `<p style="margin-bottom: 0.4rem; color: var(--warning);"><span style="font-size: 1.1rem; vertical-align: middle; margin-right: 0.2rem;">📅</span><strong>Prog:</strong> ${formattedDate}</p>`;
+                    }
+
+                    // Renderizar fotos
+                    let fotosHtml = '';
+                    if (ot.fotos && ot.fotos.length > 0) {
+                        fotosHtml = `
+                            <div style="margin-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem;">
+                                <strong style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Fotos de Respaldo:</strong>
+                                <div style="display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.25rem;">
+                                    ${ot.fotos.map(f => `
+                                        <div style="flex: 0 0 80px; position: relative; cursor: pointer;" onclick="window.open('${f.url_foto}', '_blank')">
+                                            <img src="${f.url_foto}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);" title="${f.comentario || ''}">
+                                            ${f.comentario ? `<div style="font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; margin-top: 0.15rem;">${f.comentario}</div>` : ''}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    let uploadPhotoHtml = '';
+                    if (!isDone) {
+                        uploadPhotoHtml = `
+                            <div style="margin-top: 0.5rem; text-align: left;">
+                                <button class="btn-secondary btn-tech-upload-photo-trigger" data-id="${ot.id}" style="font-size: 0.75rem; padding: 0.25rem 0.5rem; display: flex; align-items: center; gap: 0.25rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); cursor: pointer;">
+                                    📸 Añadir Foto
+                                </button>
+                                <input type="file" id="file-input-${ot.id}" accept="image/*" style="display: none;" class="tech-file-input" data-id="${ot.id}">
+                            </div>
+                        `;
                     }
 
                     techOtList.innerHTML += `
                         <div class="tech-ot-card ${statusClass}">
                             <div class="tech-ot-header">
                                 <span style="font-weight: 700; font-size: 0.95rem; color: var(--accent-color);">#OT-${ot.id}</span>
-                                <span class="card-tag status-${isDone ? 'done' : isScheduled ? 'scheduled' : 'assigned'}">${statusLabel}</span>
+                                <span class="card-tag status-${isDone ? 'done' : statusLabel === 'Iniciada' ? 'progress' : statusLabel === 'Pausada' ? 'pending' : isScheduled ? 'scheduled' : 'assigned'}">${statusLabel}</span>
                             </div>
                             <div class="tech-ot-body">
                                 <p style="margin-bottom: 0.4rem;"><strong>Ubicación:</strong> ${ot.planta_nombre} / ${ot.edificio_nombre} ${ot.ubicacion_nombre ? '/ ' + ot.ubicacion_nombre : ''}</p>
@@ -140,40 +204,116 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ${dateHtml}
                                 <p style="margin-top: 0.5rem; background: rgba(0,0,0,0.15); padding: 0.6rem; border-radius: 6px; font-size: 0.85rem; color: #cbd5e1; border-left: 2px solid var(--border-focus);">${ot.descripcion}</p>
                                 ${ot.comentarios_tecnicos ? `<p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--success);"><strong>Resolución:</strong> ${ot.comentarios_tecnicos}</p>` : ''}
+                                ${fotosHtml}
+                                ${uploadPhotoHtml}
                             </div>
                             <div class="tech-ot-footer">
                                 <span style="font-size: 0.75rem; color: var(--text-muted);">Prioridad: <strong style="color: ${ot.prioridad === 'Alta' ? 'var(--danger)' : ot.prioridad === 'Media' ? 'var(--warning)' : 'var(--success)'}">${ot.prioridad}</strong></span>
-                                <div>${actionBtn}</div>
+                                <div class="flex-inline">${actionBtnHtml}</div>
                             </div>
                         </div>
                     `;
                 });
                 
                 // Add event listeners to action buttons
-                document.querySelectorAll('.btn-complete-task').forEach(btn => {
+                document.querySelectorAll('.btn-tech-start').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const otId = btn.getAttribute('data-id');
+                        startTask(otId);
+                    });
+                });
+
+                document.querySelectorAll('.btn-tech-pause').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const otId = btn.getAttribute('data-id');
+                        pauseTask(otId);
+                    });
+                });
+
+                document.querySelectorAll('.btn-tech-resume').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const otId = btn.getAttribute('data-id');
+                        resumeTask(otId);
+                    });
+                });
+
+                document.querySelectorAll('.btn-tech-complete').forEach(btn => {
                     btn.addEventListener('click', () => {
                         const otId = btn.getAttribute('data-id');
                         const pId = btn.getAttribute('data-plantilla-id') ? parseInt(btn.getAttribute('data-plantilla-id')) : null;
                         openCompleteModal(otId, pId);
                     });
                 });
+
+                // Listeners for photo triggers
+                document.querySelectorAll('.btn-tech-upload-photo-trigger').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const otId = btn.getAttribute('data-id');
+                        const fileInput = document.getElementById(`file-input-${otId}`);
+                        if (fileInput) fileInput.click();
+                    });
+                });
+
+                document.querySelectorAll('.tech-file-input').forEach(input => {
+                    input.addEventListener('change', (e) => {
+                        const otId = input.getAttribute('data-id');
+                        const file = e.target.files[0];
+                        if (file) {
+                            openPhotoModal(otId, file);
+                        }
+                    });
+                });
             })
             .catch(err => console.error('Error al cargar tareas del técnico:', err));
     }
 
-    // --- 4. START TASK ACTION ---
+    // --- 4. START/PAUSE/RESUME TASK ACTIONS ---
     function startTask(otId) {
         fetch(`/api/ordenes/${otId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ estado: 'En Proceso' })
+            body: JSON.stringify({ 
+                fecha_inicio: new Date().toISOString(),
+                estado_ejecucion: 'EN_PROCESO'
+            })
         })
         .then(res => {
-            if (!res.ok) throw new Error('Error al iniciar tarea');
+            if (!res.ok) throw new Error('Error al iniciar la tarea');
             loadMyTasks();
         })
         .catch(err => alert(err.message));
     }
+
+    function pauseTask(otId) {
+        fetch(`/api/ordenes/${otId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                estado_ejecucion: 'PAUSADA'
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al detener la tarea');
+            loadMyTasks();
+        })
+        .catch(err => alert(err.message));
+    }
+
+    function resumeTask(otId) {
+        fetch(`/api/ordenes/${otId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                estado_ejecucion: 'EN_PROCESO'
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al retomar la tarea');
+            loadMyTasks();
+        })
+        .catch(err => alert(err.message));
+    }
+
 
     // --- 5. COMPLETE TASK DIALOG ---
     const techChecklistSection = document.getElementById('tech-checklist-section');
@@ -477,6 +617,67 @@ document.addEventListener('DOMContentLoaded', () => {
             tabMyTasks.click();
         })
         .catch(err => alert(err.message));
+    });
+
+    // --- 9. PHOTO MODAL MANAGEMENT ---
+    function openPhotoModal(otId, file) {
+        photoOtId.value = otId;
+        selectedPhotoFile = file;
+        photoComment.value = '';
+        
+        // Show file preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            photoPreviewImg.src = e.target.result;
+            photoPreviewContainer.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+        
+        photoModal.style.display = 'flex';
+    }
+
+    closePhotoModal.addEventListener('click', () => {
+        photoModal.style.display = 'none';
+        selectedPhotoFile = null;
+    });
+
+    photoUploadForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!selectedPhotoFile) return;
+
+        const otId = photoOtId.value;
+        const commentVal = photoComment.value.trim();
+        const btnConfirm = document.getElementById('btn-confirm-upload');
+        
+        btnConfirm.disabled = true;
+        btnConfirm.textContent = 'Subiendo...';
+
+        const formData = new FormData();
+        formData.append('file', selectedPhotoFile);
+        if (commentVal) {
+            formData.append('comentario', commentVal);
+        }
+
+        fetch(`/api/ordenes/${otId}/fotos`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al subir la imagen');
+            return res.json();
+        })
+        .then(data => {
+            photoModal.style.display = 'none';
+            selectedPhotoFile = null;
+            btnConfirm.disabled = false;
+            btnConfirm.textContent = 'Subir Imagen';
+            loadMyTasks();
+        })
+        .catch(err => {
+            alert(err.message);
+            btnConfirm.disabled = false;
+            btnConfirm.textContent = 'Subir Imagen';
+        });
     });
 
     // Inicializar

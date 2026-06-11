@@ -114,6 +114,11 @@ class OrdenTrabajo(SQLModel, table=True):
         back_populates="orden_trabajo",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    fotos: List["FotoOrdenTrabajo"] = Relationship(
+        back_populates="orden_trabajo",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
 
 class RespuestaChequeo(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -128,4 +133,14 @@ class RespuestaChequeo(SQLModel, table=True):
     
     orden_trabajo: OrdenTrabajo = Relationship(back_populates="respuestas_checklist")
     item_plantilla: ItemPlantillaChequeo = Relationship(back_populates="respuestas")
+
+class FotoOrdenTrabajo(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    orden_trabajo_id: int = Field(foreign_key="ordentrabajo.id")
+    url_foto: str
+    comentario: Optional[str] = None
+    fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
+    
+    orden_trabajo: Optional[OrdenTrabajo] = Relationship(back_populates="fotos")
+
 

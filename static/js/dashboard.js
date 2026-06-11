@@ -869,6 +869,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
 
+            // Build fotos gallery HTML for admin
+            let fotosGalleryHtml = '';
+            if (ot.fotos && ot.fotos.length > 0) {
+                fotosGalleryHtml = `
+                    <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem;">
+                        <strong style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Fotos de Respaldo:</strong>
+                        <div style="display: flex; gap: 0.4rem; overflow-x: auto; padding-bottom: 0.25rem;">
+                            ${ot.fotos.map(f => `
+                                <div style="flex: 0 0 60px; cursor: pointer;" onclick="window.open('${f.url_foto}', '_blank')">
+                                    <img src="${f.url_foto}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border-color);" title="${f.comentario || ''}">
+                                    ${f.comentario ? `<div style="font-size: 0.6rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px; margin-top: 0.1rem;">${f.comentario}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
             const card = document.createElement('div');
             card.className = `entity-card priority-${ot.prioridad.toLowerCase()}`;
             card.innerHTML = `
@@ -888,6 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 
                 ${checklistBtn}
+                ${fotosGalleryHtml}
                 
                 <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; width: 100%;">
                     <span>Reportado por: <strong style="color: var(--text-color);">${ot.reportado_por || 'Sistema'}</strong></span>

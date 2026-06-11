@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,7 +13,7 @@ from database import engine, init_db
 from models import (
     Planta, Edificio, Ubicacion, Activo, 
     ComponenteActivo, Tecnico, OrdenTrabajo,
-    PlantillaChequeo, ItemPlantillaChequeo, RespuestaChequeo
+    PlantillaChequeo, ItemPlantillaChequeo, RespuestaChequeo, FotoOrdenTrabajo
 )
 
 @asynccontextmanager
@@ -278,6 +278,15 @@ def get_ordenes(
         activo = db.get(Activo, ot.activo_id) if ot.activo_id else None
         tecnico = db.get(Tecnico, ot.tecnico_id) if ot.tecnico_id else None
         
+        # Obtener fotos
+        fotos_db = db.exec(select(FotoOrdenTrabajo).where(FotoOrdenTrabajo.orden_trabajo_id == ot.id)).all()
+        fotos_list = [{
+            "id": f.id,
+            "url_foto": f.url_foto,
+            "comentario": f.comentario,
+            "fecha_creacion": f.fecha_creacion.isoformat() + "Z" if f.fecha_creacion else None
+        } for f in fotos_db]
+        
         results.append({
             "id": ot.id,
             "descripcion": ot.descripcion,
@@ -298,7 +307,8 @@ def get_ordenes(
             "activo_tipo": activo.tipo if activo else "Otros",
             "tecnico_nombre": tecnico.nombre if tecnico else "No asignado",
             "tecnico_id": ot.tecnico_id,
-            "plantilla_id": ot.plantilla_id
+            "plantilla_id": ot.plantilla_id,
+            "fotos": fotos_list
         })
         
     return results
@@ -486,6 +496,58 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(ot)
     return ot
+
+@app.post("/api/ordenes/{ot_id}/fotos")
+async def upload_ot_foto(
+    ot_id: int,
+    file: UploadFile = File(...),
+    comentario: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    import os
+    import uuid
+    
+    ot = db.get(OrdenTrabajo, ot_id)
+    if not ot:
+        raise HTTPException(status_code=404, detail="Orden de Trabajo no encontrada")
+        
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic"]:
+        raise HTTPException(status_code=400, detail="Formato de archivo no permitido. Sube una imagen (.jpg, .png, etc.)")
+        
+    # Crear directorio si no existe
+    uploads_dir = os.path.join("static", "uploads")
+    if not os.path.exists(uploads_dir):
+        os.makedirs(uploads_dir)
+        
+    unique_filename = f"ot_{ot_id}_{uuid.uuid4().hex}{ext}"
+    file_path = os.path.join(uploads_dir, unique_filename)
+    
+    try:
+        contents = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al guardar el archivo: {str(e)}")
+        
+    # Guardar en BD
+    new_foto = FotoOrdenTrabajo(
+        orden_trabajo_id=ot_id,
+        url_foto=f"/static/uploads/{unique_filename}",
+        comentario=comentario,
+        fecha_creacion=datetime.utcnow()
+    )
+    db.add(new_foto)
+    db.commit()
+    db.refresh(new_foto)
+    
+    return {
+        "id": new_foto.id,
+        "orden_trabajo_id": new_foto.orden_trabajo_id,
+        "url_foto": new_foto.url_foto,
+        "comentario": new_foto.comentario,
+        "fecha_creacion": new_foto.fecha_creacion.isoformat() + "Z"
+    }
 
 
 # --- ENDPOINTS KPI & DASHBOARD ---
