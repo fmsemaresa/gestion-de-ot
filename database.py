@@ -6,7 +6,7 @@ import openpyxl
 from models import (
     Planta, Edificio, Ubicacion, Activo, ComponenteActivo,
     Tecnico, OrdenTrabajo, PlantillaChequeo, ItemPlantillaChequeo,
-    RespuestaChequeo, FotoOrdenTrabajo
+    RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT
 )
 
 # Render uses DATABASE_URL for PostgreSQL connection

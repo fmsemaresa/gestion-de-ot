@@ -13,7 +13,7 @@ from database import engine, init_db
 from models import (
     Planta, Edificio, Ubicacion, Activo, 
     ComponenteActivo, Tecnico, OrdenTrabajo,
-    PlantillaChequeo, ItemPlantillaChequeo, RespuestaChequeo, FotoOrdenTrabajo
+    PlantillaChequeo, ItemPlantillaChequeo, RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT
 )
 
 @asynccontextmanager
@@ -287,6 +287,19 @@ def get_ordenes(
             "fecha_creacion": f.fecha_creacion.isoformat() + "Z" if f.fecha_creacion else None
         } for f in fotos_db]
         
+        # Obtener comentarios de avance (ordenados por fecha ascendente para ver el hilo de conversación)
+        comentarios_db = db.exec(
+            select(ComentarioAvanceOT)
+            .where(ComentarioAvanceOT.orden_trabajo_id == ot.id)
+            .order_by(ComentarioAvanceOT.fecha_creacion.asc())
+        ).all()
+        comentarios_list = [{
+            "id": c.id,
+            "comentario": c.comentario,
+            "autor": c.autor,
+            "fecha_creacion": c.fecha_creacion.isoformat() + "Z" if c.fecha_creacion else None
+        } for c in comentarios_db]
+        
         results.append({
             "id": ot.id,
             "descripcion": ot.descripcion,
@@ -308,7 +321,8 @@ def get_ordenes(
             "tecnico_nombre": tecnico.nombre if tecnico else "No asignado",
             "tecnico_id": ot.tecnico_id,
             "plantilla_id": ot.plantilla_id,
-            "fotos": fotos_list
+            "fotos": fotos_list,
+            "comentarios_avance": comentarios_list
         })
         
     return results
@@ -548,6 +562,41 @@ async def upload_ot_foto(
         "comentario": new_foto.comentario,
         "fecha_creacion": new_foto.fecha_creacion.isoformat() + "Z"
     }
+
+@app.post("/api/ordenes/{ot_id}/comentarios")
+def add_ot_comentario(
+    ot_id: int,
+    payload: dict,
+    db: Session = Depends(get_db)
+):
+    ot = db.get(OrdenTrabajo, ot_id)
+    if not ot:
+        raise HTTPException(status_code=404, detail="Orden de Trabajo no encontrada")
+        
+    comentario_txt = payload.get("comentario")
+    autor_txt = payload.get("autor", "Sistema")
+    
+    if not comentario_txt:
+        raise HTTPException(status_code=400, detail="El comentario no puede estar vacío")
+        
+    new_comentario = ComentarioAvanceOT(
+        orden_trabajo_id=ot_id,
+        comentario=comentario_txt,
+        autor=autor_txt,
+        fecha_creacion=datetime.utcnow()
+    )
+    db.add(new_comentario)
+    db.commit()
+    db.refresh(new_comentario)
+    
+    return {
+        "id": new_comentario.id,
+        "orden_trabajo_id": new_comentario.orden_trabajo_id,
+        "comentario": new_comentario.comentario,
+        "autor": new_comentario.autor,
+        "fecha_creacion": new_comentario.fecha_creacion.isoformat() + "Z"
+    }
+
 
 
 # --- ENDPOINTS KPI & DASHBOARD ---

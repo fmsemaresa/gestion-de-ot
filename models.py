@@ -118,6 +118,11 @@ class OrdenTrabajo(SQLModel, table=True):
         back_populates="orden_trabajo",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    comentarios_avance: List["ComentarioAvanceOT"] = Relationship(
+        back_populates="orden_trabajo",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
 
 
 class RespuestaChequeo(SQLModel, table=True):
@@ -142,5 +147,15 @@ class FotoOrdenTrabajo(SQLModel, table=True):
     fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
     
     orden_trabajo: Optional[OrdenTrabajo] = Relationship(back_populates="fotos")
+
+class ComentarioAvanceOT(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    orden_trabajo_id: int = Field(foreign_key="ordentrabajo.id")
+    comentario: str
+    autor: str
+    fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
+    
+    orden_trabajo: Optional[OrdenTrabajo] = Relationship(back_populates="comentarios_avance")
+
 
 

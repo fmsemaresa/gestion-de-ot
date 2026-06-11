@@ -887,6 +887,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
 
+            // Build comentarios avance HTML for admin
+            let comentariosAvanceHtml = '';
+            if (ot.comentarios_avance && ot.comentarios_avance.length > 0) {
+                comentariosAvanceHtml = `
+                    <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem; text-align: left;">
+                        <strong style="font-size: 0.78rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Bitácora de Notas:</strong>
+                        <div style="display: flex; flex-direction: column; gap: 0.35rem; max-height: 120px; overflow-y: auto; background: rgba(0,0,0,0.15); padding: 0.4rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                            ${ot.comentarios_avance.map(c => {
+                                const cDate = new Date(c.fecha_creacion);
+                                const timeStr = cDate.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+                                const dateStr = cDate.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+                                return `
+                                    <div style="font-size: 0.75rem; line-height: 1.3;">
+                                        <span style="color: var(--accent-color); font-weight: 600;">${c.autor}</span> 
+                                        <span style="color: var(--text-muted); font-size: 0.65rem;">(${dateStr} ${timeStr}):</span>
+                                        <span style="color: #cbd5e1;">${c.comentario}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
             const card = document.createElement('div');
             card.className = `entity-card priority-${ot.prioridad.toLowerCase()}`;
             card.innerHTML = `
@@ -907,6 +931,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 ${checklistBtn}
                 ${fotosGalleryHtml}
+                ${comentariosAvanceHtml}
                 
                 <div style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; width: 100%;">
                     <span>Reportado por: <strong style="color: var(--text-color);">${ot.reportado_por || 'Sistema'}</strong></span>

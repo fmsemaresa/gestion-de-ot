@@ -192,6 +192,44 @@ document.addEventListener('DOMContentLoaded', () => {
                         `;
                     }
 
+                    // Renderizar comentarios de avance (Bitácora)
+                    let comentariosAvanceHtml = '';
+                    if (ot.comentarios_avance && ot.comentarios_avance.length > 0) {
+                        comentariosAvanceHtml = `
+                            <div style="margin-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem; text-align: left;">
+                                <strong style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.35rem;">Bitácora de Notas:</strong>
+                                <div style="display: flex; flex-direction: column; gap: 0.45rem; max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.15); padding: 0.5rem; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                                    ${ot.comentarios_avance.map(c => {
+                                        const cDate = new Date(c.fecha_creacion);
+                                        const timeStr = cDate.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+                                        const dateStr = cDate.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+                                        return `
+                                            <div style="font-size: 0.78rem; line-height: 1.35; border-bottom: 1px solid rgba(255,255,255,0.02); padding-bottom: 0.25rem; margin-bottom: 0.15rem;">
+                                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.1rem;">
+                                                    <span style="color: var(--accent-color); font-weight: 600; font-size: 0.75rem;">${c.autor}</span>
+                                                    <span style="color: var(--text-muted); font-size: 0.68rem;">${dateStr} ${timeStr}</span>
+                                                </div>
+                                                <span style="color: #e2e8f0;">${c.comentario}</span>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    let addCommentHtml = '';
+                    if (!isDone) {
+                        addCommentHtml = `
+                            <div style="margin-top: 0.65rem; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 0.5rem; display: flex; gap: 0.35rem; align-items: center;">
+                                <input type="text" id="note-input-${ot.id}" class="form-control" placeholder="Escribe una nota de avance..." style="font-size: 0.8rem; padding: 0.35rem 0.5rem; flex: 1; height: 32px; background: rgba(0,0,0,0.2);">
+                                <button class="btn-primary btn-tech-add-note" data-id="${ot.id}" style="font-size: 0.8rem; padding: 0 0.75rem; background: var(--accent-color); border: none; border-radius: 4px; cursor: pointer; font-weight: 500; height: 32px; display: flex; align-items: center; justify-content: center; gap: 0.25rem;">
+                                    Enviar
+                                </button>
+                            </div>
+                        `;
+                    }
+
                     techOtList.innerHTML += `
                         <div class="tech-ot-card ${statusClass}">
                             <div class="tech-ot-header">
@@ -206,6 +244,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ${ot.comentarios_tecnicos ? `<p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--success);"><strong>Resolución:</strong> ${ot.comentarios_tecnicos}</p>` : ''}
                                 ${fotosHtml}
                                 ${uploadPhotoHtml}
+                                ${comentariosAvanceHtml}
+                                ${addCommentHtml}
                             </div>
                             <div class="tech-ot-footer">
                                 <span style="font-size: 0.75rem; color: var(--text-muted);">Prioridad: <strong style="color: ${ot.prioridad === 'Alta' ? 'var(--danger)' : ot.prioridad === 'Media' ? 'var(--warning)' : 'var(--success)'}">${ot.prioridad}</strong></span>
@@ -263,8 +303,39 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     });
                 });
+
+                // Listeners for progress notes
+                document.querySelectorAll('.btn-tech-add-note').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const otId = btn.getAttribute('data-id');
+                        const noteInput = document.getElementById(`note-input-${otId}`);
+                        if (noteInput && noteInput.value.trim()) {
+                            addProgressNote(otId, noteInput.value.trim());
+                        }
+                    });
+                });
             })
             .catch(err => console.error('Error al cargar tareas del técnico:', err));
+    }
+
+    function addProgressNote(otId, comentario) {
+        const currentTechName = selectTechUser.options[selectTechUser.selectedIndex].text;
+        fetch(`/api/ordenes/${otId}/comentarios`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                comentario: comentario,
+                autor: currentTechName
+            })
+        })
+        .then(res => {
+            if (!res.ok) throw new Error('Error al guardar nota de avance');
+            return res.json();
+        })
+        .then(() => {
+            loadMyTasks();
+        })
+        .catch(err => alert(err.message));
     }
 
     // --- 4. START/PAUSE/RESUME TASK ACTIONS ---
