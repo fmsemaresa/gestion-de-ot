@@ -6,7 +6,7 @@ import openpyxl
 from models import (
     Planta, Edificio, Ubicacion, Activo, ComponenteActivo,
     Tecnico, OrdenTrabajo, PlantillaChequeo, ItemPlantillaChequeo,
-    RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT
+    RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT, OcupanteUbicacion
 )
 
 # Render uses DATABASE_URL for PostgreSQL connection
@@ -55,6 +55,103 @@ def create_db_and_tables():
         # Ensure existing templates are categorized correctly
         with engine.begin() as conn:
             conn.execute(text("UPDATE plantillachequeo SET tipo_revision = 'Ronda' WHERE nombre LIKE '%Ronda%'"))
+
+        # Check and migrate ubicacion table
+        columns_ub = [col['name'] for col in inspector.get_columns('ubicacion')]
+        if 'codigo' not in columns_ub:
+            print("Migrando base de datos: agregando columna 'codigo' a la tabla 'ubicacion'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE ubicacion ADD COLUMN codigo VARCHAR(100)"))
+            print("Columna 'codigo' agregada exitosamente.")
+        if 'uso' not in columns_ub:
+            print("Migrando base de datos: agregando columna 'uso' a la tabla 'ubicacion'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE ubicacion ADD COLUMN uso VARCHAR(100) DEFAULT 'Oficina'"))
+            print("Columna 'uso' agregada exitosamente.")
+        if 'cargo' not in columns_ub:
+            print("Migrando base de datos: agregando columna 'cargo' a la tabla 'ubicacion'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE ubicacion ADD COLUMN cargo VARCHAR(200)"))
+            print("Columna 'cargo' agregada exitosamente.")
+
+        # Execute data migration for existing 129 locations
+        try:
+            with Session(engine) as session:
+                stmt = select(Ubicacion).where(Ubicacion.codigo == None)
+                unmigrated = session.exec(stmt).all()
+                if unmigrated:
+                    print(f"Migrando {len(unmigrated)} registros de ubicaciones en la base de datos...")
+                    import re
+                    
+                    # Palabras clave genéricas para identificar el uso (en minúsculas)
+                    usos_genericos = {
+                        "baño": "Baño", "wc": "Baño", "sanitario": "Baño", "camarin": "Camarín", "camarines": "Camarín",
+                        "bodega": "Bodega", "cocina": "Cocina", "kitchinet": "Kitchenette", "kitchenette": "Kitchenette",
+                        "servidores": "Servidores", "reuniones": "Sala de Reuniones", "directorio": "Sala de Reuniones",
+                        "comedor": "Comedor", "casino": "Casino", "pasillo": "Pasillo", "hall": "Hall", "recepcion": "Recepción",
+                        "patio": "Patio", "terraza": "Terraza", "estacionamiento": "Estacionamiento", "taller": "Taller",
+                        "ducto": "Ducto", "horno": "Horno"
+                    }
+                    
+                    # Palabras clave de roles/cargos/departamentos (en minúsculas)
+                    roles_cargos = [
+                        "jefe", "gte", "gerente", "director", "asistente", "asit", "gn", "auditor", "supervisor",
+                        "subgerente", "coordinador", "construccion", "construcción", "rental", "marketing", "marketin",
+                        "izaje", "ti", "finanzas", "operaciones", "personas", "rrhh", "tesoreria", "tesorería"
+                    ]
+                    
+                    for u in unmigrated:
+                        # Extraer el código entre corchetes, ej: "Oficina RRHH [EC-P1-RecN-#1]"
+                        match_code = re.search(r'\[([^\]]+)\]', u.nombre)
+                        if match_code:
+                            code_val = match_code.group(1).strip()
+                            # Extraer la descripción antes de los corchetes
+                            desc_val = re.sub(r'\[[^\]]+\]', '', u.nombre).strip()
+                            
+                            u.codigo = code_val
+                            
+                            # Analizar la descripción para determinar uso, cargo y ocupantes
+                            desc_lower = desc_val.lower()
+                            
+                            # 1. Comprobar si es un uso genérico
+                            matched_uso = None
+                            for key, val in usos_genericos.items():
+                                if key in desc_lower:
+                                    matched_uso = val
+                                    break
+                            
+                            if matched_uso:
+                                u.uso = matched_uso
+                                u.cargo = None
+                                u.nombre = f"{matched_uso} [{code_val}]"
+                            else:
+                                # 2. Comprobar si es un cargo/rol/departamento
+                                is_cargo = any(role in desc_lower for role in roles_cargos)
+                                if is_cargo:
+                                    u.uso = "Oficina"
+                                    u.cargo = desc_val
+                                    u.nombre = f"{desc_val} [{code_val}]"
+                                else:
+                                    # 3. Asumir que es una persona/ocupante (si no está vacío y no es "oficina compartida")
+                                    if desc_val and desc_val.lower() != "oficina compartida":
+                                        u.uso = "Oficina"
+                                        u.cargo = None
+                                        u.nombre = f"Oficina [{code_val}]"
+                                        # Agregar ocupante
+                                        new_ocupante = OcupanteUbicacion(nombre=desc_val, ubicacion_id=u.id)
+                                        session.add(new_ocupante)
+                                    else:
+                                        # Oficina compartida o sin nombre
+                                        u.uso = "Oficina"
+                                        u.cargo = None
+                                        u.nombre = f"Oficina [{code_val}]"
+                            
+                            session.add(u)
+                    session.commit()
+                    print("Migración de ubicaciones completada con éxito.")
+        except Exception as ex_mig:
+            print(f"Error durante la migración de datos de ubicaciones: {ex_mig}")
+
     except Exception as e:
         print(f"Error al verificar/migrar columnas de base de datos: {e}")
 

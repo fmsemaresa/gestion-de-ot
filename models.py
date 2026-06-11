@@ -20,10 +20,24 @@ class Edificio(SQLModel, table=True):
 class Ubicacion(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     nombre: str = Field(index=True)  # E.g. "Oficinas Piso 1", "Sala Electrica"
+    codigo: Optional[str] = Field(default=None, index=True)
+    uso: str = Field(default="Oficina", index=True)
+    cargo: Optional[str] = Field(default=None, index=True)
     edificio_id: int = Field(foreign_key="edificio.id")
     
     edificio: Edificio = Relationship(back_populates="ubicaciones")
     activos: List["Activo"] = Relationship(back_populates="ubicacion")
+    ocupantes: List["OcupanteUbicacion"] = Relationship(
+        back_populates="ubicacion",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+class OcupanteUbicacion(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    nombre: str = Field(index=True)
+    ubicacion_id: int = Field(foreign_key="ubicacion.id")
+    
+    ubicacion: Optional[Ubicacion] = Relationship(back_populates="ocupantes")
 
 class Activo(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

@@ -329,9 +329,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (selectedPlantaId && u.planta_id !== selectedPlantaId) {
                         return false;
                     }
-                    return u.nombre.toLowerCase().includes(query) || 
-                           u.planta_nombre.toLowerCase().includes(query) || 
-                           u.edificio_nombre.toLowerCase().includes(query);
+                    const matchName = u.nombre.toLowerCase().includes(query) || 
+                                      u.planta_nombre.toLowerCase().includes(query) || 
+                                      u.edificio_nombre.toLowerCase().includes(query);
+                    const matchMeta = (u.codigo && u.codigo.toLowerCase().includes(query)) ||
+                                      (u.uso && u.uso.toLowerCase().includes(query)) ||
+                                      (u.cargo && u.cargo.toLowerCase().includes(query));
+                    const matchOcupante = u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().includes(query));
+                    
+                    return matchName || matchMeta || matchOcupante;
                 });
             } else {
                 filtered = locationsSearchList.filter(u => {
@@ -346,6 +352,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Match location, plant, or building name
                     if (cleanName.includes(cleanQuery) || cleanPlanta.includes(cleanQuery) || cleanEdificio.includes(cleanQuery)) {
+                        return true;
+                    }
+
+                    // Match metadata (codigo, uso, cargo)
+                    const cleanCodigo = u.codigo ? u.codigo.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanUso = u.uso ? u.uso.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanCargo = u.cargo ? u.cargo.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    
+                    if (cleanCodigo.includes(cleanQuery) || cleanUso.includes(cleanQuery) || cleanCargo.includes(cleanQuery)) {
+                        return true;
+                    }
+
+                    // Match occupants
+                    if (u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
                         return true;
                     }
 
@@ -380,9 +400,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (cleanQuery === '') {
                 filtered = locationsSearchList.filter(u => {
-                    return u.nombre.toLowerCase().includes(query) || 
-                           u.planta_nombre.toLowerCase().includes(query) || 
-                           u.edificio_nombre.toLowerCase().includes(query);
+                    const matchName = u.nombre.toLowerCase().includes(query) || 
+                                      u.planta_nombre.toLowerCase().includes(query) || 
+                                      u.edificio_nombre.toLowerCase().includes(query);
+                    const matchMeta = (u.codigo && u.codigo.toLowerCase().includes(query)) ||
+                                      (u.uso && u.uso.toLowerCase().includes(query)) ||
+                                      (u.cargo && u.cargo.toLowerCase().includes(query));
+                    const matchOcupante = u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().includes(query));
+                    
+                    return matchName || matchMeta || matchOcupante;
                 });
             } else {
                 filtered = locationsSearchList.filter(u => {
@@ -391,6 +417,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     const cleanEdificio = u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
 
                     if (cleanName.includes(cleanQuery) || cleanPlanta.includes(cleanQuery) || cleanEdificio.includes(cleanQuery)) {
+                        return true;
+                    }
+
+                    const cleanCodigo = u.codigo ? u.codigo.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanUso = u.uso ? u.uso.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanCargo = u.cargo ? u.cargo.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    
+                    if (cleanCodigo.includes(cleanQuery) || cleanUso.includes(cleanQuery) || cleanCargo.includes(cleanQuery)) {
+                        return true;
+                    }
+
+                    if (u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
                         return true;
                     }
 
@@ -513,6 +551,17 @@ document.addEventListener('DOMContentLoaded', () => {
         results.forEach(u => {
             const item = document.createElement('div');
             item.className = 'search-result-item';
+            
+            let occupantsHtml = '';
+            if (u.ocupantes && u.ocupantes.length > 0) {
+                const names = u.ocupantes.map(o => o.nombre).join(', ');
+                occupantsHtml = `
+                    <div style="font-size: 0.72rem; color: var(--success); margin-top: 0.15rem; display: flex; align-items: center; gap: 0.25rem;">
+                        <span>👤</span> <span>Ocupantes: <strong>${names}</strong></span>
+                    </div>
+                `;
+            }
+
             item.innerHTML = `
                 <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.15rem;">
                     🏢 ${u.planta_nombre} &gt; 📦 ${u.edificio_nombre}
@@ -520,6 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div style="font-weight: 600; color: var(--text-main); display: flex; align-items: center; gap: 0.35rem;">
                     📍 ${u.nombre}
                 </div>
+                ${occupantsHtml}
                 ${u.activos.length > 0 ? `
                     <div style="font-size: 0.75rem; color: var(--accent-color); margin-top: 0.2rem; display: flex; align-items: center; gap: 0.25rem;">
                         <span>⚡</span> <span style="font-style: italic;">${u.activos.join(', ')}</span>
@@ -705,8 +755,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     locItem.className = 'sub-item';
                     locItem.style.fontSize = '0.85rem';
                     locItem.setAttribute('data-ubicacion-id', u.id);
-                    locItem.setAttribute('data-ubicacion-nombre', u.nombre);
-                    locItem.innerHTML = `<span>📍 ${u.nombre}</span>`;
+                    
+                    let displayName = u.nombre;
+                    if (u.ocupantes && u.ocupantes.length > 0) {
+                        const names = u.ocupantes.map(o => o.nombre).join(', ');
+                        displayName = `${u.nombre} (${names})`;
+                    }
+                    
+                    locItem.setAttribute('data-ubicacion-nombre', displayName);
+                    locItem.innerHTML = `<span>📍 ${displayName}</span>`;
                     containerElement.appendChild(locItem);
 
                     locItem.addEventListener('click', (event) => {
