@@ -13,7 +13,7 @@ from database import engine, init_db
 from models import (
     Planta, Edificio, Ubicacion, Activo, 
     ComponenteActivo, Tecnico, OrdenTrabajo,
-    PlantillaChequeo, ItemPlantillaChequeo, RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT
+    PlantillaChequeo, ItemPlantillaChequeo, RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT, OcupanteUbicacion
 )
 
 @asynccontextmanager
@@ -1683,11 +1683,48 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
     wb = openpyxl.Workbook()
     
     # -------------------------------------------------------------
-    # HOJA 1: Importar Activos (Editable)
+    # HOJA 1: Importar Ubicaciones (Editable)
     # -------------------------------------------------------------
-    ws_activos = wb.active
-    ws_activos.title = "Importar Activos"
+    ws_ubicaciones = wb.active
+    ws_ubicaciones.title = "Importar Ubicaciones"
     
+    headers_ubicaciones = [
+        "Planta *", "Edificio *", "Ubicación (Nombre Completo) *", "Código", "Uso", "Cargo", "Ocupantes"
+    ]
+    ws_ubicaciones.append(headers_ubicaciones)
+    
+    ubicaciones = db.exec(select(Ubicacion)).all()
+    ref_locs_data = []
+    for u in ubicaciones:
+        edificio = db.get(Edificio, u.edificio_id) if u.edificio_id else None
+        planta = db.get(Planta, edificio.planta_id) if edificio else None
+        ocupantes_str = ", ".join([o.nombre for o in u.ocupantes])
+        ref_locs_data.append([
+            planta.nombre if planta else "",
+            edificio.nombre if edificio else "",
+            u.nombre,
+            u.codigo or "",
+            u.uso or "Oficina",
+            u.cargo or "",
+            ocupantes_str
+        ])
+    ref_locs_data.sort(key=lambda x: (x[0], x[1], x[2]))
+    for row in ref_locs_data:
+        ws_ubicaciones.append(row)
+        
+    # Estilos cabecera Hoja 1
+    from openpyxl.styles import Font, PatternFill
+    header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+    header_fill_ubic = PatternFill(start_color="595959", end_color="595959", fill_type="solid")
+    for col in range(1, len(headers_ubicaciones) + 1):
+        cell = ws_ubicaciones.cell(row=1, column=col)
+        cell.font = header_font
+        cell.fill = header_fill_ubic
+        
+    # -------------------------------------------------------------
+    # HOJA 2: Importar Activos (Editable)
+    # -------------------------------------------------------------
+    ws_activos = wb.create_sheet(title="Importar Activos")
     headers_activos = [
         "Planta *", "Edificio *", "Ubicación *", "Nombre Activo *", "Tipo *", "Marca", "Modelo", "N° Serie"
     ]
@@ -1730,9 +1767,7 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
             item["serie"]
         ])
         
-    # Estilos cabecera Hoja 1
-    from openpyxl.styles import Font, PatternFill
-    header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+    # Estilos cabecera Hoja 2
     header_fill_act = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     for col in range(1, len(headers_activos) + 1):
         cell = ws_activos.cell(row=1, column=col)
@@ -1740,7 +1775,7 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
         cell.fill = header_fill_act
         
     # -------------------------------------------------------------
-    # HOJA 2: Importar Despieces (Editable)
+    # HOJA 3: Importar Despieces (Editable)
     # -------------------------------------------------------------
     ws_despieces = wb.create_sheet(title="Importar Despieces")
     headers_despieces = [
@@ -1800,45 +1835,12 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
             c.estado
         ])
         
-    # Estilos cabecera Hoja 2
+    # Estilos cabecera Hoja 3
     header_fill_desp = PatternFill(start_color="365F91", end_color="365F91", fill_type="solid")
     for col in range(1, len(headers_despieces) + 1):
         cell = ws_despieces.cell(row=1, column=col)
         cell.font = header_font
         cell.fill = header_fill_desp
-        
-    # -------------------------------------------------------------
-    # HOJA 3: Ubicaciones de Referencia (Solo Lectura)
-    # -------------------------------------------------------------
-    ws_ref_locs = wb.create_sheet(title="Ubicaciones de Referencia")
-    headers_ref_locs = ["Planta", "Edificio", "Ubicación (Nombre Completo)", "Código", "Uso", "Cargo", "Ocupantes"]
-    ws_ref_locs.append(headers_ref_locs)
-    
-    ubicaciones = db.exec(select(Ubicacion)).all()
-    ref_locs_data = []
-    for u in ubicaciones:
-        edificio = db.get(Edificio, u.edificio_id) if u.edificio_id else None
-        planta = db.get(Planta, edificio.planta_id) if edificio else None
-        ocupantes_str = ", ".join([o.nombre for o in u.ocupantes])
-        ref_locs_data.append([
-            planta.nombre if planta else "",
-            edificio.nombre if edificio else "",
-            u.nombre,
-            u.codigo or "",
-            u.uso or "Oficina",
-            u.cargo or "",
-            ocupantes_str
-        ])
-    ref_locs_data.sort(key=lambda x: (x[0], x[1], x[2]))
-    for row in ref_locs_data:
-        ws_ref_locs.append(row)
-        
-    # Estilos cabecera Hoja 3
-    header_fill_ref_locs = PatternFill(start_color="595959", end_color="595959", fill_type="solid")
-    for col in range(1, len(headers_ref_locs) + 1):
-        cell = ws_ref_locs.cell(row=1, column=col)
-        cell.font = header_font
-        cell.fill = header_fill_ref_locs
         
     # -------------------------------------------------------------
     # HOJA 4: Activos de Referencia (Solo Lectura)
@@ -1873,7 +1875,7 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
         cell.fill = header_fill_ref_act
         
     # Autoajuste de columnas en todas las hojas
-    for ws in [ws_activos, ws_despieces, ws_ref_locs, ws_ref_act]:
+    for ws in [ws_ubicaciones, ws_activos, ws_despieces, ws_ref_act]:
         for col in ws.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
             col_letter = openpyxl.utils.get_column_letter(col[0].column)
@@ -1899,6 +1901,102 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
         file_stream = io.BytesIO(contents)
         wb = openpyxl.load_workbook(file_stream, read_only=True)
         
+        # 0. PROCESAR HOJA DE UBICACIONES
+        locations_imported = 0
+        locations_updated = 0
+        
+        if "Importar Ubicaciones" in wb.sheetnames:
+            sheet_ubicaciones = wb["Importar Ubicaciones"]
+            rows_ubicaciones = list(sheet_ubicaciones.iter_rows(values_only=True))
+            
+            for idx, row in enumerate(rows_ubicaciones[1:], start=2):
+                if not row or not any(row):
+                    continue
+                
+                planta_name = str(row[0]).strip() if row[0] is not None else ""
+                edificio_name = str(row[1]).strip() if row[1] is not None else ""
+                ubicacion_name = str(row[2]).strip() if row[2] is not None else ""
+                codigo_val = str(row[3]).strip() if row[3] is not None else ""
+                uso_val = str(row[4]).strip() if row[4] is not None else "Oficina"
+                cargo_val = str(row[5]).strip() if row[5] is not None else ""
+                ocupantes_val = str(row[6]).strip() if row[6] is not None else ""
+                
+                if not planta_name or not edificio_name or not ubicacion_name:
+                    continue
+                
+                # Buscar o crear Planta
+                planta = db.exec(select(Planta).where(Planta.nombre == planta_name)).first()
+                if not planta:
+                    planta = Planta(nombre=planta_name)
+                    db.add(planta)
+                    db.commit()
+                    db.refresh(planta)
+                
+                # Buscar o crear Edificio
+                edificio = db.exec(
+                    select(Edificio)
+                    .where(Edificio.nombre == edificio_name, Edificio.planta_id == planta.id)
+                ).first()
+                if not edificio:
+                    edificio = Edificio(nombre=edificio_name, planta_id=planta.id)
+                    db.add(edificio)
+                    db.commit()
+                    db.refresh(edificio)
+                
+                # Buscar Ubicación por código (si está presente) o por nombre
+                ubicacion = None
+                if codigo_val:
+                    ubicacion = db.exec(
+                        select(Ubicacion)
+                        .where(Ubicacion.codigo == codigo_val)
+                        .where(Ubicacion.edificio_id == edificio.id)
+                    ).first()
+                
+                if not ubicacion:
+                    ubicacion = db.exec(
+                        select(Ubicacion)
+                        .where(Ubicacion.nombre == ubicacion_name)
+                        .where(Ubicacion.edificio_id == edificio.id)
+                    ).first()
+                
+                if ubicacion:
+                    # Actualizar ubicación
+                    ubicacion.nombre = ubicacion_name
+                    ubicacion.codigo = codigo_val if codigo_val else None
+                    ubicacion.uso = uso_val if uso_val else "Oficina"
+                    ubicacion.cargo = cargo_val if cargo_val else None
+                    db.add(ubicacion)
+                    db.commit()
+                    db.refresh(ubicacion)
+                    locations_updated += 1
+                else:
+                    # Crear nueva ubicación
+                    ubicacion = Ubicacion(
+                        nombre=ubicacion_name,
+                        codigo=codigo_val if codigo_val else None,
+                        uso=uso_val if uso_val else "Oficina",
+                        cargo=cargo_val if cargo_val else None,
+                        edificio_id=edificio.id
+                    )
+                    db.add(ubicacion)
+                    db.commit()
+                    db.refresh(ubicacion)
+                    locations_imported += 1
+                
+                # Actualizar ocupantes
+                new_occupants = [o.strip() for o in ocupantes_val.split(",") if o.strip()] if ocupantes_val else []
+                
+                # Limpiar ocupantes existentes
+                from sqlalchemy import delete
+                db.exec(delete(OcupanteUbicacion).where(OcupanteUbicacion.ubicacion_id == ubicacion.id))
+                db.commit()
+                
+                # Añadir los nuevos
+                for o_name in new_occupants:
+                    db.add(OcupanteUbicacion(nombre=o_name, ubicacion_id=ubicacion.id))
+                
+                db.commit()
+
         # 1. PROCESAR HOJA DE ACTIVOS
         assets_imported = 0
         assets_omitted = 0
@@ -1906,10 +2004,12 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
         sheet_activos = None
         if "Importar Activos" in wb.sheetnames:
             sheet_activos = wb["Importar Activos"]
-        else:
+        elif "Importar Ubicaciones" not in wb.sheetnames:
             sheet_activos = wb.active
             
-        rows_activos = list(sheet_activos.iter_rows(values_only=True))
+        rows_activos = []
+        if sheet_activos:
+            rows_activos = list(sheet_activos.iter_rows(values_only=True))
         
         # Guardar conteo de activos en el Excel para resolver duplicados por cantidad
         seen_in_excel = {}
@@ -2185,12 +2285,21 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
             db.commit()
             
         # Mensaje de resultado
-        msg = f"Activos: {assets_imported} creados, {assets_omitted} omitidos. Despieces: {comps_imported} creados, {comps_updated} actualizados, {comps_omitted} omitidos."
+        parts = []
+        if "Importar Ubicaciones" in wb.sheetnames:
+            parts.append(f"{locations_imported + locations_updated} ubicaciones ({locations_imported} creadas, {locations_updated} actualizadas)")
+        parts.append(f"{assets_imported} activos creados ({assets_omitted} omitidos)")
+        if "Importar Despieces" in wb.sheetnames:
+            parts.append(f"{comps_imported + comps_updated} componentes ({comps_imported} creados, {comps_updated} actualizados, {comps_omitted} omitidos)")
+            
+        msg = "Se importaron con éxito: " + ", ".join(parts) + "."
         if unmatched_comps:
             msg += f" Omitidos {len(unmatched_comps)} por activo o ID no encontrado: {', '.join(unmatched_comps[:2])}..."
             
         return {
             "status": "success",
+            "locations_imported": locations_imported,
+            "locations_updated": locations_updated,
             "assets_imported": assets_imported,
             "assets_omitted": assets_omitted,
             "comps_imported": comps_imported,
