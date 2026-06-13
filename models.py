@@ -23,6 +23,7 @@ class Ubicacion(SQLModel, table=True):
     codigo: Optional[str] = Field(default=None, index=True)
     uso: str = Field(default="Oficina", index=True)
     cargo: Optional[str] = Field(default=None, index=True)
+    color: Optional[str] = Field(default=None)
     edificio_id: int = Field(foreign_key="edificio.id")
     
     edificio: Edificio = Relationship(back_populates="ubicaciones")
@@ -47,6 +48,7 @@ class Activo(SQLModel, table=True):
     modelo: Optional[str] = None
     numero_serie: Optional[str] = None
     estado: str = Field(default="Operativo")  # Operativo, En Reparación, Inactivo
+    color: Optional[str] = Field(default=None)
     
     ubicacion_id: Optional[int] = Field(default=None, foreign_key="ubicacion.id")
     ubicacion: Optional[Ubicacion] = Relationship(back_populates="activos")

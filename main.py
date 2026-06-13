@@ -1678,6 +1678,49 @@ async def importar_checklists(file: UploadFile = File(...), db: Session = Depend
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error al procesar el archivo Excel: {str(e)}")
 
+def serialize_cell_color(cell) -> Optional[str]:
+    fill = cell.fill
+    if not fill or not fill.fill_type or fill.fill_type == 'none':
+        return None
+    sc = fill.start_color
+    if not sc or sc.type is None:
+        return None
+    if sc.type == 'rgb' and sc.rgb and sc.rgb != "00000000" and sc.rgb != "FFFFFFFF":
+        return f"rgb:{sc.rgb}"
+    elif sc.type == 'theme' and sc.theme is not None:
+        tint = sc.tint if sc.tint is not None else 0.0
+        return f"theme:{sc.theme}:{tint}"
+    elif sc.type == 'indexed' and sc.indexed is not None:
+        return f"indexed:{sc.indexed}"
+    return None
+
+def deserialize_and_apply_color(cell, color_str: Optional[str]):
+    if not color_str:
+        return
+    from openpyxl.styles import PatternFill
+    from openpyxl.styles.colors import Color
+    
+    parts = color_str.split(":")
+    if not parts or len(parts) < 2:
+        return
+        
+    color_type = parts[0]
+    try:
+        if color_type == "rgb":
+            rgb_val = parts[1]
+            cell.fill = PatternFill(start_color=rgb_val, end_color=rgb_val, fill_type="solid")
+        elif color_type == "theme" and len(parts) >= 3:
+            theme_val = int(parts[1])
+            tint_val = float(parts[2])
+            c = Color(type="theme", theme=theme_val, tint=tint_val)
+            cell.fill = PatternFill(start_color=c, end_color=c, fill_type="solid")
+        elif color_type == "indexed":
+            indexed_val = int(parts[1])
+            c = Color(type="indexed", indexed=indexed_val)
+            cell.fill = PatternFill(start_color=c, end_color=c, fill_type="solid")
+    except Exception as e:
+        print(f"Error applying color {color_str} to cell: {e}")
+
 @app.get("/api/excel/plantilla-unificada")
 def descargar_plantilla_unificada(db: Session = Depends(get_db)):
     wb = openpyxl.Workbook()
@@ -1699,18 +1742,26 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
         edificio = db.get(Edificio, u.edificio_id) if u.edificio_id else None
         planta = db.get(Planta, edificio.planta_id) if edificio else None
         ocupantes_str = ", ".join([o.nombre for o in u.ocupantes])
-        ref_locs_data.append([
-            planta.nombre if planta else "",
-            edificio.nombre if edificio else "",
-            u.nombre,
-            u.codigo or "",
-            u.uso or "Oficina",
-            u.cargo or "",
-            ocupantes_str
-        ])
-    ref_locs_data.sort(key=lambda x: (x[0], x[1], x[2]))
-    for row in ref_locs_data:
-        ws_ubicaciones.append(row)
+        ref_locs_data.append({
+            "row": [
+                planta.nombre if planta else "",
+                edificio.nombre if edificio else "",
+                u.nombre,
+                u.codigo or "",
+                u.uso or "Oficina",
+                u.cargo or "",
+                ocupantes_str
+            ],
+            "color": u.color
+        })
+    ref_locs_data.sort(key=lambda x: (x["row"][0], x["row"][1], x["row"][2]))
+    for item in ref_locs_data:
+        ws_ubicaciones.append(item["row"])
+        if item["color"]:
+            row_idx = ws_ubicaciones.max_row
+            for col_idx in range(1, len(item["row"]) + 1):
+                cell = ws_ubicaciones.cell(row=row_idx, column=col_idx)
+                deserialize_and_apply_color(cell, item["color"])
         
     # Estilos cabecera Hoja 1
     from openpyxl.styles import Font, PatternFill
@@ -1751,7 +1802,8 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
             "tipo": a.tipo,
             "marca": a.marca or "",
             "modelo": a.modelo or "",
-            "serie": a.numero_serie or ""
+            "serie": a.numero_serie or "",
+            "color": a.color
         })
     activos_data.sort(key=lambda x: (x["planta"], x["edificio"], x["ubicacion"], x["nombre"]))
     
@@ -1766,6 +1818,11 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
             item["modelo"],
             item["serie"]
         ])
+        if item["color"]:
+            row_idx = ws_activos.max_row
+            for col_idx in range(1, len(headers_activos) + 1):
+                cell = ws_activos.cell(row=row_idx, column=col_idx)
+                deserialize_and_apply_color(cell, item["color"])
         
     # Estilos cabecera Hoja 2
     header_fill_act = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
@@ -1899,7 +1956,7 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
     try:
         contents = await file.read()
         file_stream = io.BytesIO(contents)
-        wb = openpyxl.load_workbook(file_stream, read_only=True)
+        wb = openpyxl.load_workbook(file_stream, data_only=True)
         
         # 0. PROCESAR HOJA DE UBICACIONES
         locations_imported = 0
@@ -1907,22 +1964,30 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
         
         if "Importar Ubicaciones" in wb.sheetnames:
             sheet_ubicaciones = wb["Importar Ubicaciones"]
-            rows_ubicaciones = list(sheet_ubicaciones.iter_rows(values_only=True))
+            rows_ubicaciones = list(sheet_ubicaciones.iter_rows())
             
             for idx, row in enumerate(rows_ubicaciones[1:], start=2):
-                if not row or not any(row):
+                if not row or not any(cell.value for cell in row):
                     continue
                 
-                planta_name = str(row[0]).strip() if row[0] is not None else ""
-                edificio_name = str(row[1]).strip() if row[1] is not None else ""
-                ubicacion_name = str(row[2]).strip() if row[2] is not None else ""
-                codigo_val = str(row[3]).strip() if row[3] is not None else ""
-                uso_val = str(row[4]).strip() if row[4] is not None else "Oficina"
-                cargo_val = str(row[5]).strip() if row[5] is not None else ""
-                ocupantes_val = str(row[6]).strip() if row[6] is not None else ""
+                planta_name = str(row[0].value).strip() if row[0].value is not None else ""
+                edificio_name = str(row[1].value).strip() if row[1].value is not None else ""
+                ubicacion_name = str(row[2].value).strip() if row[2].value is not None else ""
+                codigo_val = str(row[3].value).strip() if row[3].value is not None else ""
+                uso_val = str(row[4].value).strip() if row[4].value is not None else "Oficina"
+                cargo_val = str(row[5].value).strip() if row[5].value is not None else ""
+                ocupantes_val = str(row[6].value).strip() if row[6].value is not None else ""
                 
                 if not planta_name or not edificio_name or not ubicacion_name:
                     continue
+                
+                # Detect color in any cell of this row
+                row_color = None
+                for cell in row:
+                    c_color = serialize_cell_color(cell)
+                    if c_color:
+                        row_color = c_color
+                        break
                 
                 # Buscar o crear Planta
                 planta = db.exec(select(Planta).where(Planta.nombre == planta_name)).first()
@@ -1965,6 +2030,7 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
                     ubicacion.codigo = codigo_val if codigo_val else None
                     ubicacion.uso = uso_val if uso_val else "Oficina"
                     ubicacion.cargo = cargo_val if cargo_val else None
+                    ubicacion.color = row_color
                     db.add(ubicacion)
                     db.commit()
                     db.refresh(ubicacion)
@@ -1976,6 +2042,7 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
                         codigo=codigo_val if codigo_val else None,
                         uso=uso_val if uso_val else "Oficina",
                         cargo=cargo_val if cargo_val else None,
+                        color=row_color,
                         edificio_id=edificio.id
                     )
                     db.add(ubicacion)
@@ -2009,24 +2076,24 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
             
         rows_activos = []
         if sheet_activos:
-            rows_activos = list(sheet_activos.iter_rows(values_only=True))
+            rows_activos = list(sheet_activos.iter_rows())
         
         # Guardar conteo de activos en el Excel para resolver duplicados por cantidad
         seen_in_excel = {}
         valid_activo_rows = []
         
         for idx, row in enumerate(rows_activos[1:], start=2):
-            if not row or not any(row):
+            if not row or not any(cell.value for cell in row):
                 continue
                 
-            planta_name = str(row[0]).strip() if row[0] is not None else ""
-            edificio_name = str(row[1]).strip() if row[1] is not None else ""
-            ubicacion_name = str(row[2]).strip() if row[2] is not None else ""
-            activo_name = str(row[3]).strip() if row[3] is not None else ""
-            tipo_val = str(row[4]).strip() if row[4] is not None else "Climatización"
-            marca_val = str(row[5]).strip() if row[5] is not None else None
-            modelo_val = str(row[6]).strip() if row[6] is not None else None
-            serie_val = str(row[7]).strip() if row[7] is not None else None
+            planta_name = str(row[0].value).strip() if row[0].value is not None else ""
+            edificio_name = str(row[1].value).strip() if row[1].value is not None else ""
+            ubicacion_name = str(row[2].value).strip() if row[2].value is not None else ""
+            activo_name = str(row[3].value).strip() if row[3].value is not None else ""
+            tipo_val = str(row[4].value).strip() if row[4].value is not None else "Climatización"
+            marca_val = str(row[5].value).strip() if row[5].value is not None else None
+            modelo_val = str(row[6].value).strip() if row[6].value is not None else None
+            serie_val = str(row[7].value).strip() if row[7].value is not None else None
             
             # Fila de ejemplo (Santa Adela / Fancoil Muro Oficina 1) se omite
             if (planta_name == "Santa Adela" and edificio_name == "Edificio Corporativo" and 
@@ -2036,6 +2103,14 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
             if not planta_name or not edificio_name or not ubicacion_name or not activo_name:
                 continue
                 
+            # Detect color in any cell of this row
+            row_color = None
+            for cell in row:
+                c_color = serialize_cell_color(cell)
+                if c_color:
+                    row_color = c_color
+                    break
+                    
             valid_activo_rows.append({
                 "idx": idx,
                 "planta": planta_name,
@@ -2045,7 +2120,8 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
                 "tipo": tipo_val,
                 "marca": marca_val,
                 "modelo": modelo_val,
-                "serie": serie_val
+                "serie": serie_val,
+                "color": row_color
             })
             
             # Contabilizar apariciones en Excel
@@ -2094,23 +2170,29 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
                     db.refresh(ubicacion)
                     
             # Conteo en la base de datos
-            db_count = 0
+            db_assets = []
             if item["serie"]:
-                db_count = len(db.exec(
+                db_assets = db.exec(
                     select(Activo)
                     .where(Activo.numero_serie == item["serie"])
                     .where(Activo.ubicacion_id == ubicacion.id)
                     .where(Activo.estado != "Reemplazado")
                     .where(Activo.estado != "Eliminado sin Reemplazo")
-                ).all())
+                ).all()
             else:
-                db_count = len(db.exec(
+                db_assets = db.exec(
                     select(Activo)
                     .where(Activo.nombre == item["nombre"])
                     .where(Activo.ubicacion_id == ubicacion.id)
                     .where(Activo.estado != "Reemplazado")
                     .where(Activo.estado != "Eliminado sin Reemplazo")
-                ).all())
+                ).all()
+            db_count = len(db_assets)
+            
+            # Update existing assets colors if imported
+            for a in db_assets:
+                a.color = item["color"]
+                db.add(a)
                 
             excel_count = seen_in_excel[key]
             
@@ -2125,7 +2207,8 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
                         modelo=item["modelo"],
                         numero_serie=item["serie"],
                         estado="Operativo",
-                        ubicacion_id=ubicacion.id
+                        ubicacion_id=ubicacion.id,
+                        color=item["color"]
                     )
                     db.add(new_activo)
                 assets_imported += to_import

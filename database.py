@@ -73,6 +73,19 @@ def create_db_and_tables():
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE ubicacion ADD COLUMN cargo VARCHAR(200)"))
             print("Columna 'cargo' agregada exitosamente.")
+        if 'color' not in columns_ub:
+            print("Migrando base de datos: agregando columna 'color' a la tabla 'ubicacion'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE ubicacion ADD COLUMN color VARCHAR(50)"))
+            print("Columna 'color' agregada exitosamente.")
+
+        # Check and migrate activo table
+        columns_act = [col['name'] for col in inspector.get_columns('activo')]
+        if 'color' not in columns_act:
+            print("Migrando base de datos: agregando columna 'color' a la tabla 'activo'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE activo ADD COLUMN color VARCHAR(50)"))
+            print("Columna 'color' agregada exitosamente.")
 
         # Execute data migration for existing 129 locations
         try:
