@@ -2791,6 +2791,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         document.getElementById('asset-modelo').value = ''; // clear model for new one
                         document.getElementById('asset-serie').value = ''; // clear serial for new one
                         
+                        if (uId) {
+                            displayAssignedLocationInAssetModal(uId);
+                        } else {
+                            document.getElementById('asset-assigned-location-container').style.display = 'none';
+                        }
+                        
                         // Show modal
                         assetModal.style.display = 'flex';
                     } else {
@@ -3426,14 +3432,48 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- 10. REGISTER NEW ASSET MODAL ---
+    function displayAssignedLocationInAssetModal(locationId) {
+        const container = document.getElementById('asset-assigned-location-container');
+        const nameLabel = document.getElementById('asset-assigned-location-name');
+        
+        if (!locationId) {
+            container.style.display = 'none';
+            return;
+        }
+        
+        container.style.display = 'block';
+        nameLabel.textContent = 'Cargando ubicación...';
+        
+        fetch(`/api/ubicaciones/${locationId}`)
+            .then(res => {
+                if (!res.ok) throw new Error('Ubicación no encontrada');
+                return res.json();
+            })
+            .then(loc => {
+                const parts = [];
+                if (loc.planta_nombre) parts.push(loc.planta_nombre);
+                if (loc.edificio_nombre) parts.push(loc.edificio_nombre);
+                if (loc.nombre) parts.push(loc.nombre);
+                
+                nameLabel.textContent = parts.join(' ➔ ');
+            })
+            .catch(err => {
+                console.error(err);
+                nameLabel.textContent = 'Ubicación ID: ' + locationId;
+            });
+    }
+
     btnCreateActivo.addEventListener('click', () => {
         if (!selectedUbicacionId) return;
         document.getElementById('asset-location-id').value = selectedUbicacionId;
+        displayAssignedLocationInAssetModal(selectedUbicacionId);
         assetModal.style.display = 'flex';
     });
 
     closeAssetModal.addEventListener('click', () => {
         assetModal.style.display = 'none';
+        const container = document.getElementById('asset-assigned-location-container');
+        if (container) container.style.display = 'none';
     });
 
     assetForm.addEventListener('submit', (e) => {
@@ -3468,6 +3508,8 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             assetModal.style.display = 'none';
             assetForm.reset();
+            const container = document.getElementById('asset-assigned-location-container');
+            if (container) container.style.display = 'none';
             loadAssets();
             loadKPIs();
             preloadSearchList();

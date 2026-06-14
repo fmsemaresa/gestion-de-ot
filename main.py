@@ -91,6 +91,26 @@ def get_ubicaciones(edificio_id: int, db: Session = Depends(get_db)):
         "ocupantes": [{"id": o.id, "nombre": o.nombre} for o in u.ocupantes]
     } for u in ubicaciones]
 
+@app.get("/api/ubicaciones/{ubicacion_id}")
+def get_ubicacion_by_id(ubicacion_id: int, db: Session = Depends(get_db)):
+    u = db.get(Ubicacion, ubicacion_id)
+    if not u:
+        raise HTTPException(status_code=404, detail="Ubicación no encontrada")
+    edificio = db.get(Edificio, u.edificio_id)
+    planta = db.get(Planta, edificio.planta_id) if edificio else None
+    return {
+        "id": u.id,
+        "nombre": u.nombre,
+        "codigo": u.codigo,
+        "uso": u.uso,
+        "cargo": u.cargo,
+        "edificio_id": u.edificio_id,
+        "edificio_nombre": edificio.nombre if edificio else None,
+        "planta_id": edificio.planta_id if edificio else None,
+        "planta_nombre": planta.nombre if planta else None,
+        "ocupantes": [{"id": o.id, "nombre": o.nombre} for o in u.ocupantes]
+    }
+
 @app.get("/api/search/locations")
 def search_locations(db: Session = Depends(get_db)):
     results = []
