@@ -1726,7 +1726,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         card.className = cardClass;
                         card.innerHTML = `
                             <h4 class="entity-title" style="margin-bottom:0.15rem; font-size:0.95rem;">${a.nombre}</h4>
-                            <div style="font-size:0.72rem; color: var(--text-muted); margin-bottom: 0.4rem; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${locHierarchyStr}">
+                            <div style="font-size:0.72rem; color: var(--text-muted); margin-bottom: 0.4rem; font-style: italic; white-space: normal; word-break: break-word; line-height: 1.2;" title="${locHierarchyStr}">
                                 📍 ${locHierarchyStr}
                             </div>
                             <div class="entity-meta">
