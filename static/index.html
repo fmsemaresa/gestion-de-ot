@@ -131,6 +131,9 @@
                                 <button class="btn-secondary" id="btn-ot-view-type" style="padding: 0.4rem 0.75rem; font-size: 0.85rem; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; background: transparent; color: var(--text-muted); font-weight: 500;">
                                     🔧 Por Tipo
                                 </button>
+                                <button class="btn-secondary" id="btn-ot-view-calendar" style="padding: 0.4rem 0.75rem; font-size: 0.85rem; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; background: transparent; color: var(--text-muted); font-weight: 500;">
+                                    📅 Calendario
+                                </button>
                             </div>
                             <button class="btn-secondary" id="btn-export-ots-excel" style="background: #107c41; color: white; border-color: #107c41; display: flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; font-size: 0.85rem;">
                                 <span>📥</span> Exportar Excel
@@ -375,6 +378,99 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- SLIDING DETAIL DRAWER FOR OT -->
+    <div class="drawer" id="ot-drawer">
+        <div class="drawer-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h3 id="drawer-ot-title">Detalles de la OT</h3>
+            <button class="btn-icon" id="close-ot-drawer">✕</button>
+        </div>
+        <div class="drawer-body">
+            <!-- OT Hierarchy Location Info -->
+            <div class="detail-section" style="margin-top: 0; margin-bottom: 1.25rem; background: rgba(59, 130, 246, 0.05); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2);">
+                <div class="detail-label" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.35rem; font-weight: 600;">Ubicación de los Trabajos</div>
+                <div style="font-size: 0.9rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                    <span id="drawer-ot-planta" style="color: var(--accent-color);">Planta</span>
+                    <span style="color: var(--text-muted); font-size: 0.8rem;">&gt;</span> 
+                    <span id="drawer-ot-edificio" style="color: var(--text-main);">Edificio</span>
+                    <span id="drawer-ot-ubicacion-container" style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                        <span style="color: var(--text-muted); font-size: 0.8rem;">&gt;</span>
+                        <span id="drawer-ot-ubicacion" style="color: var(--text-main); font-weight: 600;">Ubicación</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- OT Status Row -->
+            <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.03); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.25rem;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Estado:</span>
+                    <span id="drawer-ot-estado" class="status-badge">Estado</span>
+                </div>
+                <div style="display: flex; gap: 0.5rem;" id="drawer-ot-actions-container">
+                    <!-- Quick actions (e.g. Programar/Reasignar, Iniciar, Terminar, etc.) -->
+                </div>
+            </div>
+
+            <!-- OT Specs/Info -->
+            <div class="detail-section">
+                <h4 class="detail-section-title">Información General</h4>
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="detail-label">Prioridad</div>
+                        <div class="detail-value" id="drawer-ot-prioridad">Media</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Reportado por</div>
+                        <div class="detail-value" id="drawer-ot-reportado">Sistema</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Fecha Creación</div>
+                        <div class="detail-value" id="drawer-ot-creacion">-</div>
+                    </div>
+                </div>
+                <div class="detail-grid" style="margin-top: 0.75rem;">
+                    <div class="detail-item" style="grid-column: span 2;">
+                        <div class="detail-label">Técnico Asignado</div>
+                        <div class="detail-value" id="drawer-ot-tecnico">No Asignado</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Fecha Programada</div>
+                        <div class="detail-value" id="drawer-ot-programada">Pendiente</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div class="detail-section">
+                <h4 class="detail-section-title">Descripción del Problema / Tarea</h4>
+                <p id="drawer-ot-descripcion" style="font-size:0.9rem; background:rgba(0,0,0,0.15); padding:0.75rem; border-radius:6px; color:#cbd5e1; line-height:1.4; margin:0;"></p>
+            </div>
+
+            <!-- Worked Components (Despieces) -->
+            <div class="detail-section" id="drawer-ot-components-section" style="display: none;">
+                <h4 class="detail-section-title">Despieces a Trabajar</h4>
+                <div class="component-list" id="drawer-ot-components-list"></div>
+            </div>
+
+            <!-- Checklist results -->
+            <div class="detail-section" id="drawer-ot-checklist-section" style="display: none;">
+                <h4 class="detail-section-title">Resultados de Inspección</h4>
+                <div class="component-list" id="drawer-ot-checklist-results"></div>
+            </div>
+
+            <!-- Backup photos -->
+            <div class="detail-section" id="drawer-ot-photos-section" style="display: none;">
+                <h4 class="detail-section-title">Fotos de Respaldo</h4>
+                <div style="display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.25rem;" id="drawer-ot-photos-container"></div>
+            </div>
+
+            <!-- Notes diary -->
+            <div class="detail-section" id="drawer-ot-comentarios-section" style="display: none;">
+                <h4 class="detail-section-title">Bitácora de Notas</h4>
+                <div class="component-list" id="drawer-ot-comentarios-list" style="display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;"></div>
+            </div>
         </div>
     </div>
 

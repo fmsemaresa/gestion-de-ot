@@ -10,7 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSelectedPlantName = null;
     let allLoadedOts = [];
     let currentPlantViewMode = 'flat'; // 'flat', 'building', or 'type'
-    let currentOtViewMode = 'flat'; // 'flat', 'building', or 'type'
+    let currentOtViewMode = 'flat'; // 'flat', 'building', 'type', or 'calendar'
+    let calendarYear = new Date().getFullYear();
+    let calendarMonth = new Date().getMonth();
 
     // DOM Elements
     const kpiTotalOts = document.getElementById('kpi-total-ots');
@@ -47,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnOtViewFlat = document.getElementById('btn-ot-view-flat');
     const btnOtViewBuilding = document.getElementById('btn-ot-view-building');
     const btnOtViewType = document.getElementById('btn-ot-view-type');
+    const btnOtViewCalendar = document.getElementById('btn-ot-view-calendar');
 
     // Plant count selector mappings
     const plantCounts = {
@@ -129,6 +132,31 @@ document.addEventListener('DOMContentLoaded', () => {
     const drawerComponentList = document.getElementById('drawer-component-list');
     const drawerHistoryList = document.getElementById('drawer-history-list');
     const btnCreateOtForAsset = document.getElementById('btn-create-ot-for-asset');
+
+    // OT Drawer
+    const otDrawer = document.getElementById('ot-drawer');
+    const closeOtDrawer = document.getElementById('close-ot-drawer');
+    const drawerOtTitle = document.getElementById('drawer-ot-title');
+    const drawerOtPlanta = document.getElementById('drawer-ot-planta');
+    const drawerOtEdificio = document.getElementById('drawer-ot-edificio');
+    const drawerOtUbicacion = document.getElementById('drawer-ot-ubicacion');
+    const drawerOtUbicacionContainer = document.getElementById('drawer-ot-ubicacion-container');
+    const drawerOtEstado = document.getElementById('drawer-ot-estado');
+    const drawerOtActionsContainer = document.getElementById('drawer-ot-actions-container');
+    const drawerOtPrioridad = document.getElementById('drawer-ot-prioridad');
+    const drawerOtReportado = document.getElementById('drawer-ot-reportado');
+    const drawerOtCreacion = document.getElementById('drawer-ot-creacion');
+    const drawerOtTecnico = document.getElementById('drawer-ot-tecnico');
+    const drawerOtProgramada = document.getElementById('drawer-ot-programada');
+    const drawerOtDescripcion = document.getElementById('drawer-ot-descripcion');
+    const drawerOtComponentsSection = document.getElementById('drawer-ot-components-section');
+    const drawerOtComponentsList = document.getElementById('drawer-ot-components-list');
+    const drawerOtChecklistSection = document.getElementById('drawer-ot-checklist-section');
+    const drawerOtChecklistResults = document.getElementById('drawer-ot-checklist-results');
+    const drawerOtPhotosSection = document.getElementById('drawer-ot-photos-section');
+    const drawerOtPhotosContainer = document.getElementById('drawer-ot-photos-container');
+    const drawerOtComentariosSection = document.getElementById('drawer-ot-comentarios-section');
+    const drawerOtComentariosList = document.getElementById('drawer-ot-comentarios-list');
 
     // Simulated Role Toggle
     const selectRole = document.getElementById('select-role');
@@ -1188,11 +1216,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         otGrid.style.gap = '2rem';
                         otGrid.style.overflowX = '';
                         renderBuildingGroupedView(filteredOts, otGrid);
+                    } else if (currentOtViewMode === 'calendar') {
+                        otGrid.style.display = 'flex';
+                        otGrid.style.flexDirection = 'column';
+                        otGrid.style.gap = '1.5rem';
+                        otGrid.style.overflowX = 'hidden';
+                        renderCalendarView(filteredOts, otGrid);
                     }
                 }
                 
                 // Update location summaries and detail panel reactively
                 loadPlantSummaries();
+
+                // If OT drawer is open, refresh it in case it was modified
+                if (otDrawer && otDrawer.classList.contains('open') && currentOpenOtId) {
+                    openOtDrawer(currentOpenOtId);
+                }
             })
             .catch(err => console.error('Error al cargar OTs:', err));
     }
@@ -1293,7 +1332,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const buttons = [
             { btn: btnOtViewFlat, mode: 'flat' },
             { btn: btnOtViewBuilding, mode: 'building' },
-            { btn: btnOtViewType, mode: 'type' }
+            { btn: btnOtViewType, mode: 'type' },
+            { btn: btnOtViewCalendar, mode: 'calendar' }
         ];
         buttons.forEach(item => {
             if (item.btn) {
@@ -1581,6 +1621,528 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    let currentOpenOtId = null;
+
+    function openOtDrawer(otId) {
+        // Close asset drawer if open
+        assetDrawer.classList.remove('open');
+
+        // Show loading state or clear previous content
+        drawerOtTitle.textContent = `Cargando OT #${otId}...`;
+        drawerOtPlanta.textContent = '-';
+        drawerOtEdificio.textContent = '-';
+        drawerOtUbicacion.textContent = '-';
+        drawerOtEstado.textContent = '-';
+        drawerOtEstado.className = 'status-badge';
+        drawerOtDescripcion.textContent = '';
+        drawerOtPrioridad.textContent = '-';
+        drawerOtReportado.textContent = '-';
+        drawerOtCreacion.textContent = '-';
+        drawerOtTecnico.textContent = '-';
+        drawerOtProgramada.textContent = '-';
+        drawerOtActionsContainer.innerHTML = '';
+        drawerOtComponentsSection.style.display = 'none';
+        drawerOtChecklistSection.style.display = 'none';
+        drawerOtPhotosSection.style.display = 'none';
+        drawerOtComentariosSection.style.display = 'none';
+
+        otDrawer.classList.add('open');
+        currentOpenOtId = otId;
+
+        // Fetch fresh details from API
+        fetch(`/api/ordenes/${otId}`)
+            .then(res => {
+                if (!res.ok) throw new Error("No se pudo cargar la orden");
+                return res.json();
+            })
+            .then(ot => {
+                drawerOtTitle.innerHTML = `<span style="font-weight: normal;">#OT-${ot.id}</span> - ${ot.tipo}`;
+                drawerOtPlanta.textContent = ot.planta_nombre || 'N/A';
+                drawerOtEdificio.textContent = ot.edificio_nombre || 'N/A';
+                
+                if (ot.ubicacion_nombre) {
+                    drawerOtUbicacionContainer.style.display = 'inline-flex';
+                    drawerOtUbicacion.textContent = ot.ubicacion_nombre;
+                } else {
+                    drawerOtUbicacionContainer.style.display = 'none';
+                }
+
+                // Status formatting
+                let statusLabel = 'Creada';
+                let statusClass = 'status-created';
+                const isDone = ot.estado === 'REALIZADA' || ot.estado === 'Resuelta';
+                const isScheduled = ot.estado === 'PROGRAMADA';
+                const isAssigned = ot.estado === 'ASIGNADA';
+                const isCreated = ot.estado === 'CREADA';
+
+                if (isDone) {
+                    statusLabel = 'Realizada';
+                    statusClass = 'status-done';
+                } else if (ot.fecha_inicio) {
+                    if (ot.estado_ejecucion === 'PAUSADA' || ot.estado_ejecucion === 'DETENIDA') {
+                        statusLabel = 'Pausada';
+                        statusClass = 'status-scheduled';
+                    } else {
+                        statusLabel = 'Iniciada';
+                        statusClass = 'status-progress';
+                    }
+                } else if (isScheduled) {
+                    statusLabel = 'Programada';
+                    statusClass = 'status-scheduled';
+                } else if (isAssigned) {
+                    statusLabel = 'Asignada';
+                    statusClass = 'status-assigned';
+                } else if (isCreated) {
+                    statusLabel = 'Creada';
+                    statusClass = 'status-created';
+                } else {
+                    statusLabel = ot.estado;
+                    statusClass = 'status-created';
+                }
+
+                drawerOtEstado.className = `status-badge ${statusClass}`;
+                drawerOtEstado.textContent = statusLabel;
+
+                // Priority
+                drawerOtPrioridad.textContent = ot.prioridad || 'Media';
+                drawerOtReportado.textContent = ot.reportado_por || 'Sistema';
+                
+                // Creation Date
+                drawerOtCreacion.textContent = new Date(ot.fecha_creacion).toLocaleDateString('es-CL', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+
+                // Tech assigned
+                drawerOtTecnico.textContent = ot.tecnico_nombre || 'Sin Asignar';
+
+                // Programmed Date
+                let progDateStr = 'Pendiente';
+                if (ot.fecha_programada) {
+                    const pDate = new Date(ot.fecha_programada);
+                    progDateStr = pDate.toLocaleDateString('es-CL', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+                    if (ot.fecha_programada.includes('T')) {
+                        const timePart = ot.fecha_programada.substring(11, 16);
+                        if (timePart !== '00:00') {
+                            progDateStr += ` a las ${timePart}`;
+                        }
+                    }
+                }
+                drawerOtProgramada.textContent = progDateStr;
+
+                // Description
+                drawerOtDescripcion.textContent = ot.descripcion || 'Sin descripción';
+
+                // Actions
+                let actionsHtml = '';
+                if (!isDone) {
+                    const assignLabel = ot.tecnico_nombre ? '🔧 Reasignar / Programar' : '👤 Asignar Técnico';
+                    actionsHtml += `
+                        <button class="btn-primary" id="drawer-ot-btn-assign" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: var(--accent-color); border: 1px solid var(--accent-color); color: white; cursor: pointer; border-radius: 4px; display: flex; align-items: center; gap: 0.25rem;">
+                            ${assignLabel}
+                        </button>
+                    `;
+                    
+                    if (ot.fecha_inicio) {
+                        if (ot.estado_ejecucion === 'PAUSADA' || ot.estado_ejecucion === 'DETENIDA') {
+                            actionsHtml += `
+                                <button class="btn-primary" id="drawer-ot-btn-resume" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: var(--accent-color); border: none; color: white; cursor: pointer; border-radius: 4px; margin-left: 0.25rem;">Retomar</button>
+                                <button class="btn-primary" id="drawer-ot-btn-complete" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: var(--success); border: none; color: white; cursor: pointer; border-radius: 4px; margin-left: 0.25rem;">Terminar</button>
+                            `;
+                        } else {
+                            actionsHtml += `
+                                <button class="btn-secondary" id="drawer-ot-btn-pause" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); cursor: pointer; border-radius: 4px; margin-left: 0.25rem;">Pausar</button>
+                                <button class="btn-primary" id="drawer-ot-btn-complete" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: var(--success); border: none; color: white; cursor: pointer; border-radius: 4px; margin-left: 0.25rem;">Terminar</button>
+                            `;
+                        }
+                    } else {
+                        actionsHtml += `
+                            <button class="btn-primary" id="drawer-ot-btn-start" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: var(--accent-color); border: none; color: white; cursor: pointer; border-radius: 4px; margin-left: 0.25rem;">Iniciar Trabajos</button>
+                        `;
+                    }
+                }
+                drawerOtActionsContainer.innerHTML = actionsHtml;
+
+                // Event Listeners for actions
+                const btnAssign = document.getElementById('drawer-ot-btn-assign');
+                if (btnAssign) {
+                    btnAssign.addEventListener('click', () => {
+                        openAssignModalDialog(ot.id);
+                    });
+                }
+                const btnStart = document.getElementById('drawer-ot-btn-start');
+                if (btnStart) {
+                    btnStart.addEventListener('click', () => {
+                        startWorkOrder(ot.id);
+                    });
+                }
+                const btnPause = document.getElementById('drawer-ot-btn-pause');
+                if (btnPause) {
+                    btnPause.addEventListener('click', () => {
+                        pauseWorkOrder(ot.id);
+                    });
+                }
+                const btnResume = document.getElementById('drawer-ot-btn-resume');
+                if (btnResume) {
+                    btnResume.addEventListener('click', () => {
+                        resumeWorkOrder(ot.id);
+                    });
+                }
+                const btnComplete = document.getElementById('drawer-ot-btn-complete');
+                if (btnComplete) {
+                    btnComplete.addEventListener('click', () => {
+                        completeWorkOrderDirect(ot.id);
+                    });
+                }
+
+                // Components Worked (Despieces)
+                if (ot.componentes_trabajados && ot.componentes_trabajados.length > 0) {
+                    drawerOtComponentsSection.style.display = 'block';
+                    drawerOtComponentsList.innerHTML = `
+                        <ul style="margin: 0; padding-left: 1rem; list-style-type: disc; display: flex; flex-direction: column; gap: 0.35rem;">
+                            ${ot.componentes_trabajados.map(comp => `
+                                <li style="font-size: 0.85rem; color: var(--text-main);">
+                                    <strong>${comp.nombre}</strong>
+                                    ${comp.comentario ? `<span style="color: #cbd5e1; font-style: italic;"> - "${comp.comentario}"</span>` : ''}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    `;
+                } else {
+                    drawerOtComponentsSection.style.display = 'none';
+                }
+
+                // Checklist results
+                if (isDone && ot.plantilla_id) {
+                    drawerOtChecklistSection.style.display = 'block';
+                    drawerOtChecklistResults.innerHTML = '<span style="color:var(--text-muted); font-size:0.85rem;">Cargando respuestas...</span>';
+                    
+                    fetch(`/api/ordenes/${ot.id}/respuestas`)
+                        .then(res => res.json())
+                        .then(respuestas => {
+                            if (respuestas.length === 0) {
+                                drawerOtChecklistResults.innerHTML = '<span style="color:var(--text-muted); font-size:0.85rem;">Sin respuestas registradas.</span>';
+                                return;
+                            }
+                            drawerOtChecklistResults.innerHTML = '';
+                            respuestas.forEach(r => {
+                                let valStr = '';
+                                if (r.tipo_respuesta === 'booleano') {
+                                    valStr = r.valor_booleano ? 
+                                        '<span style="color: var(--success); font-weight: 600;">Pasa (OK)</span>' : 
+                                        '<span style="color: var(--danger); font-weight: 600;">Falla (No OK)</span>';
+                                } else if (r.tipo_respuesta === 'numerico') {
+                                    valStr = `<strong style="color:var(--accent-color);">${r.valor_numerico}</strong> <span style="font-size:0.75rem; color:var(--text-muted);">${r.unidad_medida || ''}</span>`;
+                                } else {
+                                    valStr = `<span style="color:#cbd5e1;">${r.valor_texto || ''}</span>`;
+                                }
+                                
+                                drawerOtChecklistResults.innerHTML += `
+                                    <div style="border-bottom:1px solid rgba(255,255,255,0.03); padding-bottom:0.4rem; margin-bottom:0.4rem; font-size:0.85rem;">
+                                        <div style="font-weight: 600; color: #94a3b8; font-size: 0.8rem;">${r.texto_pregunta}</div>
+                                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:0.2rem;">
+                                            <div>${valStr}</div>
+                                            ${r.observacion ? `<span style="font-size:0.78rem; color:var(--warning); font-style:italic;">"${r.observacion}"</span>` : ''}
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                        })
+                        .catch(err => {
+                            drawerOtChecklistResults.innerHTML = `<span style="color:var(--danger); font-size:0.85rem;">Error: ${err.message}</span>`;
+                        });
+                } else {
+                    drawerOtChecklistSection.style.display = 'none';
+                }
+
+                // Backup Photos
+                if (ot.fotos && ot.fotos.length > 0) {
+                    drawerOtPhotosSection.style.display = 'block';
+                    drawerOtPhotosContainer.innerHTML = ot.fotos.map(f => `
+                        <div style="flex: 0 0 80px; cursor: pointer; position: relative;" onclick="window.open('${f.url_foto}', '_blank')">
+                            <img src="${f.url_foto}" style="width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border-color);" title="${f.comentario || ''}">
+                            ${f.comentario ? `<div style="font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; margin-top: 0.15rem;">${f.comentario}</div>` : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    drawerOtPhotosSection.style.display = 'none';
+                }
+
+                // Notes Diary
+                if (ot.comentarios_avance && ot.comentarios_avance.length > 0) {
+                    drawerOtComentariosSection.style.display = 'block';
+                    drawerOtComentariosList.innerHTML = ot.comentarios_avance.map(c => {
+                        const cDate = new Date(c.fecha_creacion);
+                        const timeStr = cDate.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+                        const dateStr = cDate.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+                        return `
+                            <div style="font-size: 0.85rem; line-height: 1.4; border-bottom: 1px solid rgba(255,255,255,0.03); padding-bottom: 0.4rem; margin-bottom: 0.2rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.15rem;">
+                                    <strong style="color: var(--accent-color);">${c.autor}</strong>
+                                    <span style="color: var(--text-muted); font-size: 0.7rem;">${dateStr} ${timeStr}</span>
+                                </div>
+                                <div style="color: #cbd5e1;">${c.comentario}</div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    drawerOtComentariosSection.style.display = 'none';
+                }
+            })
+            .catch(err => {
+                drawerOtTitle.textContent = "Error";
+                console.error(err);
+            });
+    }
+
+    function renderCalendarView(filteredOts, targetGrid) {
+        targetGrid.innerHTML = '';
+        
+        // Define calendar layout container
+        const layout = document.createElement('div');
+        layout.className = 'calendar-layout-container';
+        
+        // Month names in Spanish
+        const monthNames = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ];
+        
+        // Split OTs: scheduled vs unscheduled
+        const unscheduledOts = filteredOts.filter(ot => !ot.fecha_programada);
+        const scheduledOts = filteredOts.filter(ot => ot.fecha_programada);
+
+        // 1. Sidebar (Unscheduled OTs)
+        let sidebarOtsHtml = '';
+        if (unscheduledOts.length === 0) {
+            sidebarOtsHtml = '<p style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0; text-align: center;">No hay órdenes sin programar.</p>';
+        } else {
+            unscheduledOts.forEach(ot => {
+                sidebarOtsHtml += `
+                    <div class="unscheduled-ot-card priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}">
+                        <div style="font-weight: 700; font-size: 0.85rem; margin-bottom: 0.25rem;">#OT-${ot.id}</div>
+                        <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-main); margin-bottom: 0.25rem;">${ot.tipo}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${ot.descripcion || 'Sin descripción'}</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 0.7rem; color: var(--text-muted);">${ot.planta_nombre}</span>
+                            <button class="btn-primary btn-schedule-ot" data-ot-id="${ot.id}" style="padding: 0.2rem 0.4rem; font-size: 0.7rem; border-radius: 4px; border: none; cursor: pointer; line-height: 1;">Programar</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        const sidebarHtml = `
+            <div class="calendar-sidebar">
+                <div class="calendar-sidebar-title">
+                    <span>📋 Sin Programar</span>
+                    <span class="badge" style="background: var(--bg-primary); padding: 0.15rem 0.4rem; border-radius: 10px; font-size: 0.75rem;">${unscheduledOts.length}</span>
+                </div>
+                <div class="unscheduled-ots-container">
+                    ${sidebarOtsHtml}
+                </div>
+            </div>
+        `;
+
+        // 2. Main Calendar Grid
+        const mainAreaHtml = `
+            <div class="calendar-main-area">
+                <div class="calendar-navbar">
+                    <button class="btn-secondary" id="calendar-prev-month" style="padding: 0.4rem 0.6rem; cursor: pointer; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main);">◀</button>
+                    <span class="calendar-nav-title" id="calendar-month-title">${monthNames[calendarMonth]} ${calendarYear}</span>
+                    <div class="calendar-nav-buttons">
+                        <button class="btn-secondary" id="calendar-today" style="padding: 0.4rem 0.75rem; cursor: pointer; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main); font-weight: 500;">Hoy</button>
+                        <button class="btn-secondary" id="calendar-next-month" style="padding: 0.4rem 0.6rem; cursor: pointer; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main);">▶</button>
+                    </div>
+                </div>
+                <div class="calendar-grid-wrapper">
+                    <div class="calendar-days-header">
+                        <div>Lun</div>
+                        <div>Mar</div>
+                        <div>Mié</div>
+                        <div>Jue</div>
+                        <div>Vie</div>
+                        <div>Sáb</div>
+                        <div>Dom</div>
+                    </div>
+                    <div class="calendar-grid" id="calendar-grid-cells">
+                        <!-- cells will go here -->
+                    </div>
+                </div>
+            </div>
+        `;
+
+        layout.innerHTML = sidebarHtml + mainAreaHtml;
+        targetGrid.appendChild(layout);
+
+        // Calendar math & cells rendering
+        const cellsContainer = document.getElementById('calendar-grid-cells');
+        const cells = [];
+        
+        let firstDayIndex = new Date(calendarYear, calendarMonth, 1).getDay();
+        let startColumnIndex = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+        let totalDaysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+        let totalDaysInPrevMonth = new Date(calendarYear, calendarMonth, 0).getDate();
+
+        // Prev Month padding
+        for (let i = startColumnIndex - 1; i >= 0; i--) {
+            const prevMonth = calendarMonth === 0 ? 11 : calendarMonth - 1;
+            const prevYear = calendarMonth === 0 ? calendarYear - 1 : calendarYear;
+            const prevDay = totalDaysInPrevMonth - i;
+            
+            const today = new Date();
+            const isToday = today.getDate() === prevDay && today.getMonth() === prevMonth && today.getFullYear() === prevYear;
+
+            cells.push({
+                day: prevDay,
+                month: prevMonth,
+                year: prevYear,
+                isCurrentMonth: false,
+                isToday: isToday
+            });
+        }
+
+        // Current Month
+        for (let d = 1; d <= totalDaysInMonth; d++) {
+            const today = new Date();
+            const isToday = today.getDate() === d && today.getMonth() === calendarMonth && today.getFullYear() === calendarYear;
+
+            cells.push({
+                day: d,
+                month: calendarMonth,
+                year: calendarYear,
+                isCurrentMonth: true,
+                isToday: isToday
+            });
+        }
+
+        // Next Month padding
+        let nextMonthDaysCount = 42 - cells.length;
+        for (let d = 1; d <= nextMonthDaysCount; d++) {
+            const nextMonth = calendarMonth === 11 ? 0 : calendarMonth + 1;
+            const nextYear = calendarMonth === 11 ? calendarYear + 1 : calendarYear;
+            
+            const today = new Date();
+            const isToday = today.getDate() === d && today.getMonth() === nextMonth && today.getFullYear() === nextYear;
+
+            cells.push({
+                day: d,
+                month: nextMonth,
+                year: nextYear,
+                isCurrentMonth: false,
+                isToday: isToday
+            });
+        }
+
+        // Render cells
+        cells.forEach(cell => {
+            const cellDiv = document.createElement('div');
+            let cellClass = 'calendar-day-cell';
+            if (!cell.isCurrentMonth) cellClass += ' other-month';
+            if (cell.isToday) cellClass += ' today';
+            cellDiv.className = cellClass;
+            
+            // Format cell date string: YYYY-MM-DD
+            const cellDateStr = `${cell.year}-${String(cell.month + 1).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}`;
+            cellDiv.dataset.date = cellDateStr;
+
+            // OTs for this day
+            const dayOts = scheduledOts.filter(ot => {
+                const otDateOnly = ot.fecha_programada.substring(0, 10);
+                return otDateOnly === cellDateStr;
+            });
+
+            let otTagsHtml = '';
+            dayOts.forEach(ot => {
+                otTagsHtml += `
+                    <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}">
+                        <div class="ot-tag-id">#OT-${ot.id}</div>
+                        <div class="ot-tag-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
+                    </div>
+                `;
+            });
+
+            cellDiv.innerHTML = `
+                <span class="day-number-label">${cell.day}</span>
+                <div class="calendar-ot-list">
+                    ${otTagsHtml}
+                </div>
+            `;
+            
+            cellsContainer.appendChild(cellDiv);
+
+            // Click listener for empty cells to create a new OT
+            cellDiv.addEventListener('click', (e) => {
+                // If clicking an OT tag or button, don't trigger cell click
+                if (e.target.closest('.calendar-ot-tag')) return;
+                
+                openNewOTModal(cellDateStr);
+            });
+        });
+
+        // Add event listeners to navbar controls
+        document.getElementById('calendar-prev-month').addEventListener('click', () => {
+            if (calendarMonth === 0) {
+                calendarMonth = 11;
+                calendarYear--;
+            } else {
+                calendarMonth--;
+            }
+            loadWorkOrders();
+        });
+
+        document.getElementById('calendar-next-month').addEventListener('click', () => {
+            if (calendarMonth === 11) {
+                calendarMonth = 0;
+                calendarYear++;
+            } else {
+                calendarMonth++;
+            }
+            loadWorkOrders();
+        });
+
+        document.getElementById('calendar-today').addEventListener('click', () => {
+            calendarMonth = new Date().getMonth();
+            calendarYear = new Date().getFullYear();
+            loadWorkOrders();
+        });
+
+        // Add click listener to calendar OT tags to open details drawer
+        cellsContainer.querySelectorAll('.calendar-ot-tag').forEach(tag => {
+            tag.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const otId = tag.dataset.otId;
+                openOtDrawer(otId);
+            });
+        });
+
+        // Add click listeners to sidebar cards to open details drawer, and button to schedule
+        const sidebarContainer = layout.querySelector('.unscheduled-ots-container');
+        if (sidebarContainer) {
+            sidebarContainer.querySelectorAll('.unscheduled-ot-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    // If schedule button clicked, do not trigger drawer open
+                    if (e.target.classList.contains('btn-schedule-ot')) return;
+                    const otId = card.dataset.otId;
+                    openOtDrawer(otId);
+                });
+            });
+
+            sidebarContainer.querySelectorAll('.btn-schedule-ot').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const otId = btn.dataset.otId;
+                    openAssignModalDialog(otId);
+                });
+            });
+        }
+    }
+
     function renderPlantDetail(plantName) {
         currentSelectedPlantName = plantName;
         if (plantDetailTitle) {
@@ -1684,6 +2246,13 @@ document.addEventListener('DOMContentLoaded', () => {
         btnOtViewType.addEventListener('click', () => {
             currentOtViewMode = 'type';
             setActiveOtViewButton(btnOtViewType);
+            loadWorkOrders();
+        });
+    }
+    if (btnOtViewCalendar) {
+        btnOtViewCalendar.addEventListener('click', () => {
+            currentOtViewMode = 'calendar';
+            setActiveOtViewButton(btnOtViewCalendar);
             loadWorkOrders();
         });
     }
@@ -1944,10 +2513,17 @@ document.addEventListener('DOMContentLoaded', () => {
         assetDrawer.classList.remove('open');
     });
 
+    if (closeOtDrawer) {
+        closeOtDrawer.addEventListener('click', () => {
+            otDrawer.classList.remove('open');
+        });
+    }
+
     // Helper to open New OT Modal pre-filled for a specific asset
     function openNewOTModalForAsset(plantaId, edificioId, ubicacionId, activoId) {
-        // Close asset drawer
+        // Close drawers
         assetDrawer.classList.remove('open');
+        if (otDrawer) otDrawer.classList.remove('open');
 
         // Clear search inputs
         const otSearchInput = document.getElementById('ot-search-location');
@@ -2448,10 +3024,8 @@ document.addEventListener('DOMContentLoaded', () => {
             loadWorkOrders();
         })
         .catch(err => alert(err.message));
-    });
-
-    // --- 9. MANUAL OT CREATION MODAL ---
-    btnCreateOt.addEventListener('click', () => {
+    });    // --- 9. MANUAL OT CREATION MODAL ---
+    function openNewOTModal(prefilledDate = null) {
         // Clear search inputs
         const otSearchInput = document.getElementById('ot-search-location');
         const otSearchResults = document.getElementById('ot-search-location-results');
@@ -2467,6 +3041,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const otEdificio = document.getElementById('ot-select-edificio');
         const otUbicacion = document.getElementById('ot-select-ubicacion');
         const otActivo = document.getElementById('ot-select-activo');
+
+        // Handle date pre-filling
+        const otFechaProgramada = document.getElementById('ot-fecha-programada');
+        const otHoraProgramada = document.getElementById('ot-hora-programada');
+        if (prefilledDate) {
+            otFechaProgramada.value = prefilledDate;
+            otHoraProgramada.value = '08:00';
+        } else {
+            otFechaProgramada.value = '';
+            otHoraProgramada.value = '';
+        }
 
         // Clear checklist template selector dropdown
         const otSelectPlantilla = document.getElementById('ot-select-plantilla');
@@ -2575,8 +3160,11 @@ document.addEventListener('DOMContentLoaded', () => {
             .finally(() => {
                 otModal.style.display = 'flex';
             });
-    });
+    }
 
+    btnCreateOt.addEventListener('click', () => {
+        openNewOTModal();
+    });
     closeOtModal.addEventListener('click', () => {
         otModal.style.display = 'none';
     });
