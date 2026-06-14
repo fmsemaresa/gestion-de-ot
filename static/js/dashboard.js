@@ -157,6 +157,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const drawerOtPhotosContainer = document.getElementById('drawer-ot-photos-container');
     const drawerOtComentariosSection = document.getElementById('drawer-ot-comentarios-section');
     const drawerOtComentariosList = document.getElementById('drawer-ot-comentarios-list');
+    const drawerOtResolucionSection = document.getElementById('drawer-ot-resolucion-section');
+    const drawerOtResolucion = document.getElementById('drawer-ot-resolucion');
 
     // Simulated Role Toggle
     const selectRole = document.getElementById('select-role');
@@ -920,6 +922,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (ot.fecha_inicio) {
                     gestionContentHtml += ` <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(Iniciada: ${startTimeFormatted})</span>`;
                 }
+                if (ot.comentarios_tecnicos) {
+                    gestionContentHtml += `<br><span style="font-size: 0.8rem; color: var(--success); display: block; margin-top: 0.2rem;"><strong>Cierre:</strong> ${ot.comentarios_tecnicos}</span>`;
+                }
             } else {
                 if (ot.fecha_inicio) {
                     if (ot.estado_ejecucion === 'PAUSADA' || ot.estado_ejecucion === 'DETENIDA') {
@@ -1645,6 +1650,8 @@ document.addEventListener('DOMContentLoaded', () => {
         drawerOtChecklistSection.style.display = 'none';
         drawerOtPhotosSection.style.display = 'none';
         drawerOtComentariosSection.style.display = 'none';
+        drawerOtResolucionSection.style.display = 'none';
+        drawerOtResolucion.textContent = '';
 
         otDrawer.classList.add('open');
         currentOpenOtId = otId;
@@ -1737,6 +1744,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Description
                 drawerOtDescripcion.textContent = ot.descripcion || 'Sin descripción';
+
+                // Technical Comments / Resolution Notes
+                if (ot.comentarios_tecnicos) {
+                    drawerOtResolucionSection.style.display = 'block';
+                    drawerOtResolucion.textContent = ot.comentarios_tecnicos;
+                } else {
+                    drawerOtResolucionSection.style.display = 'none';
+                    drawerOtResolucion.textContent = '';
+                }
 
                 // Actions
                 let actionsHtml = '';

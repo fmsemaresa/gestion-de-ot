@@ -641,9 +641,10 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
     if "estado_ejecucion" in updated_ot:
         val_ej = updated_ot["estado_ejecucion"]
         ot.estado_ejecucion = val_ej
-        if val_ej == "REALIZADA" and ot.estado != "REALIZADA":
+        if val_ej == "REALIZADA":
             ot.estado = "REALIZADA"
-            ot.fecha_resolucion = datetime.utcnow()
+            if not ot.fecha_resolucion:
+                ot.fecha_resolucion = datetime.utcnow()
             if ot.activo_id:
                 activo = db.get(Activo, ot.activo_id)
                 if activo:
