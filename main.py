@@ -402,6 +402,93 @@ def get_ordenes(
         
     return results
 
+@app.get("/api/ordenes/{ot_id}")
+def get_orden_by_id(ot_id: int, db: Session = Depends(get_db)):
+    ot = db.get(OrdenTrabajo, ot_id)
+    if not ot:
+        raise HTTPException(status_code=404, detail="Orden de trabajo no encontrada")
+        
+    # Mapeo dinámico del estado
+    mapped_estado = ot.estado
+    if mapped_estado in ("Resuelta", "REALIZADA"):
+        mapped_estado = "REALIZADA"
+    elif mapped_estado != "Cancelada":
+        if ot.tecnico_id:
+            if ot.fecha_programada:
+                mapped_estado = "PROGRAMADA"
+            else:
+                mapped_estado = "ASIGNADA"
+        else:
+            mapped_estado = "CREADA"
+            
+    planta = db.get(Planta, ot.planta_id)
+    edificio = db.get(Edificio, ot.edificio_id)
+    ubicacion = db.get(Ubicacion, ot.ubicacion_id) if ot.ubicacion_id else None
+    activo = db.get(Activo, ot.activo_id) if ot.activo_id else None
+    tecnico = db.get(Tecnico, ot.tecnico_id) if ot.tecnico_id else None
+    
+    # Obtener fotos
+    fotos_db = db.exec(select(FotoOrdenTrabajo).where(FotoOrdenTrabajo.orden_trabajo_id == ot.id)).all()
+    fotos_list = [{
+        "id": f.id,
+        "url_foto": f.url_foto,
+        "comentario": f.comentario,
+        "fecha_creacion": f.fecha_creacion.isoformat() + "Z" if f.fecha_creacion else None
+    } for f in fotos_db]
+    
+    # Obtener comentarios de avance
+    comentarios_db = db.exec(
+        select(ComentarioAvanceOT)
+        .where(ComentarioAvanceOT.orden_trabajo_id == ot.id)
+        .order_by(ComentarioAvanceOT.fecha_creacion.asc())
+    ).all()
+    comentarios_list = [{
+        "id": c.id,
+        "comentario": c.comentario,
+        "autor": c.autor,
+        "fecha_creacion": c.fecha_creacion.isoformat() + "Z" if c.fecha_creacion else None
+    } for c in comentarios_db]
+    
+    # Obtener componentes seleccionados y sus comentarios individuales
+    componentes_db = db.exec(
+        select(OrdenTrabajoComponente, ComponenteActivo)
+        .join(ComponenteActivo, OrdenTrabajoComponente.componente_id == ComponenteActivo.id)
+        .where(OrdenTrabajoComponente.orden_trabajo_id == ot.id)
+    ).all()
+    componentes_list = [{
+        "id": comp.id,
+        "nombre": comp.nombre,
+        "comentario": ot_comp.comentario
+    } for ot_comp, comp in componentes_db]
+    
+    return {
+        "id": ot.id,
+        "descripcion": ot.descripcion,
+        "tipo": ot.tipo,
+        "estado": mapped_estado,
+        "prioridad": ot.prioridad,
+        "fecha_creacion": ot.fecha_creacion.isoformat() + "Z" if ot.fecha_creacion else None,
+        "fecha_resolucion": ot.fecha_resolucion.isoformat() + "Z" if ot.fecha_resolucion else None,
+        "fecha_programada": ot.fecha_programada.isoformat() if ot.fecha_programada else None,
+        "fecha_inicio": ot.fecha_inicio.isoformat() + "Z" if ot.fecha_inicio else None,
+        "estado_ejecucion": ot.estado_ejecucion,
+        "reportado_por": ot.reportado_por,
+        "comentarios_tecnicos": ot.comentarios_tecnicos,
+        "planta_nombre": planta.nombre if planta else None,
+        "edificio_nombre": edificio.nombre if edificio else None,
+        "ubicacion_nombre": ubicacion.nombre if ubicacion else None,
+        "activo_nombre": activo.nombre if activo else None,
+        "activo_tipo": activo.tipo if activo else "Otros",
+        "activo_color": activo.color if activo else None,
+        "ubicacion_color": ubicacion.color if ubicacion else None,
+        "tecnico_nombre": tecnico.nombre if tecnico else "No asignado",
+        "tecnico_id": ot.tecnico_id,
+        "plantilla_id": ot.plantilla_id,
+        "fotos": fotos_list,
+        "comentarios_avance": comentarios_list,
+        "componentes_trabajados": componentes_list
+    }
+
 @app.post("/api/ordenes", response_model=OrdenTrabajo)
 def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
     # Validar que los campos de ubicación sean correctos
