@@ -876,8 +876,11 @@
                         <label for="ot-complete-comments">Comentarios Técnicos / Notas de Cierre</label>
                         <textarea id="ot-complete-comments" class="form-control" rows="4" placeholder="Escriba aquí los detalles de resolución de la orden de trabajo..." style="resize: vertical; font-family: inherit; width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--input-bg); color: var(--text-color);"></textarea>
                     </div>
-                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem; background: var(--success); border-color: var(--success);">
+                    <button type="submit" id="btn-submit-ot-complete" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem; background: var(--success); border-color: var(--success); cursor: pointer; border-radius: 6px;">
                         Finalizar Orden de Trabajo
+                    </button>
+                    <button type="button" id="btn-submit-ot-complete-and-new" class="btn-secondary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 0.5rem; background: var(--bg-secondary); border: 1px solid var(--border-color); color: var(--text-color); cursor: pointer; border-radius: 6px;">
+                        🔄 Finalizar y Generar Otra OT para este Activo
                     </button>
                 </form>
             </div>

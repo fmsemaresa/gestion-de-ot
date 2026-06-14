@@ -105,6 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeOtCompleteModal = document.getElementById('close-ot-complete-modal');
     const otCompleteId = document.getElementById('ot-complete-id');
     const otCompleteComments = document.getElementById('ot-complete-comments');
+    let shouldCreateAnotherOtAfterComplete = false;
 
     // Edit Modals (Asset and Component lifecycle)
     const assetEditModal = document.getElementById('asset-edit-modal');
@@ -2587,20 +2588,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 ubicaciones.forEach(u => {
                     otUbicacion.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
                 });
-                otUbicacion.value = ubicacionId;
-
-                // Load assets for this location
-                return fetch(`/api/activos?ubicacion_id=${ubicacionId}`);
+                
+                if (ubicacionId) {
+                    otUbicacion.value = ubicacionId;
+                    // Load assets for this location
+                    return fetch(`/api/activos?ubicacion_id=${ubicacionId}`);
+                } else {
+                    otUbicacion.value = '';
+                    otActivo.innerHTML = '<option value="">Selecciona ubicación...</option>';
+                    otActivo.disabled = true;
+                    return [];
+                }
             })
-            .then(res => res.json())
+            .then(resOrActivos => {
+                if (resOrActivos && typeof resOrActivos.json === 'function') {
+                    return resOrActivos.json();
+                }
+                return resOrActivos;
+            })
             .then(activos => {
-                otActivo.disabled = false;
-                otActivo.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
-                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
-                activeActivos.forEach(a => {
-                    otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
-                });
-                otActivo.value = activoId;
+                if (ubicacionId) {
+                    otActivo.disabled = false;
+                    otActivo.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
+                    const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                    activeActivos.forEach(a => {
+                        otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
+                    });
+                    otActivo.value = activoId || '';
+                } else {
+                    otActivo.innerHTML = '<option value="">Selecciona ubicación...</option>';
+                    otActivo.disabled = true;
+                }
 
                 // Load technicians in assignment dropdown
                 const otTecnico = document.getElementById('ot-tecnico');
@@ -3016,6 +3034,21 @@ document.addEventListener('DOMContentLoaded', () => {
         otCompleteModal.style.display = 'none';
     });
 
+    const btnSubmitOtCompleteAndNew = document.getElementById('btn-submit-ot-complete-and-new');
+    if (btnSubmitOtCompleteAndNew) {
+        btnSubmitOtCompleteAndNew.addEventListener('click', () => {
+            shouldCreateAnotherOtAfterComplete = true;
+            otCompleteForm.requestSubmit();
+        });
+    }
+
+    const btnSubmitOtComplete = document.getElementById('btn-submit-ot-complete');
+    if (btnSubmitOtComplete) {
+        btnSubmitOtComplete.addEventListener('click', () => {
+            shouldCreateAnotherOtAfterComplete = false;
+        });
+    }
+
     otCompleteForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const otId = otCompleteId.value;
@@ -3034,10 +3067,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error('Error al terminar la orden de trabajo');
             return res.json();
         })
-        .then(() => {
+        .then((updatedOt) => {
             otCompleteModal.style.display = 'none';
             loadKPIs();
             loadWorkOrders();
+
+            if (shouldCreateAnotherOtAfterComplete) {
+                shouldCreateAnotherOtAfterComplete = false;
+                if (updatedOt && updatedOt.planta_id && updatedOt.edificio_id) {
+                    openNewOTModalForAsset(
+                        updatedOt.planta_id,
+                        updatedOt.edificio_id,
+                        updatedOt.ubicacion_id || null,
+                        updatedOt.activo_id || null
+                    );
+                }
+            }
         })
         .catch(err => alert(err.message));
     });    // --- 9. MANUAL OT CREATION MODAL ---
