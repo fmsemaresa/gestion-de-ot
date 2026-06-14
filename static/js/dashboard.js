@@ -34,9 +34,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const tabBtnOts = document.getElementById('tab-btn-ots');
     const tabBtnActivos = document.getElementById('tab-btn-activos');
     const tabBtnUbicaciones = document.getElementById('tab-btn-ubicaciones');
+    const tabBtnKpis = document.getElementById('tab-btn-kpis');
     const tabOts = document.getElementById('tab-ots');
     const tabActivos = document.getElementById('tab-activos');
     const tabUbicaciones = document.getElementById('tab-ubicaciones');
+    const tabKpis = document.getElementById('tab-kpis');
     
     const plantSummaryView = document.getElementById('plant-summary-view');
     const plantDetailView = document.getElementById('plant-detail-view');
@@ -176,9 +178,11 @@ document.addEventListener('DOMContentLoaded', () => {
         tabBtnOts.style.borderBottomColor = 'var(--accent-color)';
         tabBtnActivos.style.borderBottomColor = 'transparent';
         tabBtnUbicaciones.style.borderBottomColor = 'transparent';
+        tabBtnKpis.style.borderBottomColor = 'transparent';
         tabOts.style.display = 'block';
         tabActivos.style.display = 'none';
         tabUbicaciones.style.display = 'none';
+        tabKpis.style.display = 'none';
         loadWorkOrders();
     });
 
@@ -187,9 +191,11 @@ document.addEventListener('DOMContentLoaded', () => {
         tabBtnActivos.style.borderBottomColor = 'var(--accent-color)';
         tabBtnOts.style.borderBottomColor = 'transparent';
         tabBtnUbicaciones.style.borderBottomColor = 'transparent';
+        tabBtnKpis.style.borderBottomColor = 'transparent';
         tabActivos.style.display = 'block';
         tabOts.style.display = 'none';
         tabUbicaciones.style.display = 'none';
+        tabKpis.style.display = 'none';
         loadAssets();
     });
 
@@ -198,9 +204,11 @@ document.addEventListener('DOMContentLoaded', () => {
         tabBtnUbicaciones.style.borderBottomColor = 'var(--accent-color)';
         tabBtnOts.style.borderBottomColor = 'transparent';
         tabBtnActivos.style.borderBottomColor = 'transparent';
+        tabBtnKpis.style.borderBottomColor = 'transparent';
         tabUbicaciones.style.display = 'block';
         tabOts.style.display = 'none';
         tabActivos.style.display = 'none';
+        tabKpis.style.display = 'none';
         
         // Reset sub-view to plants summary by default
         plantSummaryView.style.display = 'block';
@@ -208,6 +216,20 @@ document.addEventListener('DOMContentLoaded', () => {
         currentSelectedPlantName = null;
         
         loadPlantSummaries();
+    });
+
+    tabBtnKpis.addEventListener('click', () => {
+        activeTab = 'kpis';
+        tabBtnKpis.style.borderBottomColor = 'var(--accent-color)';
+        tabBtnOts.style.borderBottomColor = 'transparent';
+        tabBtnActivos.style.borderBottomColor = 'transparent';
+        tabBtnUbicaciones.style.borderBottomColor = 'transparent';
+        tabKpis.style.display = 'block';
+        tabOts.style.display = 'none';
+        tabActivos.style.display = 'none';
+        tabUbicaciones.style.display = 'none';
+        
+        loadKpisDashboard();
     });
 
     // --- 1.5. KPI INTERACTION ---
@@ -1158,6 +1180,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function loadWorkOrders() {
+        if (activeTab === 'kpis') {
+            loadKpisDashboard();
+            return;
+        }
         let url = '/api/ordenes';
         const params = [];
         
@@ -3690,6 +3716,328 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- KPIs DASHBOARD LOGIC ---
+    function formatDateLocal(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function initKpisFilterEvents() {
+        const btn7d = document.getElementById('kpis-preset-7d');
+        const btnMonth = document.getElementById('kpis-preset-month');
+        const btnPrevMonth = document.getElementById('kpis-preset-prev-month');
+        const btnAll = document.getElementById('kpis-preset-all');
+        const kpisDateStart = document.getElementById('kpis-date-start');
+        const kpisDateEnd = document.getElementById('kpis-date-end');
+        
+        function setActivePresetBtn(activeBtn) {
+            [btn7d, btnMonth, btnPrevMonth, btnAll].forEach(btn => {
+                if (btn) {
+                    btn.classList.remove('active');
+                    btn.style.background = 'transparent';
+                    btn.style.color = 'var(--text-muted)';
+                }
+            });
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+                activeBtn.style.background = 'var(--accent-color)';
+                activeBtn.style.color = 'white';
+            }
+        }
+        
+        if (btn7d) {
+            btn7d.addEventListener('click', () => {
+                const today = new Date();
+                const start = new Date();
+                start.setDate(today.getDate() - 6);
+                kpisDateStart.value = formatDateLocal(start);
+                kpisDateEnd.value = formatDateLocal(today);
+                setActivePresetBtn(btn7d);
+                loadKpisDashboard();
+            });
+        }
+        
+        if (btnMonth) {
+            btnMonth.addEventListener('click', () => {
+                const today = new Date();
+                const start = new Date(today.getFullYear(), today.getMonth(), 1);
+                kpisDateStart.value = formatDateLocal(start);
+                kpisDateEnd.value = formatDateLocal(today);
+                setActivePresetBtn(btnMonth);
+                loadKpisDashboard();
+            });
+        }
+        
+        if (btnPrevMonth) {
+            btnPrevMonth.addEventListener('click', () => {
+                const today = new Date();
+                const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+                const end = new Date(today.getFullYear(), today.getMonth(), 0);
+                kpisDateStart.value = formatDateLocal(start);
+                kpisDateEnd.value = formatDateLocal(end);
+                setActivePresetBtn(btnPrevMonth);
+                loadKpisDashboard();
+            });
+        }
+        
+        if (btnAll) {
+            btnAll.addEventListener('click', () => {
+                kpisDateStart.value = '';
+                kpisDateEnd.value = '';
+                setActivePresetBtn(btnAll);
+                loadKpisDashboard();
+            });
+        }
+        
+        [kpisDateStart, kpisDateEnd].forEach(input => {
+            if (input) {
+                input.addEventListener('change', () => {
+                    setActivePresetBtn(null);
+                    loadKpisDashboard();
+                });
+            }
+        });
+        
+        // Initialize default preset: Este Mes
+        if (btnMonth) {
+            const today = new Date();
+            const start = new Date(today.getFullYear(), today.getMonth(), 1);
+            kpisDateStart.value = formatDateLocal(start);
+            kpisDateEnd.value = formatDateLocal(today);
+            setActivePresetBtn(btnMonth);
+        }
+    }
+
+    function loadKpisDashboard() {
+        fetch('/api/ordenes')
+            .then(res => res.json())
+            .then(ots => {
+                calculateAndRenderKpis(ots);
+            })
+            .catch(err => console.error('Error al cargar KPIs:', err));
+    }
+
+    function calculateAndRenderKpis(ots) {
+        const startVal = document.getElementById('kpis-date-start').value;
+        const endVal = document.getElementById('kpis-date-end').value;
+        
+        let filtered = ots;
+        
+        // 1. Filter by hierarchy selections
+        if (selectedPlantaId) {
+            const plantaEl = document.querySelector(`[data-planta-id="${selectedPlantaId}"]`);
+            const plantaName = plantaEl ? plantaEl.getAttribute('data-planta-nombre') : '';
+            if (plantaName) {
+                filtered = filtered.filter(ot => ot.planta_nombre === plantaName);
+            }
+        }
+        if (selectedEdificioId) {
+            const edificioEl = document.querySelector(`[data-edificio-id="${selectedEdificioId}"]`);
+            const edificioName = edificioEl ? edificioEl.getAttribute('data-edificio-nombre') : '';
+            if (edificioName) {
+                filtered = filtered.filter(ot => ot.edificio_nombre === edificioName);
+            }
+        }
+        if (selectedUbicacionId) {
+            const ubicacionEl = document.querySelector(`[data-ubicacion-id="${selectedUbicacionId}"]`);
+            const ubicacionName = ubicacionEl ? ubicacionEl.getAttribute('data-ubicacion-nombre') : '';
+            if (ubicacionName) {
+                filtered = filtered.filter(ot => ot.ubicacion_nombre === ubicacionName);
+            }
+        }
+
+        // 2. Filter by date range (inclusive)
+        if (startVal) {
+            const startDate = new Date(startVal + 'T00:00:00');
+            filtered = filtered.filter(ot => {
+                if (!ot.fecha_creacion) return false;
+                const d = new Date(ot.fecha_creacion);
+                return d >= startDate;
+            });
+        }
+        if (endVal) {
+            const endDate = new Date(endVal + 'T23:59:59');
+            filtered = filtered.filter(ot => {
+                if (!ot.fecha_creacion) return false;
+                const d = new Date(ot.fecha_creacion);
+                return d <= endDate;
+            });
+        }
+
+        // 3. Calculate metrics
+        const resolved = filtered.filter(ot => ot.estado === 'REALIZADA');
+        const resolutionRate = filtered.length > 0 ? Math.round((resolved.length / filtered.length) * 100) : 0;
+
+        let totalHours = 0;
+        let countWithTime = 0;
+        resolved.forEach(ot => {
+            if (ot.fecha_creacion && ot.fecha_resolucion) {
+                const start = new Date(ot.fecha_creacion);
+                const end = new Date(ot.fecha_resolucion);
+                const diffMs = end - start;
+                if (diffMs >= 0) {
+                    totalHours += diffMs / (1000 * 60 * 60);
+                    countWithTime++;
+                }
+            }
+        });
+        const mttr = countWithTime > 0 ? (totalHours / countWithTime).toFixed(1) : '0';
+
+        let onTimeCount = 0;
+        let programmedCount = 0;
+        resolved.forEach(ot => {
+            if (ot.fecha_programada) {
+                programmedCount++;
+                const progDate = new Date(ot.fecha_programada);
+                const resDate = new Date(ot.fecha_resolucion);
+                
+                const progDay = new Date(progDate.getFullYear(), progDate.getMonth(), progDate.getDate());
+                const resDay = new Date(resDate.getFullYear(), resDate.getMonth(), resDate.getDate());
+                
+                if (resDay <= progDay) {
+                    onTimeCount++;
+                }
+            }
+        });
+        const onTimeRate = programmedCount > 0 ? Math.round((onTimeCount / programmedCount) * 100) : 0;
+
+        // Populate card metrics
+        document.getElementById('kpi-val-total-ots').textContent = filtered.length;
+        document.getElementById('kpi-val-resolution-rate').textContent = resolutionRate + '%';
+        document.getElementById('kpi-val-resolved-count').textContent = resolved.length;
+        document.getElementById('kpi-val-total-resolved-base').textContent = filtered.length;
+        document.getElementById('kpi-val-mttr').textContent = mttr + ' hrs';
+        document.getElementById('kpi-val-ontime-rate').textContent = programmedCount > 0 ? onTimeRate + '%' : 'N/A';
+
+        // 4. Priorities Chart
+        const priorities = { Alta: 0, Media: 0, Baja: 0 };
+        filtered.forEach(ot => {
+            if (priorities[ot.prioridad] !== undefined) {
+                priorities[ot.prioridad]++;
+            }
+        });
+        const priorityChart = document.getElementById('kpis-priority-chart');
+        priorityChart.innerHTML = '';
+        const priorityColors = { Alta: '#ef4444', Media: '#f59e0b', Baja: '#3b82f6' };
+        
+        ['Alta', 'Media', 'Baja'].forEach(p => {
+            const count = priorities[p];
+            const pct = filtered.length > 0 ? Math.round((count / filtered.length) * 100) : 0;
+            priorityChart.innerHTML += `
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                        <span style="font-weight: 500;">${p}</span>
+                        <span style="color: var(--text-muted);">${count} OTs (${pct}%)</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                        <div style="width: ${pct}%; height: 100%; background: ${priorityColors[p]}; border-radius: 4px; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+            `;
+        });
+
+        // 5. Maintenance Type Chart
+        const types = {};
+        filtered.forEach(ot => {
+            const t = ot.tipo || 'General';
+            if (!types[t]) types[t] = 0;
+            types[t]++;
+        });
+        const typeChart = document.getElementById('kpis-type-chart');
+        typeChart.innerHTML = '';
+        const typeColors = { Correctiva: '#f97316', Preventiva: '#10b981' };
+        
+        Object.keys(types).forEach(t => {
+            const count = types[t];
+            const pct = filtered.length > 0 ? Math.round((count / filtered.length) * 100) : 0;
+            const color = typeColors[t] || '#6366f1';
+            typeChart.innerHTML += `
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                        <span style="font-weight: 500;">${t}</span>
+                        <span style="color: var(--text-muted);">${count} OTs (${pct}%)</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                        <div style="width: ${pct}%; height: 100%; background: ${color}; border-radius: 4px; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+            `;
+        });
+
+        // 6. Technicians Ranking
+        const techStats = {};
+        resolved.forEach(ot => {
+            const name = ot.tecnico_nombre || 'No asignado';
+            if (!techStats[name]) {
+                techStats[name] = { count: 0, totalHours: 0, timeCount: 0 };
+            }
+            techStats[name].count++;
+            if (ot.fecha_creacion && ot.fecha_resolucion) {
+                const start = new Date(ot.fecha_creacion);
+                const end = new Date(ot.fecha_resolucion);
+                const diffMs = end - start;
+                if (diffMs >= 0) {
+                    techStats[name].totalHours += diffMs / (1000 * 60 * 60);
+                    techStats[name].timeCount++;
+                }
+            }
+        });
+        const techList = Object.keys(techStats).map(name => {
+            const stat = techStats[name];
+            const avgMttr = stat.timeCount > 0 ? (stat.totalHours / stat.timeCount).toFixed(1) : '0';
+            return { name, count: stat.count, avgMttr: parseFloat(avgMttr) };
+        }).sort((a, b) => b.count - a.count).slice(0, 5);
+
+        const techRanking = document.getElementById('kpis-technicians-ranking');
+        techRanking.innerHTML = '';
+        if (techList.length === 0) {
+            techRanking.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 1rem;">No hay registros en este período.</td></tr>`;
+        } else {
+            techList.forEach(t => {
+                techRanking.innerHTML += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <td style="padding: 0.65rem 0.25rem; font-weight: 500;">👤 ${t.name}</td>
+                        <td style="padding: 0.65rem; text-align: center; font-weight: 600; color: var(--success);">${t.count}</td>
+                        <td style="padding: 0.65rem; text-align: right; color: var(--accent-color);">${t.avgMttr} hrs</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // 7. Top Assets with failures (Correctives only)
+        const assetStats = {};
+        const correctives = filtered.filter(ot => ot.tipo === 'Correctiva' || ot.tipo === 'Correctiva / Emergencia');
+        correctives.forEach(ot => {
+            const assetName = ot.activo_nombre;
+            if (!assetName) return;
+            if (!assetStats[assetName]) {
+                assetStats[assetName] = { count: 0, location: ot.ubicacion_nombre || ot.edificio_nombre || 'N/A' };
+            }
+            assetStats[assetName].count++;
+        });
+        const assetList = Object.keys(assetStats).map(name => {
+            return { name, count: assetStats[name].count, location: assetStats[name].location };
+        }).sort((a, b) => b.count - a.count).slice(0, 5);
+
+        const assetRanking = document.getElementById('kpis-assets-ranking');
+        assetRanking.innerHTML = '';
+        if (assetList.length === 0) {
+            assetRanking.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 1rem;">No hay fallas registradas en este período.</td></tr>`;
+        } else {
+            assetList.forEach(a => {
+                assetRanking.innerHTML += `
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <td style="padding: 0.65rem 0.25rem; font-weight: 500; color: var(--text-main);">⚙️ ${a.name}</td>
+                        <td style="padding: 0.65rem; color: var(--text-muted);">${a.location}</td>
+                        <td style="padding: 0.65rem; text-align: right; font-weight: 600; color: var(--danger);">${a.count}</td>
+                    </tr>
+                `;
+            });
+        }
+    }
+
     // --- INITIALIZE APPLICATION ---
     if (btnOtViewFlat) setActiveOtViewButton(btnOtViewFlat);
     loadKPIs();
@@ -3697,4 +4045,5 @@ document.addEventListener('DOMContentLoaded', () => {
     loadWorkOrders();
     loadAssets();
     loadTechniciansForAssign();
+    initKpisFilterEvents();
 });

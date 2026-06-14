@@ -114,6 +114,9 @@
                     <button class="btn-secondary" id="tab-btn-activos" style="border: none; background: transparent; padding: 0.5rem 1rem; border-bottom: 2px solid transparent; border-radius: 0; font-weight: 600;">
                         Activos (Equipos)
                     </button>
+                    <button class="btn-secondary" id="tab-btn-kpis" style="border: none; background: transparent; padding: 0.5rem 1rem; border-bottom: 2px solid transparent; border-radius: 0; font-weight: 600;">
+                        📊 Indicadores (KPIs)
+                    </button>
                 </div>
 
                 <!-- Tab 1 Content: Work Orders -->
@@ -291,6 +294,134 @@
                         </div>
                         <div class="grid-container" id="plant-ot-grid">
                             <!-- Dynamic OT Cards for selected plant -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 4 Content: KPIs -->
+                <div id="tab-kpis" class="tab-content" style="display: none; padding-bottom: 2rem;">
+                    <div class="card-header-actions" style="margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <h2 style="font-size: 1.25rem;">Indicadores Clave de Rendimiento (KPIs)</h2>
+                            <span style="font-size: 0.85rem; color: var(--text-muted);">Análisis de desempeño y tiempos de respuesta de las órdenes de trabajo</span>
+                        </div>
+                        
+                        <!-- Rango de Fechas y Presets -->
+                        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; background: rgba(255,255,255,0.02); padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <div style="display: flex; gap: 0.5rem; background: rgba(0,0,0,0.2); padding: 0.2rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                                <button class="btn-secondary" id="kpis-preset-7d" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; border: none; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text-muted); font-weight: 500;">7D</button>
+                                <button class="btn-secondary active" id="kpis-preset-month" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; border: none; border-radius: 4px; cursor: pointer; background: var(--accent-color); color: white; font-weight: 500;">Este Mes</button>
+                                <button class="btn-secondary" id="kpis-preset-prev-month" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; border: none; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text-muted); font-weight: 500;">Mes Ant.</button>
+                                <button class="btn-secondary" id="kpis-preset-all" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; border: none; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text-muted); font-weight: 500;">Todo</button>
+                            </div>
+                            
+                            <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+                                <label for="kpis-date-start" style="color: var(--text-muted);">Desde:</label>
+                                <input type="date" id="kpis-date-start" style="background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 0.35rem 0.5rem; border-radius: 4px; outline: none; font-family: inherit; font-size: 0.85rem;">
+                                
+                                <label for="kpis-date-end" style="color: var(--text-muted);">Hasta:</label>
+                                <input type="date" id="kpis-date-end" style="background: var(--input-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 0.35rem 0.5rem; border-radius: 4px; outline: none; font-family: inherit; font-size: 0.85rem;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cuadrícula de KPIs -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem;">
+                        <!-- KPI Card: Total OTs -->
+                        <div class="entity-card" style="padding: 1.25rem; border: 1px solid var(--border-color); background: rgba(255,255,255,0.02); border-radius: 8px;">
+                            <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">📋 OTs Creadas</span>
+                            <h3 id="kpi-val-total-ots" style="font-size: 2rem; font-weight: 700; margin: 0; color: var(--text-main);">0</h3>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">En el período seleccionado</span>
+                        </div>
+                        
+                        <!-- KPI Card: Tasa de Resolución -->
+                        <div class="entity-card" style="padding: 1.25rem; border: 1px solid var(--border-color); background: rgba(255,255,255,0.02); border-radius: 8px;">
+                            <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">✅ Tasa de Resolución</span>
+                            <h3 id="kpi-val-resolution-rate" style="font-size: 2rem; font-weight: 700; margin: 0; color: var(--success);">0%</h3>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;"><span id="kpi-val-resolved-count">0</span> de <span id="kpi-val-total-resolved-base">0</span> resueltas</span>
+                        </div>
+                        
+                        <!-- KPI Card: MTTR -->
+                        <div class="entity-card" style="padding: 1.25rem; border: 1px solid var(--border-color); background: rgba(255,255,255,0.02); border-radius: 8px;">
+                            <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">⏱️ Tiempo Medio (MTTR)</span>
+                            <h3 id="kpi-val-mttr" style="font-size: 2rem; font-weight: 700; margin: 0; color: var(--accent-color);">0 hrs</h3>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">Promedio de resolución</span>
+                        </div>
+                        
+                        <!-- KPI Card: Cumplimiento de Programación -->
+                        <div class="entity-card" style="padding: 1.25rem; border: 1px solid var(--border-color); background: rgba(255,255,255,0.02); border-radius: 8px;">
+                            <span style="font-size: 0.8rem; color: var(--text-muted); display: block; margin-bottom: 0.5rem;">📅 Cumplimiento Plazos</span>
+                            <h3 id="kpi-val-ontime-rate" style="font-size: 2rem; font-weight: 700; margin: 0; color: var(--warning);">0%</h3>
+                            <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">OTs programadas a tiempo</span>
+                        </div>
+                    </div>
+
+                    <!-- Panel de Gráficos y Rankings -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 1.5rem;">
+                        <!-- Panel Izquierdo: Gráficos de OTs -->
+                        <div class="entity-card" style="padding: 1.5rem; border: 1px solid var(--border-color); background: rgba(255,255,255,0.02); border-radius: 8px; display: flex; flex-direction: column; gap: 1.5rem;">
+                            
+                            <!-- Distribución por Prioridad -->
+                            <div>
+                                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">🚦 Distribución por Prioridad</h3>
+                                <div style="display: flex; flex-direction: column; gap: 0.8rem;" id="kpis-priority-chart">
+                                    <!-- Dynamic Bars -->
+                                </div>
+                            </div>
+                            
+                            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 0;">
+                            
+                            <!-- Distribución por Tipo de OT -->
+                            <div>
+                                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">🔧 Tipos de Mantenimiento</h3>
+                                <div style="display: flex; flex-direction: column; gap: 0.8rem;" id="kpis-type-chart">
+                                    <!-- Dynamic Bars -->
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Panel Derecho: Rankings -->
+                        <div class="entity-card" style="padding: 1.5rem; border: 1px solid var(--border-color); background: rgba(255,255,255,0.02); border-radius: 8px; display: flex; flex-direction: column; gap: 1.5rem;">
+                            
+                            <!-- Ranking de Técnicos -->
+                            <div>
+                                <h3 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">🏆 Rendimiento de Técnicos</h3>
+                                <div style="overflow-x: auto;">
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+                                        <thead>
+                                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--text-muted);">
+                                                <th style="padding: 0.5rem 0.25rem;">Técnico</th>
+                                                <th style="padding: 0.5rem; text-align: center;">OTs Resueltas</th>
+                                                <th style="padding: 0.5rem; text-align: right;">MTTR Promedio</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="kpis-technicians-ranking">
+                                            <!-- Dynamically loaded rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            
+                            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 0;">
+                            
+                            <!-- Activos Críticos con más Fallas -->
+                            <div>
+                                <h3 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">🚨 Top Activos con Fallas (Correctivos)</h3>
+                                <div style="overflow-x: auto;">
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+                                        <thead>
+                                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--text-muted);">
+                                                <th style="padding: 0.5rem 0.25rem;">Equipo (Activo)</th>
+                                                <th style="padding: 0.5rem;">Ubicación</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Fallas</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="kpis-assets-ranking">
+                                            <!-- Dynamically loaded rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
