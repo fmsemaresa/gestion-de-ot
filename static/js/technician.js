@@ -114,6 +114,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
+                // Sort OTs by priority (alta, media, baja) and then by creation date (older first)
+                const priorityWeight = { 'alta': 1, 'media': 2, 'baja': 3 };
+                ots.sort((a, b) => {
+                    const pA = priorityWeight[(a.prioridad || 'media').toLowerCase()] || 2;
+                    const pB = priorityWeight[(b.prioridad || 'media').toLowerCase()] || 2;
+                    if (pA !== pB) return pA - pB;
+                    return new Date(a.fecha_creacion || 0) - new Date(b.fecha_creacion || 0);
+                });
+
                 techOtList.innerHTML = '';
                 ots.forEach(ot => {
                     const isDone = ot.estado === 'REALIZADA' || ot.estado === 'Resuelta';

@@ -1108,6 +1108,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 4. LOAD WORK ORDERS ---
+    function sortOts(otArray) {
+        if (!otArray) return [];
+        const priorityWeight = {
+            'alta': 1,
+            'media': 2,
+            'baja': 3
+        };
+        return otArray.sort((a, b) => {
+            const pA = priorityWeight[(a.prioridad || 'media').toLowerCase()] || 2;
+            const pB = priorityWeight[(b.prioridad || 'media').toLowerCase()] || 2;
+            if (pA !== pB) return pA - pB;
+            return new Date(a.fecha_creacion || 0) - new Date(b.fecha_creacion || 0);
+        });
+    }
+
     function loadWorkOrders() {
         let url = '/api/ordenes';
         const params = [];
@@ -1149,7 +1164,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         allLoadedOts[idx] = ot;
                     }
                 });
+                sortOts(allLoadedOts);
 
+                filteredOts = sortOts(filteredOts);
                 loadedWorkOrdersList = filteredOts;
                 
                 if (otGrid) {
@@ -1185,7 +1202,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch('/api/ordenes')
             .then(res => res.json())
             .then(ots => {
-                allLoadedOts = ots;
+                allLoadedOts = sortOts(ots);
                 
                 const counts = {
                     'Santa Adela': { corrective: 0, preventive: 0, total: 0 },
