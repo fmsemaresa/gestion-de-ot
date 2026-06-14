@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const techSelectActivo = document.getElementById('tech-select-activo');
     const btnAddLocation = document.getElementById('btn-add-location');
     const techReportForm = document.getElementById('tech-report-form');
+    const techAssignee = document.getElementById('tech-assignee');
     
     const resolveModal = document.getElementById('resolve-modal');
     const resolveForm = document.getElementById('resolve-form');
@@ -37,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedPhotoFile = null;
     
     let currentTechId = localStorage.getItem('selected_tech_id') || null;
+    let allTechnicians = [];
 
     // --- 1. TABS MANAGEMENT ---
     tabMyTasks.addEventListener('click', () => {
@@ -56,10 +58,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- 2. LOAD TECHNICIANS (SIMULATED AUTH) ---
+    function populateAssigneeDropdown() {
+        if (!techAssignee) return;
+        techAssignee.innerHTML = '<option value="">-- Sin asignar --</option>';
+        allTechnicians.forEach(t => {
+            const isMe = currentTechId && parseInt(currentTechId) === t.id;
+            techAssignee.innerHTML += `<option value="${t.id}" ${isMe ? 'selected' : ''}>${t.nombre} ${isMe ? '(Yo)' : ''}</option>`;
+        });
+    }
+
     function loadTechnicians() {
         fetch('/api/tecnicos')
             .then(res => res.json())
             .then(tecnicos => {
+                allTechnicians = tecnicos;
                 selectTechUser.innerHTML = '<option value="">-- Seleccionar --</option>';
                 tecnicos.forEach(t => {
                     const selected = currentTechId && parseInt(currentTechId) === t.id ? 'selected' : '';
@@ -72,6 +84,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     selectTechUser.value = currentTechId;
                 }
                 
+                populateAssigneeDropdown();
                 loadMyTasks();
             })
             .catch(err => console.error('Error al cargar técnicos:', err));
@@ -81,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentTechId = selectTechUser.value;
         if (currentTechId) {
             localStorage.setItem('selected_tech_id', currentTechId);
+            populateAssigneeDropdown();
             loadMyTasks();
         } else {
             techOtList.innerHTML = '<p style="color: var(--text-muted); text-align: center;">Por favor selecciona un técnico arriba.</p>';
@@ -720,7 +734,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const descText = document.getElementById('tech-problem-description').value.trim();
         const prioridad = document.getElementById('tech-select-prioridad').value;
-        const currentTechName = selectTechUser.options[selectTechUser.selectedIndex].text;
+        const currentTechName = selectTechUser.value ? selectTechUser.options[selectTechUser.selectedIndex].text : 'Técnico';
+
+        const targetAssigneeVal = document.getElementById('tech-assignee').value;
+        const targetTechId = targetAssigneeVal ? parseInt(targetAssigneeVal) : null;
 
         const componentes_trabajados = [];
         document.querySelectorAll('.tech-ot-comp-checkbox:checked').forEach(cb => {
@@ -742,7 +759,7 @@ document.addEventListener('DOMContentLoaded', () => {
             edificio_id: edificioId,
             ubicacion_id: ubicacionId,
             activo_id: activoId,
-            tecnico_id: currentTechId ? parseInt(currentTechId) : null, // Auto-asignar a sí mismo
+            tecnico_id: targetTechId,
             componentes_trabajados: componentes_trabajados
         };
 
@@ -756,9 +773,24 @@ document.addEventListener('DOMContentLoaded', () => {
             return res.json();
         })
         .then(data => {
-            alert(`Orden #OT-${data.id} registrada con éxito y asignada a tu cola.`);
+            let successMsg = `Orden #OT-${data.id} registrada con éxito.`;
+            if (data.tecnico_id) {
+                if (currentTechId && parseInt(currentTechId) === data.tecnico_id) {
+                    successMsg += " Asignada a tu cola.";
+                } else {
+                    const assignedTech = allTechnicians.find(t => t.id === data.tecnico_id);
+                    if (assignedTech) {
+                        successMsg += ` Asignada a ${assignedTech.nombre}.`;
+                    }
+                }
+            } else {
+                successMsg += " Quedó sin asignar.";
+            }
+            alert(successMsg);
+
             techReportForm.reset();
             resetTechOtComponents();
+            populateAssigneeDropdown();
             // Reset dropdowns
             techSelectEdificio.innerHTML = '<option value="">Selecciona planta primero...</option>';
             techSelectEdificio.disabled = true;
