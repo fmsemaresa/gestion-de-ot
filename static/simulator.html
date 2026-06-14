@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Dispositivos - FMS Climatización</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        /* Simulator Specific CSS Overrides */
+        body {
+            background-color: #060913;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            padding: 0;
+        }
+
+        .simulator-header {
+            background-color: rgba(19, 27, 46, 0.85);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.65rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+        }
+
+        .simulator-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .simulator-badge {
+            background: linear-gradient(135deg, var(--accent-color), #8b5cf6);
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.2rem 0.55rem;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+        }
+
+        .simulator-instructions {
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(46, 59, 94, 0.6);
+            padding: 0.35rem 1rem;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .instruction-step {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .step-num {
+            background: var(--border-focus);
+            color: var(--text-main);
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .simulator-container {
+            display: flex;
+            flex: 1;
+            padding: 1.25rem;
+            gap: 1.5rem;
+            background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.03), transparent 60%);
+            overflow: hidden;
+        }
+
+        /* Left Side: Phone Mockup */
+        .simulator-left {
+            flex: 0 0 350px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        .device-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            width: 100%;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .device-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .btn-simulator {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 0.35rem 0.65rem;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            transition: var(--transition-fast);
+        }
+
+        .btn-simulator:hover {
+            border-color: var(--accent-color);
+            background: var(--bg-card-hover);
+        }
+
+        .phone-mockup {
+            width: 335px;
+            height: calc(100vh - 170px);
+            max-height: 670px;
+            background: #000;
+            border-radius: 42px;
+            border: 11px solid #1c1c1f;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), 0 0 0 2px #2d2d30;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Phone Screen Frame */
+        .phone-screen {
+            flex: 1;
+            background: #090d16;
+            border-radius: 32px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* Phone Island/Notch (Dynamic Island style) */
+        .phone-island {
+            position: absolute;
+            top: 7px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 95px;
+            height: 22px;
+            background: #000;
+            border-radius: 12px;
+            z-index: 1000;
+            box-shadow: inset 0 0 2px rgba(255,255,255,0.15);
+        }
+
+        /* Phone Status Bar */
+        .phone-status-bar {
+            height: 34px;
+            padding: 0 1.35rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #fff;
+            background: #090d16;
+            padding-bottom: 5px;
+            z-index: 999;
+            user-select: none;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+        }
+
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+        }
+
+        .phone-iframe {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #090d16;
+        }
+
+        /* Phone Home swipe indicator */
+        .phone-home-indicator {
+            height: 14px;
+            width: 100%;
+            background: #090d16;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-bottom: 4px;
+            z-index: 999;
+        }
+
+        .home-bar {
+            width: 105px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.4);
+            border-radius: 2px;
+        }
+
+        /* Right Side: Desktop Mockup */
+        .simulator-right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
+        }
+
+        .desktop-mockup {
+            flex: 1;
+            background: var(--bg-secondary);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .browser-header {
+            background-color: rgba(10, 15, 27, 0.6);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .browser-dots {
+            display: flex;
+            gap: 0.35rem;
+        }
+
+        .browser-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .dot-red { background-color: #ef4444; }
+        .dot-yellow { background-color: #f59e0b; }
+        .dot-green { background-color: #10b981; }
+
+        .browser-address-bar {
+            flex: 1;
+            background: #0b0f19;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .desktop-iframe {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: var(--bg-primary);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .simulator-container {
+                flex-direction: column;
+                overflow-y: auto;
+            }
+            .simulator-left {
+                flex: 0 0 auto;
+                width: 100%;
+                margin-bottom: 1.5rem;
+            }
+            .simulator-right {
+                height: 550px;
+                flex: none;
+            }
+            body {
+                overflow: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header bar -->
+    <div class="simulator-header">
+        <div class="simulator-title">
+            <h1 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main);">FMS Climatización</h1>
+            <span class="simulator-badge">Simulador dual</span>
+        </div>
+        
+        <div class="simulator-instructions">
+            <div class="instruction-step">
+                <span class="step-num">1</span>
+                <span>Crea/Asigna OT a la derecha</span>
+            </div>
+            <div class="instruction-step">
+                <span class="step-num">2</span>
+                <span>Mírala e interviene en el celular</span>
+            </div>
+            <div class="instruction-step">
+                <span class="step-num">3</span>
+                <span>Ve los resultados en tiempo real</span>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem;">
+            <a href="/static/index.html" class="btn-simulator" style="text-decoration: none; padding: 0.45rem 0.85rem; font-weight: 600; background: var(--bg-secondary);">
+                🖥️ Volver al Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="simulator-container">
+        <!-- Phone Emulator Column -->
+        <div class="simulator-left">
+            <div class="device-controls">
+                <div class="device-title">
+                    <span>📱</span>
+                    <span>Técnico (Celular)</span>
+                </div>
+                <button class="btn-simulator" onclick="document.getElementById('phone-frame').contentWindow.location.reload();" title="Recargar pantalla del celular">
+                    🔄 Recargar
+                </button>
+            </div>
+            
+            <div class="phone-mockup">
+                <div class="phone-island"></div>
+                <div class="phone-screen">
+                    <!-- Status Bar -->
+                    <div class="phone-status-bar">
+                        <div class="status-left" id="phone-clock">09:41</div>
+                        <div class="status-right">
+                            <span>📶</span>
+                            <span>🔋 98%</span>
+                        </div>
+                    </div>
+                    
+                    <!-- App in Phone Frame -->
+                    <iframe id="phone-frame" class="phone-iframe" src="/static/technician.html"></iframe>
+                    
+                    <!-- Home indicator -->
+                    <div class="phone-home-indicator">
+                        <div class="home-bar"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Desktop Emulator Column -->
+        <div class="simulator-right">
+            <div class="device-controls">
+                <div class="device-title">
+                    <span>🖥️</span>
+                    <span>Administración (Escritorio)</span>
+                </div>
+                <button class="btn-simulator" onclick="document.getElementById('desktop-frame').contentWindow.location.reload();" title="Recargar panel administrador">
+                    🔄 Recargar
+                </button>
+            </div>
+            
+            <div class="desktop-mockup">
+                <!-- Browser window headers -->
+                <div class="browser-header">
+                    <div class="browser-dots">
+                        <div class="browser-dot dot-red"></div>
+                        <div class="browser-dot dot-yellow"></div>
+                        <div class="browser-dot dot-green"></div>
+                    </div>
+                    <div class="browser-address-bar">
+                        <span id="browser-url">http://localhost:8000/static/index.html</span>
+                        <span style="cursor: pointer; opacity: 0.8;" onclick="document.getElementById('desktop-frame').contentWindow.location.reload();">🔄</span>
+                    </div>
+                </div>
+                
+                <!-- App in Desktop Frame -->
+                <iframe id="desktop-frame" class="desktop-iframe" src="/static/index.html"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script to keep the simulated phone time in sync with reality -->
+    <script>
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            let minutes = now.getMinutes();
+            hours = hours < 10 ? '0' + hours : hours;
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            document.getElementById('phone-clock').innerText = hours + ':' + minutes;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Dynamically track the frame address bar
+        const desktopFrame = document.getElementById('desktop-frame');
+        const browserUrl = document.getElementById('browser-url');
+        
+        try {
+            desktopFrame.onload = function() {
+                const url = desktopFrame.contentWindow.location.pathname;
+                browserUrl.innerText = 'http://localhost:8000' + url;
+            };
+        } catch(e) {}
+    </script>
+</body>
+</html>
