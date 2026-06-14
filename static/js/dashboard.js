@@ -1291,6 +1291,104 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function resolveColorToHex(colorStr) {
+        if (!colorStr) return null;
+        const parts = colorStr.split(':');
+        const type = parts[0];
+        if (type === 'rgb' && parts[1]) {
+            let hex = parts[1];
+            if (hex.length === 8) {
+                if (hex.toLowerCase().startsWith('ff')) {
+                    hex = hex.substring(2);
+                } else {
+                    hex = hex.substring(2);
+                }
+            }
+            return `#${hex}`;
+        }
+        if (type === 'theme') {
+            const themeIdx = parseInt(parts[1]);
+            const themeColors = [
+                '#FFFFFF', // 0: White
+                '#000000', // 1: Black
+                '#E7E6E6', // 2: Gray
+                '#44546A', // 3: Dark Blue
+                '#5B9BD5', // 4: Blue
+                '#ED7D31', // 5: Orange
+                '#A5A5A5', // 6: Gray
+                '#FFC000', // 7: Gold/Yellow
+                '#4472C4', // 8: Blue
+                '#70AD47'  // 9: Green
+            ];
+            return themeColors[themeIdx] || '#808080';
+        }
+        if (type === 'indexed') {
+            const idx = parseInt(parts[1]);
+            const indexedColors = {
+                1: '#000000', 2: '#FFFFFF', 3: '#FF0000', 4: '#00FF00',
+                5: '#0000FF', 6: '#FFFF00', 7: '#FF00FF', 8: '#00FFFF',
+                9: '#800000', 10: '#008000', 11: '#000080', 12: '#808000',
+                13: '#800080', 14: '#008080', 15: '#C0C0C0', 16: '#808080',
+                22: '#FFC7CE', 42: '#C6EFCE', 43: '#FFEB9C'
+            };
+            return indexedColors[idx] || '#808080';
+        }
+        return null;
+    }
+
+    function getColorsBreakdown(typeOts) {
+        const counts = {};
+        let noColorCount = 0;
+        
+        typeOts.forEach(ot => {
+            const rawColor = ot.activo_color || ot.ubicacion_color;
+            const hex = resolveColorToHex(rawColor);
+            if (hex) {
+                counts[hex] = (counts[hex] || 0) + 1;
+            } else {
+                noColorCount++;
+            }
+        });
+        
+        return { counts, noColorCount };
+    }
+
+    function generateColorsBadgeHtml(typeOts, badgeBgColor) {
+        const breakdown = getColorsBreakdown(typeOts);
+        
+        let html = `<div style="display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">`;
+        
+        // Main total badge
+        html += `
+            <span style="background: ${badgeBgColor}; color: white; font-size: 0.75rem; padding: 0.15rem 0.45rem; border-radius: 20px; font-weight: 700;">
+                ${typeOts.length}
+            </span>
+        `;
+        
+        // Color items
+        for (const [hex, count] of Object.entries(breakdown.counts)) {
+            html += `
+                <span style="display: inline-flex; align-items: center; gap: 0.2rem; background: rgba(255,255,255,0.06); padding: 0.15rem 0.35rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; font-weight: 600; color: var(--text-main);" title="Color Excel">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: ${hex}; box-shadow: 0 0 4px ${hex};"></span>
+                    <span>${count}</span>
+                </span>
+            `;
+        }
+        
+        // No color count
+        if (breakdown.noColorCount > 0) {
+            html += `
+                <span style="display: inline-flex; align-items: center; gap: 0.2rem; background: rgba(255,255,255,0.03); padding: 0.15rem 0.35rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); font-size: 0.7rem; font-weight: 500; color: var(--text-muted);" title="Sin color">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--text-muted); opacity: 0.35;"></span>
+                    <span>${breakdown.noColorCount}</span>
+                </span>
+            `;
+        }
+        
+        html += `</div>`;
+        return html;
+    }
+
     function renderTypeGroupedView(ots, targetGrid) {
         targetGrid.innerHTML = '';
         const types = ['Climatización', 'Gasfitería', 'Electricidad', 'Dispensadores', 'Mobiliario', 'Quincallería', 'Otros'];
@@ -1331,17 +1429,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const titleSpan = document.createElement('span');
             titleSpan.textContent = `${getSpecializationIcon(type)} ${type}`;
             
-            const badge = document.createElement('span');
-            badge.style.background = typeColors[type] || 'var(--border-color)';
-            badge.style.color = '#white';
-            badge.style.fontSize = '0.75rem';
-            badge.style.padding = '0.15rem 0.45rem';
-            badge.style.borderRadius = '20px';
-            badge.style.fontWeight = '700';
-            badge.textContent = typeOts.length;
+            const badgeContainer = document.createElement('div');
+            badgeContainer.innerHTML = generateColorsBadgeHtml(typeOts, typeColors[type] || 'var(--border-color)');
             
             header.appendChild(titleSpan);
-            header.appendChild(badge);
+            header.appendChild(badgeContainer);
             col.appendChild(header);
             
             const cardsContainer = document.createElement('div');
@@ -1448,16 +1540,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const colTitleSpan = document.createElement('span');
                     colTitleSpan.textContent = `${getSpecializationIcon(type)} ${type}`;
                     
-                    const colBadge = document.createElement('span');
-                    colBadge.style.background = typeColors[type] || 'var(--border-color)';
-                    colBadge.style.color = '#white';
-                    colBadge.style.fontSize = '0.75rem';
-                    colBadge.style.padding = '0.1rem 0.35rem';
-                    colBadge.style.borderRadius = '10px';
-                    colBadge.textContent = typeOts.length;
+                    const badgeContainer = document.createElement('div');
+                    badgeContainer.innerHTML = generateColorsBadgeHtml(typeOts, typeColors[type] || 'var(--border-color)');
                     
                     colHeader.appendChild(colTitleSpan);
-                    colHeader.appendChild(colBadge);
+                    colHeader.appendChild(badgeContainer);
                     col.appendChild(colHeader);
                     
                     const cardsContainer = document.createElement('div');

@@ -390,6 +390,8 @@ def get_ordenes(
             "ubicacion_nombre": ubicacion.nombre if ubicacion else None,
             "activo_nombre": activo.nombre if activo else None,
             "activo_tipo": activo.tipo if activo else "Otros",
+            "activo_color": activo.color if activo else None,
+            "ubicacion_color": ubicacion.color if ubicacion else None,
             "tecnico_nombre": tecnico.nombre if tecnico else "No asignado",
             "tecnico_id": ot.tecnico_id,
             "plantilla_id": ot.plantilla_id,
