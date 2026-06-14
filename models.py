@@ -66,6 +66,11 @@ class ComponenteActivo(SQLModel, table=True):
     
     activo_id: int = Field(foreign_key="activo.id")
     activo: Activo = Relationship(back_populates="componentes")
+    
+    ordenes_trabajo_asociadas: List["OrdenTrabajoComponente"] = Relationship(
+        back_populates="componente",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 class PlantillaChequeo(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -138,6 +143,20 @@ class OrdenTrabajo(SQLModel, table=True):
         back_populates="orden_trabajo",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    componentes_asociados: List["OrdenTrabajoComponente"] = Relationship(
+        back_populates="orden_trabajo",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+
+class OrdenTrabajoComponente(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    orden_trabajo_id: int = Field(foreign_key="ordentrabajo.id", index=True)
+    componente_id: int = Field(foreign_key="componenteactivo.id", index=True)
+    comentario: Optional[str] = Field(default=None)
+    
+    orden_trabajo: "OrdenTrabajo" = Relationship(back_populates="componentes_asociados")
+    componente: "ComponenteActivo" = Relationship(back_populates="ordenes_trabajo_asociadas")
 
 
 

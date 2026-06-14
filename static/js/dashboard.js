@@ -968,6 +968,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 `;
             }
 
+            // Render components worked on
+            let componentsHtml = '';
+            if (ot.componentes_trabajados && ot.componentes_trabajados.length > 0) {
+                componentsHtml = `
+                    <div style="font-size: 0.8rem; background: rgba(59, 130, 246, 0.08); border-left: 2px solid var(--accent-color); padding: 0.35rem 0.5rem; border-radius: 4px; margin-bottom: 0.4rem; text-align: left;">
+                        <strong style="color: var(--text-color); font-size: 0.78rem; display: block; margin-bottom: 0.15rem;">Despieces a Trabajar:</strong>
+                        <ul style="margin: 0; padding-left: 1rem; list-style-type: disc; display: flex; flex-direction: column; gap: 0.15rem;">
+                            ${ot.componentes_trabajados.map(comp => `
+                                <li>
+                                    <strong style="color: var(--text-main);">${comp.nombre}</strong>
+                                    ${comp.comentario ? `<span style="color: #cbd5e1; font-style: italic;"> - "${comp.comentario}"</span>` : ''}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
             const card = document.createElement('div');
             card.className = `entity-card priority-${ot.prioridad.toLowerCase()}`;
             card.innerHTML = `
@@ -975,6 +993,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h4 class="entity-title" style="font-weight: bold;"><span style="font-weight: normal;">#OT-${ot.id}</span> - ${ot.tipo}</h4>
                 <div class="entity-subtitle" style="font-weight: bold; color: var(--text-color); margin-bottom: 0.5rem;">${ot.planta_nombre} / ${ot.edificio_nombre} ${ot.ubicacion_nombre ? '/ ' + ot.ubicacion_nombre : ''}</div>
                 <p style="font-size:0.85rem; background:rgba(0,0,0,0.1); padding:0.5rem; border-radius:6px; margin-bottom:0.4rem; color:#cbd5e1;">${ot.descripcion}</p>
+                ${componentsHtml}
                 
                 <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem; display: flex; align-items: center; flex-wrap: wrap;">
                     Asignado a: <strong style="color: var(--text-color); margin-left: 0.25rem;">${ot.tecnico_nombre || 'Sin asignar'}</strong> ${assignBtnHtml}
@@ -1692,10 +1711,24 @@ document.addEventListener('DOMContentLoaded', () => {
                             statusBadgeClass = 'status-repair';
                         }
 
+                        let locHierarchyStr = '';
+                        if (a.planta_nombre && a.edificio_nombre && a.ubicacion_nombre) {
+                            locHierarchyStr = `${a.planta_nombre} / ${a.edificio_nombre} / ${a.ubicacion_nombre}`;
+                        } else if (a.edificio_nombre && a.ubicacion_nombre) {
+                            locHierarchyStr = `${a.edificio_nombre} / ${a.ubicacion_nombre}`;
+                        } else if (a.ubicacion_nombre) {
+                            locHierarchyStr = a.ubicacion_nombre;
+                        } else {
+                            locHierarchyStr = 'Sin ubicación';
+                        }
+
                         const card = document.createElement('div');
                         card.className = cardClass;
                         card.innerHTML = `
-                            <h4 class="entity-title" style="margin-bottom:0.25rem; font-size:0.95rem;">${a.nombre}</h4>
+                            <h4 class="entity-title" style="margin-bottom:0.15rem; font-size:0.95rem;">${a.nombre}</h4>
+                            <div style="font-size:0.72rem; color: var(--text-muted); margin-bottom: 0.4rem; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${locHierarchyStr}">
+                                📍 ${locHierarchyStr}
+                            </div>
                             <div class="entity-meta">
                                 <div class="meta-row">
                                     <span style="font-size:0.8rem; color: var(--text-muted);">Marca/Mod: <strong>${a.marca || 'S/M'} / ${a.modelo || 'S/M'}</strong></span>
@@ -2324,43 +2357,118 @@ document.addEventListener('DOMContentLoaded', () => {
             otSearchResults.innerHTML = '';
         }
 
+        resetOtComponents();
+
+        const otPlanta = document.getElementById('ot-select-planta');
+        const otEdificio = document.getElementById('ot-select-edificio');
+        const otUbicacion = document.getElementById('ot-select-ubicacion');
+        const otActivo = document.getElementById('ot-select-activo');
+
+        // Clear checklist template selector dropdown
+        const otSelectPlantilla = document.getElementById('ot-select-plantilla');
+        otSelectPlantilla.innerHTML = '<option value="">Cargando...</option>';
+
+        // Load technicians in assignment dropdown
+        const otTecnico = document.getElementById('ot-tecnico');
+        otTecnico.innerHTML = '<option value="">No Asignado</option>';
+        techniciansList.forEach(t => {
+            otTecnico.innerHTML += `<option value="${t.id}">${t.nombre}</option>`;
+        });
+
+        // Load checklists in template selector dropdown
+        fetch('/api/plantillas')
+            .then(res => res.json())
+            .then(plantasChecklist => {
+                otSelectPlantilla.innerHTML = '<option value="">-- Sin plantilla / Pauta estándar --</option>';
+                plantasChecklist.forEach(p => {
+                    otSelectPlantilla.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+                });
+            })
+            .catch(err => console.error('Error al cargar plantillas:', err));
+
         // Load Plants in form dropdown
         fetch('/api/plantas')
             .then(res => res.json())
             .then(plantas => {
-                const otPlanta = document.getElementById('ot-select-planta');
                 otPlanta.innerHTML = '<option value="">-- Selecciona Planta --</option>';
                 plantas.forEach(p => {
                     otPlanta.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
                 });
                 
-                // Clear and disable downstream selectors
-                document.getElementById('ot-select-edificio').innerHTML = '<option value="">Selecciona planta...</option>';
-                document.getElementById('ot-select-edificio').disabled = true;
-                document.getElementById('ot-select-ubicacion').innerHTML = '<option value="">Selecciona edificio...</option>';
-                document.getElementById('ot-select-ubicacion').disabled = true;
-                document.getElementById('ot-select-activo').innerHTML = '<option value="">Selecciona ubicación...</option>';
-                document.getElementById('ot-select-activo').disabled = true;
-                
-                // Load technicians in assignment dropdown
-                const otTecnico = document.getElementById('ot-tecnico');
-                otTecnico.innerHTML = '<option value="">No Asignado</option>';
-                techniciansList.forEach(t => {
-                    otTecnico.innerHTML += `<option value="${t.id}">${t.nombre}</option>`;
+                if (selectedPlantaId) {
+                    otPlanta.value = selectedPlantaId;
+                    
+                    // Load buildings
+                    otEdificio.disabled = false;
+                    otEdificio.innerHTML = '<option value="">Cargando edificios...</option>';
+                    return fetch(`/api/plantas/${selectedPlantaId}/edificios`);
+                } else {
+                    otEdificio.innerHTML = '<option value="">Selecciona planta...</option>';
+                    otEdificio.disabled = true;
+                    otUbicacion.innerHTML = '<option value="">Selecciona edificio...</option>';
+                    otUbicacion.disabled = true;
+                    otActivo.innerHTML = '<option value="">Selecciona ubicación...</option>';
+                    otActivo.disabled = true;
+                    throw new Error('no_selection'); // break promise chain cleanly
+                }
+            })
+            .then(res => res.json())
+            .then(edificios => {
+                otEdificio.innerHTML = '<option value="">-- Selecciona --</option>';
+                edificios.forEach(b => {
+                    otEdificio.innerHTML += `<option value="${b.id}">${b.nombre}</option>`;
                 });
-
-                // Load checklists in template selector dropdown
-                fetch('/api/plantillas')
-                    .then(res => res.json())
-                    .then(plantillas => {
-                        const otSelectPlantilla = document.getElementById('ot-select-plantilla');
-                        otSelectPlantilla.innerHTML = '<option value="">-- Sin plantilla / Pauta estándar --</option>';
-                        plantillas.forEach(p => {
-                            otSelectPlantilla.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
-                        });
-                    })
-                    .catch(err => console.error('Error al cargar plantillas:', err));
                 
+                if (selectedEdificioId) {
+                    otEdificio.value = selectedEdificioId;
+                    
+                    // Load locations
+                    otUbicacion.disabled = false;
+                    otUbicacion.innerHTML = '<option value="">Cargando ubicaciones...</option>';
+                    return fetch(`/api/edificios/${selectedEdificioId}/ubicaciones`);
+                } else {
+                    otUbicacion.innerHTML = '<option value="">Selecciona edificio...</option>';
+                    otUbicacion.disabled = true;
+                    otActivo.innerHTML = '<option value="">Selecciona ubicación...</option>';
+                    otActivo.disabled = true;
+                    throw new Error('no_selection');
+                }
+            })
+            .then(res => res.json())
+            .then(ubicaciones => {
+                otUbicacion.innerHTML = '<option value="">-- Selecciona --</option>';
+                ubicaciones.forEach(u => {
+                    otUbicacion.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+                });
+                
+                if (selectedUbicacionId) {
+                    otUbicacion.value = selectedUbicacionId;
+                    
+                    // Load assets
+                    otActivo.disabled = false;
+                    otActivo.innerHTML = '<option value="">Cargando activos...</option>';
+                    return fetch(`/api/activos?ubicacion_id=${selectedUbicacionId}`);
+                } else {
+                    otActivo.innerHTML = '<option value="">Selecciona ubicación...</option>';
+                    otActivo.disabled = true;
+                    throw new Error('no_selection');
+                }
+            })
+            .then(res => res.json())
+            .then(activos => {
+                otActivo.disabled = false;
+                otActivo.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                activeActivos.forEach(a => {
+                    otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
+                });
+            })
+            .catch(err => {
+                if (err.message !== 'no_selection') {
+                    console.error('Error pre-filling dropdowns:', err);
+                }
+            })
+            .finally(() => {
                 otModal.style.display = 'flex';
             });
     });
@@ -2368,6 +2476,13 @@ document.addEventListener('DOMContentLoaded', () => {
     closeOtModal.addEventListener('click', () => {
         otModal.style.display = 'none';
     });
+
+    function resetOtComponents() {
+        const container = document.getElementById('ot-components-container');
+        if (container) container.style.display = 'none';
+        const listDiv = document.getElementById('ot-components-list');
+        if (listDiv) listDiv.innerHTML = '';
+    }
 
     // Dynamically update building, location and asset dropdowns in OT Form
     document.getElementById('ot-select-planta').addEventListener('change', (e) => {
@@ -2382,6 +2497,7 @@ document.addEventListener('DOMContentLoaded', () => {
         uSelect.disabled = true;
         aSelect.innerHTML = '<option value="">Selecciona ubicación...</option>';
         aSelect.disabled = true;
+        resetOtComponents();
 
         if (!plantaId) return;
 
@@ -2405,6 +2521,7 @@ document.addEventListener('DOMContentLoaded', () => {
         uSelect.disabled = true;
         aSelect.innerHTML = '<option value="">Selecciona ubicación...</option>';
         aSelect.disabled = true;
+        resetOtComponents();
 
         if (!edificioId) return;
 
@@ -2425,6 +2542,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         aSelect.innerHTML = '<option value="">Selecciona activo...</option>';
         aSelect.disabled = true;
+        resetOtComponents();
 
         if (!ubicacionId) return;
 
@@ -2438,6 +2556,51 @@ document.addEventListener('DOMContentLoaded', () => {
                     aSelect.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
                 });
             });
+    });
+
+    document.getElementById('ot-select-activo').addEventListener('change', (e) => {
+        const activoId = e.target.value;
+        const container = document.getElementById('ot-components-container');
+        const listDiv = document.getElementById('ot-components-list');
+        
+        listDiv.innerHTML = '';
+        container.style.display = 'none';
+        
+        if (!activoId) return;
+        
+        fetch(`/api/activos/${activoId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.componentes && data.componentes.length > 0) {
+                    container.style.display = 'block';
+                    data.componentes.forEach(comp => {
+                        const itemHtml = `
+                            <div class="ot-component-item" style="display: flex; flex-direction: column; gap: 0.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <input type="checkbox" id="ot-comp-${comp.id}" class="ot-comp-checkbox" value="${comp.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                                    <label for="ot-comp-${comp.id}" style="margin-bottom: 0; cursor: pointer; font-weight: 500; font-size: 0.85rem; color: var(--text-main);">${comp.nombre} (${comp.estado})</label>
+                                </div>
+                                <div id="ot-comp-comment-container-${comp.id}" style="display: none; padding-left: 1.5rem;">
+                                    <input type="text" id="ot-comp-comment-${comp.id}" class="form-control" placeholder="Comentario técnico para este componente..." style="padding: 0.35rem 0.5rem; font-size: 0.8rem; border-radius: 6px;">
+                                </div>
+                            </div>
+                        `;
+                        listDiv.insertAdjacentHTML('beforeend', itemHtml);
+                        
+                        const checkbox = document.getElementById(`ot-comp-${comp.id}`);
+                        const commentContainer = document.getElementById(`ot-comp-comment-container-${comp.id}`);
+                        checkbox.addEventListener('change', () => {
+                            if (checkbox.checked) {
+                                commentContainer.style.display = 'block';
+                            } else {
+                                commentContainer.style.display = 'none';
+                                document.getElementById(`ot-comp-comment-${comp.id}`).value = '';
+                            }
+                        });
+                    });
+                }
+            })
+            .catch(err => console.error('Error al obtener componentes:', err));
     });
 
     otForm.addEventListener('submit', (e) => {
@@ -2463,6 +2626,17 @@ document.addEventListener('DOMContentLoaded', () => {
             fullFechaProgramada = fechaProgramadaVal + 'T' + (horaProgramadaVal || '00:00') + ':00';
         }
 
+        // Recopilar componentes/despieces seleccionados con sus comentarios individuales
+        const componentes_trabajados = [];
+        document.querySelectorAll('.ot-comp-checkbox:checked').forEach(cb => {
+            const compId = parseInt(cb.value);
+            const commentInput = document.getElementById(`ot-comp-comment-${compId}`);
+            componentes_trabajados.push({
+                componente_id: compId,
+                comentario: commentInput ? commentInput.value.trim() || null : null
+            });
+        });
+
         const payload = {
             descripcion,
             tipo,
@@ -2475,7 +2649,8 @@ document.addEventListener('DOMContentLoaded', () => {
             activo_id: activoId,
             tecnico_id: tecnicoId,
             plantilla_id: plantillaId,
-            fecha_programada: fullFechaProgramada
+            fecha_programada: fullFechaProgramada,
+            componentes_trabajados: componentes_trabajados
         };
 
         fetch('/api/ordenes', {
@@ -2490,6 +2665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             otModal.style.display = 'none';
             otForm.reset();
+            resetOtComponents();
             loadKPIs();
             loadWorkOrders();
         })

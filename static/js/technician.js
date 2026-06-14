@@ -230,6 +230,24 @@ document.addEventListener('DOMContentLoaded', () => {
                         `;
                     }
 
+                    // Render components worked on
+                    let componentsHtml = '';
+                    if (ot.componentes_trabajados && ot.componentes_trabajados.length > 0) {
+                        componentsHtml = `
+                            <div style="font-size: 0.8rem; background: rgba(59, 130, 246, 0.08); border-left: 2px solid var(--accent-color); padding: 0.35rem 0.5rem; border-radius: 4px; margin-top: 0.4rem; margin-bottom: 0.4rem; text-align: left;">
+                                <strong style="color: var(--text-color); font-size: 0.78rem; display: block; margin-bottom: 0.15rem;">Despieces a Trabajar:</strong>
+                                <ul style="margin: 0; padding-left: 1rem; list-style-type: disc; display: flex; flex-direction: column; gap: 0.15rem;">
+                                    ${ot.componentes_trabajados.map(comp => `
+                                        <li>
+                                            <strong style="color: var(--text-main);">${comp.nombre}</strong>
+                                            ${comp.comentario ? `<span style="color: #cbd5e1; font-style: italic;"> - "${comp.comentario}"</span>` : ''}
+                                        </li>
+                                    `).join('')}
+                                </ul>
+                            </div>
+                        `;
+                    }
+
                     techOtList.innerHTML += `
                         <div class="tech-ot-card ${statusClass}">
                             <div class="tech-ot-header">
@@ -241,6 +259,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <p style="margin-bottom: 0.4rem;">${activeName}</p>
                                 ${dateHtml}
                                 <p style="margin-top: 0.5rem; background: rgba(0,0,0,0.15); padding: 0.6rem; border-radius: 6px; font-size: 0.85rem; color: #cbd5e1; border-left: 2px solid var(--border-focus);">${ot.descripcion}</p>
+                                ${componentsHtml}
                                 ${ot.comentarios_tecnicos ? `<p style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--success);"><strong>Resolución:</strong> ${ot.comentarios_tecnicos}</p>` : ''}
                                 ${fotosHtml}
                                 ${uploadPhotoHtml}
@@ -516,6 +535,13 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.error('Error:', err));
     }
 
+    function resetTechOtComponents() {
+        const container = document.getElementById('tech-ot-components-container');
+        if (container) container.style.display = 'none';
+        const listDiv = document.getElementById('tech-ot-components-list');
+        if (listDiv) listDiv.innerHTML = '';
+    }
+
     techSelectPlanta.addEventListener('change', () => {
         const plantaId = techSelectPlanta.value;
         techSelectEdificio.innerHTML = '<option value="">-- Selecciona --</option>';
@@ -525,6 +551,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnAddLocation.disabled = true;
         techSelectActivo.innerHTML = '<option value="">-- Selecciona --</option>';
         techSelectActivo.disabled = true;
+        resetTechOtComponents();
 
         if (!plantaId) return;
 
@@ -546,6 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnAddLocation.disabled = true;
         techSelectActivo.innerHTML = '<option value="">-- Selecciona --</option>';
         techSelectActivo.disabled = true;
+        resetTechOtComponents();
 
         if (!edificioId) return;
 
@@ -576,6 +604,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const ubicacionId = techSelectUbicacion.value;
         techSelectActivo.innerHTML = '<option value="">-- Selecciona --</option>';
         techSelectActivo.disabled = true;
+        resetTechOtComponents();
 
         if (!ubicacionId) return;
 
@@ -599,6 +628,51 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(err => console.error(err));
     }
+
+    techSelectActivo.addEventListener('change', (e) => {
+        const activoId = e.target.value;
+        const container = document.getElementById('tech-ot-components-container');
+        const listDiv = document.getElementById('tech-ot-components-list');
+        
+        listDiv.innerHTML = '';
+        container.style.display = 'none';
+        
+        if (!activoId) return;
+        
+        fetch(`/api/activos/${activoId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.componentes && data.componentes.length > 0) {
+                    container.style.display = 'block';
+                    data.componentes.forEach(comp => {
+                        const itemHtml = `
+                            <div class="tech-ot-component-item" style="display: flex; flex-direction: column; gap: 0.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <input type="checkbox" id="tech-ot-comp-${comp.id}" class="tech-ot-comp-checkbox" value="${comp.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                                    <label for="tech-ot-comp-${comp.id}" style="margin-bottom: 0; cursor: pointer; font-weight: 500; font-size: 0.85rem; color: var(--text-main);">${comp.nombre} (${comp.estado})</label>
+                                </div>
+                                <div id="tech-ot-comp-comment-container-${comp.id}" style="display: none; padding-left: 1.5rem;">
+                                    <input type="text" id="tech-ot-comp-comment-${comp.id}" class="form-control" placeholder="Comentario técnico para este componente..." style="padding: 0.35rem 0.5rem; font-size: 0.8rem; border-radius: 6px;">
+                                </div>
+                            </div>
+                        `;
+                        listDiv.insertAdjacentHTML('beforeend', itemHtml);
+                        
+                        const checkbox = document.getElementById(`tech-ot-comp-${comp.id}`);
+                        const commentContainer = document.getElementById(`tech-ot-comp-comment-container-${comp.id}`);
+                        checkbox.addEventListener('change', () => {
+                            if (checkbox.checked) {
+                                commentContainer.style.display = 'block';
+                            } else {
+                                commentContainer.style.display = 'none';
+                                document.getElementById(`tech-ot-comp-comment-${comp.id}`).value = '';
+                            }
+                        });
+                    });
+                }
+            })
+            .catch(err => console.error('Error al obtener componentes:', err));
+    });
 
     // --- 7. INLINE LOCATION CREATION ---
     btnAddLocation.addEventListener('click', () => {
@@ -644,11 +718,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const ubicacionId = parseInt(techSelectUbicacion.value);
         const activoId = techSelectActivo.value ? parseInt(techSelectActivo.value) : null;
         
-        const description = techProblem-description.value.trim(); // wait, ID has hyphen
-        // Let's resolve the variable name safely
         const descText = document.getElementById('tech-problem-description').value.trim();
         const prioridad = document.getElementById('tech-select-prioridad').value;
         const currentTechName = selectTechUser.options[selectTechUser.selectedIndex].text;
+
+        const componentes_trabajados = [];
+        document.querySelectorAll('.tech-ot-comp-checkbox:checked').forEach(cb => {
+            const compId = parseInt(cb.value);
+            const commentInput = document.getElementById(`tech-ot-comp-comment-${compId}`);
+            componentes_trabajados.push({
+                componente_id: compId,
+                comentario: commentInput ? commentInput.value.trim() || null : null
+            });
+        });
 
         const payload = {
             descripcion: descText,
@@ -660,7 +742,8 @@ document.addEventListener('DOMContentLoaded', () => {
             edificio_id: edificioId,
             ubicacion_id: ubicacionId,
             activo_id: activoId,
-            tecnico_id: currentTechId ? parseInt(currentTechId) : null // Auto-asignar a sí mismo
+            tecnico_id: currentTechId ? parseInt(currentTechId) : null, // Auto-asignar a sí mismo
+            componentes_trabajados: componentes_trabajados
         };
 
         fetch('/api/ordenes', {
@@ -675,6 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             alert(`Orden #OT-${data.id} registrada con éxito y asignada a tu cola.`);
             techReportForm.reset();
+            resetTechOtComponents();
             // Reset dropdowns
             techSelectEdificio.innerHTML = '<option value="">Selecciona planta primero...</option>';
             techSelectEdificio.disabled = true;

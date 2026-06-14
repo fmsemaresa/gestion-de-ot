@@ -13,7 +13,8 @@ from database import engine, init_db
 from models import (
     Planta, Edificio, Ubicacion, Activo, 
     ComponenteActivo, Tecnico, OrdenTrabajo,
-    PlantillaChequeo, ItemPlantillaChequeo, RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT, OcupanteUbicacion
+    PlantillaChequeo, ItemPlantillaChequeo, RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT, OcupanteUbicacion,
+    OrdenTrabajoComponente
 )
 
 @asynccontextmanager
@@ -21,6 +22,26 @@ async def lifespan(app: FastAPI):
     # Inicializar Base de Datos y precargar plantas/edificios/técnicos
     init_db()
     yield
+
+from pydantic import BaseModel
+
+class ComponenteTrabajadoInput(BaseModel):
+    componente_id: int
+    comentario: Optional[str] = None
+
+class OrdenTrabajoCreate(BaseModel):
+    descripcion: str
+    tipo: str = "Correctiva"
+    prioridad: str = "Media"
+    planta_id: int
+    edificio_id: int
+    ubicacion_id: Optional[int] = None
+    activo_id: Optional[int] = None
+    tecnico_id: Optional[int] = None
+    plantilla_id: Optional[int] = None
+    fecha_programada: Optional[datetime] = None
+    reportado_por: Optional[str] = "Administración"
+    componentes_trabajados: Optional[List[ComponenteTrabajadoInput]] = None
 
 app = FastAPI(
     title="Gestión de OTs - FMS Climatización API", 
@@ -119,7 +140,7 @@ def create_ubicacion(ubicacion: Ubicacion, db: Session = Depends(get_db)):
 
 # --- ENDPOINTS ACTIVOS Y DESPIECE ---
 
-@app.get("/api/activos", response_model=List[Activo])
+@app.get("/api/activos")
 def get_activos(
     planta_id: Optional[int] = None,
     edificio_id: Optional[int] = None,
@@ -137,7 +158,30 @@ def get_activos(
         # Unir con Ubicacion y Edificio para filtrar por planta
         query = query.join(Ubicacion).join(Edificio).where(Edificio.planta_id == planta_id)
         
-    return db.exec(query).all()
+    activos = db.exec(query).all()
+    
+    results = []
+    for a in activos:
+        ubicacion = db.get(Ubicacion, a.ubicacion_id) if a.ubicacion_id else None
+        edificio = db.get(Edificio, ubicacion.edificio_id) if ubicacion else None
+        planta = db.get(Planta, edificio.planta_id) if edificio else None
+        
+        results.append({
+            "id": a.id,
+            "nombre": a.nombre,
+            "tipo": a.tipo,
+            "marca": a.marca,
+            "modelo": a.modelo,
+            "numero_serie": a.numero_serie,
+            "estado": a.estado,
+            "color": a.color,
+            "ubicacion_id": a.ubicacion_id,
+            "ubicacion_nombre": ubicacion.nombre if ubicacion else None,
+            "edificio_nombre": edificio.nombre if edificio else None,
+            "planta_nombre": planta.nombre if planta else None
+        })
+        
+    return results
 
 @app.get("/api/activos/{activo_id}")
 def get_activo_detail(activo_id: int, db: Session = Depends(get_db)):
@@ -316,6 +360,18 @@ def get_ordenes(
             "fecha_creacion": c.fecha_creacion.isoformat() + "Z" if c.fecha_creacion else None
         } for c in comentarios_db]
         
+        # Obtener componentes seleccionados y sus comentarios individuales
+        componentes_db = db.exec(
+            select(OrdenTrabajoComponente, ComponenteActivo)
+            .join(ComponenteActivo, OrdenTrabajoComponente.componente_id == ComponenteActivo.id)
+            .where(OrdenTrabajoComponente.orden_trabajo_id == ot.id)
+        ).all()
+        componentes_list = [{
+            "id": comp.id,
+            "nombre": comp.nombre,
+            "comentario": ot_comp.comentario
+        } for ot_comp, comp in componentes_db]
+        
         results.append({
             "id": ot.id,
             "descripcion": ot.descripcion,
@@ -338,41 +394,71 @@ def get_ordenes(
             "tecnico_id": ot.tecnico_id,
             "plantilla_id": ot.plantilla_id,
             "fotos": fotos_list,
-            "comentarios_avance": comentarios_list
+            "comentarios_avance": comentarios_list,
+            "componentes_trabajados": componentes_list
         })
         
     return results
 
 @app.post("/api/ordenes", response_model=OrdenTrabajo)
-def create_orden(ot: OrdenTrabajo, db: Session = Depends(get_db)):
+def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
     # Validar que los campos de ubicación sean correctos
-    planta = db.get(Planta, ot.planta_id)
-    edificio = db.get(Edificio, ot.edificio_id)
+    planta = db.get(Planta, ot_in.planta_id)
+    edificio = db.get(Edificio, ot_in.edificio_id)
     if not planta or not edificio:
         raise HTTPException(status_code=404, detail="Planta o Edificio no válido")
         
-    if ot.ubicacion_id:
-        ubicacion = db.get(Ubicacion, ot.ubicacion_id)
+    if ot_in.ubicacion_id:
+        ubicacion = db.get(Ubicacion, ot_in.ubicacion_id)
         if not ubicacion:
             raise HTTPException(status_code=404, detail="Ubicación no encontrada")
             
-    if ot.activo_id:
-        activo = db.get(Activo, ot.activo_id)
+    if ot_in.activo_id:
+        activo = db.get(Activo, ot_in.activo_id)
         if not activo:
             raise HTTPException(status_code=404, detail="Activo no encontrado")
             
     # Calcular automáticamente el estado
-    if ot.tecnico_id:
-        if ot.fecha_programada:
-            ot.estado = "PROGRAMADA"
+    estado = "CREADA"
+    if ot_in.tecnico_id:
+        if ot_in.fecha_programada:
+            estado = "PROGRAMADA"
         else:
-            ot.estado = "ASIGNADA"
+            estado = "ASIGNADA"
     else:
-        ot.estado = "CREADA"
+        estado = "CREADA"
         
+    ot = OrdenTrabajo(
+        descripcion=ot_in.descripcion,
+        tipo=ot_in.tipo,
+        estado=estado,
+        prioridad=ot_in.prioridad,
+        fecha_programada=ot_in.fecha_programada,
+        reportado_por=ot_in.reportado_por,
+        planta_id=ot_in.planta_id,
+        edificio_id=ot_in.edificio_id,
+        ubicacion_id=ot_in.ubicacion_id,
+        activo_id=ot_in.activo_id,
+        tecnico_id=ot_in.tecnico_id,
+        plantilla_id=ot_in.plantilla_id
+    )
+    
     db.add(ot)
     db.commit()
     db.refresh(ot)
+    
+    # Guardar componentes seleccionados
+    if ot_in.componentes_trabajados:
+        for comp_in in ot_in.componentes_trabajados:
+            link = OrdenTrabajoComponente(
+                orden_trabajo_id=ot.id,
+                componente_id=comp_in.componente_id,
+                comentario=comp_in.comentario
+            )
+            db.add(link)
+        db.commit()
+        db.refresh(ot)
+        
     return ot
 
 @app.put("/api/ordenes/{ot_id}", response_model=OrdenTrabajo)
