@@ -1185,7 +1185,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
         let url = '/api/ordenes';
-        const params = [];
+        const params = [`_t=${Date.now()}`];
         
         const filterState = filterOtState.value;
         if (filterState) params.push(`estado=${filterState}`);
@@ -1194,9 +1194,7 @@ document.addEventListener('DOMContentLoaded', () => {
             params.push(`planta_id=${selectedPlantaId}`);
         }
         
-        if (params.length > 0) {
-            url += '?' + params.join('&');
-        }
+        url += '?' + params.join('&');
 
         otGrid.innerHTML = '<p style="color: var(--text-muted);">Cargando órdenes de trabajo...</p>';
 
@@ -1270,7 +1268,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- 4.5. LOAD PLANT SUMMARIES & DETAILS ---
     function loadPlantSummaries() {
-        fetch('/api/ordenes')
+        fetch(`/api/ordenes?_t=${Date.now()}`)
             .then(res => res.json())
             .then(ots => {
                 allLoadedOts = sortOts(ots);
@@ -1684,7 +1682,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentOpenOtId = otId;
 
         // Fetch fresh details from API
-        fetch(`/api/ordenes/${otId}`)
+        fetch(`/api/ordenes/${otId}?_t=${Date.now()}`)
             .then(res => {
                 if (!res.ok) throw new Error("No se pudo cargar la orden");
                 return res.json();
@@ -3816,7 +3814,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function loadKpisDashboard() {
-        fetch('/api/ordenes')
+        fetch(`/api/ordenes?_t=${Date.now()}`)
             .then(res => res.json())
             .then(ots => {
                 calculateAndRenderKpis(ots);

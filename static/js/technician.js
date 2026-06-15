@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!currentTechId) return;
         techOtList.innerHTML = '<p style="color: var(--text-muted); text-align: center; margin-top: 1.5rem;">Cargando tus tareas...</p>';
 
-        fetch(`/api/ordenes?tecnico_id=${currentTechId}`)
+        fetch(`/api/ordenes?tecnico_id=${currentTechId}&_t=${Date.now()}`)
             .then(res => res.json())
             .then(ots => {
                 if (ots.length === 0) {
