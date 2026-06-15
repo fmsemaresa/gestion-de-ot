@@ -361,30 +361,36 @@
                         <!-- Panel Izquierdo: Gráficos de OTs -->
                         <div class="entity-card" style="padding: 1.5rem; border: 1px solid var(--border-color); background: rgba(255,255,255,0.02); border-radius: 8px; display: flex; flex-direction: column; gap: 1.5rem;">
                             
-                            <!-- Distribución por Prioridad -->
-                            <div>
-                                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">🚦 Distribución por Prioridad</h3>
-                                <div style="display: flex; flex-direction: column; gap: 0.8rem;" id="kpis-priority-chart">
-                                    <!-- Dynamic Bars -->
-                                </div>
-                            </div>
-                            
-                            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 0;">
-                            
-                            <!-- Distribución por Tipo de OT -->
-                            <div>
-                                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">🔧 Tipos de Mantenimiento</h3>
-                                <div style="display: flex; flex-direction: column; gap: 0.8rem;" id="kpis-type-chart">
-                                    <!-- Dynamic Bars -->
-                                </div>
-                            </div>
-                            
-                            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 0;">
-                            
-                            <!-- Distribución por Especialidad / Tipo de Activo -->
+                            <!-- 1. Distribución por Especialidad / Tipo de Activo -->
                             <div>
                                 <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">⚙️ Distribución por Especialidad</h3>
                                 <div style="display: flex; flex-direction: column; gap: 0.8rem;" id="kpis-specialty-chart">
+                                    <!-- Dynamic Bars -->
+                                </div>
+                            </div>
+                            
+                            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 0;">
+                            
+                            <!-- 2. Distribución por Prioridad (Pie/Torta) -->
+                            <div>
+                                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">🚦 Distribución por Prioridad</h3>
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 2.5rem; flex-wrap: wrap; padding: 0.5rem 0;" id="kpis-priority-pie-container">
+                                    <!-- Circular Pie Chart (Conic Gradient) -->
+                                    <div id="kpis-priority-pie" style="width: 130px; height: 130px; border-radius: 50%; background: conic-gradient(rgba(255,255,255,0.05) 0% 100%); flex-shrink: 0; border: 2px solid rgba(255,255,255,0.08); box-shadow: 0 4px 12px rgba(0,0,0,0.4);"></div>
+                                    
+                                    <!-- Legends -->
+                                    <div id="kpis-priority-pie-legend" style="display: flex; flex-direction: column; gap: 0.6rem; flex-grow: 1; min-width: 150px;">
+                                        <!-- Dynamic legends -->
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.05); margin: 0;">
+                            
+                            <!-- 3. Distribución por Tipo de OT -->
+                            <div>
+                                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">🔧 Tipos de Mantenimiento</h3>
+                                <div style="display: flex; flex-direction: column; gap: 0.8rem;" id="kpis-type-chart">
                                     <!-- Dynamic Bars -->
                                 </div>
                             </div>

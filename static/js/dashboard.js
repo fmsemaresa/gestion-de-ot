@@ -3911,32 +3911,53 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('kpi-val-mttr').textContent = mttr + ' hrs';
         document.getElementById('kpi-val-ontime-rate').textContent = programmedCount > 0 ? onTimeRate + '%' : 'N/A';
 
-        // 4. Priorities Chart
+        // 4. Priorities Chart (Pie / Torta)
         const priorities = { Alta: 0, Media: 0, Baja: 0 };
         filtered.forEach(ot => {
             if (priorities[ot.prioridad] !== undefined) {
                 priorities[ot.prioridad]++;
             }
         });
-        const priorityChart = document.getElementById('kpis-priority-chart');
-        priorityChart.innerHTML = '';
-        const priorityColors = { Alta: '#ef4444', Media: '#f59e0b', Baja: '#3b82f6' };
         
-        ['Alta', 'Media', 'Baja'].forEach(p => {
-            const count = priorities[p];
-            const pct = filtered.length > 0 ? Math.round((count / filtered.length) * 100) : 0;
-            priorityChart.innerHTML += `
-                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
-                        <span style="font-weight: 500;">${p}</span>
-                        <span style="color: var(--text-muted);">${count} OTs (${pct}%)</span>
+        const priorityColors = { Alta: '#ef4444', Media: '#f59e0b', Baja: '#3b82f6' };
+        const totalCount = filtered.length;
+        
+        let pieBackground = 'conic-gradient(rgba(255,255,255,0.05) 0% 100%)';
+        if (totalCount > 0) {
+            const pctAlta = (priorities.Alta / totalCount) * 100;
+            const pctMedia = (priorities.Media / totalCount) * 100;
+            
+            pieBackground = `conic-gradient(
+                ${priorityColors.Alta} 0% ${pctAlta}%,
+                ${priorityColors.Media} ${pctAlta}% ${pctAlta + pctMedia}%,
+                ${priorityColors.Baja} ${pctAlta + pctMedia}% 100%
+            )`;
+        }
+        
+        const pieElement = document.getElementById('kpis-priority-pie');
+        if (pieElement) {
+            pieElement.style.background = pieBackground;
+        }
+        
+        const legendContainer = document.getElementById('kpis-priority-pie-legend');
+        if (legendContainer) {
+            legendContainer.innerHTML = '';
+            ['Alta', 'Media', 'Baja'].forEach(p => {
+                const count = priorities[p];
+                const pct = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
+                const color = priorityColors[p];
+                
+                legendContainer.innerHTML += `
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="width: 10px; height: 10px; border-radius: 50%; background-color: ${color}; display: inline-block;"></span>
+                            <span style="font-weight: 500; color: var(--text-main);">${p}</span>
+                        </div>
+                        <span style="color: var(--text-muted); font-weight: 600;">${count} OTs <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal; margin-left: 0.25rem;">(${pct}%)</span></span>
                     </div>
-                    <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
-                        <div style="width: ${pct}%; height: 100%; background: ${priorityColors[p]}; border-radius: 4px; transition: width 0.3s ease;"></div>
-                    </div>
-                </div>
-            `;
-        });
+                `;
+            });
+        }
 
         // 5. Maintenance Type Chart
         const types = {};
