@@ -3966,6 +3966,47 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
 
+        // 5.1 Specialty / Asset Type Distribution Chart
+        const specialties = {};
+        filtered.forEach(ot => {
+            const spec = normalizeType(ot.activo_tipo);
+            if (!specialties[spec]) specialties[spec] = 0;
+            specialties[spec]++;
+        });
+        
+        const specialtyChart = document.getElementById('kpis-specialty-chart');
+        specialtyChart.innerHTML = '';
+        
+        const specialtyColors = {
+            'Climatización': '#3b82f6',
+            'Gasfitería': '#10b981',
+            'Electricidad': '#f59e0b',
+            'Dispensadores': '#a855f7',
+            'Mobiliario': '#ec4899',
+            'Edificación': '#64748b',
+            'Otros': '#6b7280'
+        };
+        
+        const sortedSpecs = Object.keys(specialties).sort((a, b) => specialties[b] - specialties[a]);
+        
+        sortedSpecs.forEach(s => {
+            const count = specialties[s];
+            const pct = filtered.length > 0 ? Math.round((count / filtered.length) * 100) : 0;
+            const color = specialtyColors[s] || '#6366f1';
+            
+            specialtyChart.innerHTML += `
+                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+                        <span style="font-weight: 500;">${s}</span>
+                        <span style="color: var(--text-muted);">${count} OTs (${pct}%)</span>
+                    </div>
+                    <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                        <div style="width: ${pct}%; height: 100%; background: ${color}; border-radius: 4px; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+            `;
+        });
+
         // 6. Technicians Ranking
         const techStats = {};
         resolved.forEach(ot => {
