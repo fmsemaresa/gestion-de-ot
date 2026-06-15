@@ -176,11 +176,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             month: '2-digit',
                             year: 'numeric'
                         });
-                        if (ot.fecha_programada.includes('T')) {
-                            const timePart = ot.fecha_programada.substring(11, 16);
-                            if (timePart !== '00:00') {
-                                formattedDate += ` a las ${timePart}`;
-                            }
+                        const hours = String(dateObj.getHours()).padStart(2, '0');
+                        const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+                        const timePart = `${hours}:${minutes}`;
+                        if (timePart !== '00:00') {
+                            formattedDate += ` a las ${timePart}`;
                         }
                         dateHtml = `<p style="margin-bottom: 0.4rem; color: var(--warning);"><span style="font-size: 1.1rem; vertical-align: middle; margin-right: 0.2rem;">📅</span><strong>Prog:</strong> ${formattedDate}</p>`;
                     }

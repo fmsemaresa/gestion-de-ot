@@ -892,11 +892,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     month: '2-digit',
                     year: 'numeric'
                 });
-                if (ot.fecha_programada.includes('T')) {
-                    const timePart = ot.fecha_programada.substring(11, 16);
-                    if (timePart !== '00:00') {
-                        progDateStr += ` a las ${timePart}`;
-                    }
+                const hours = String(pDate.getHours()).padStart(2, '0');
+                const minutes = String(pDate.getMinutes()).padStart(2, '0');
+                const timePart = `${hours}:${minutes}`;
+                if (timePart !== '00:00') {
+                    progDateStr += ` a las ${timePart}`;
                 }
                 progColor = 'var(--warning)';
             }
@@ -1760,11 +1760,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         month: '2-digit',
                         year: 'numeric'
                     });
-                    if (ot.fecha_programada.includes('T')) {
-                        const timePart = ot.fecha_programada.substring(11, 16);
-                        if (timePart !== '00:00') {
-                            progDateStr += ` a las ${timePart}`;
-                        }
+                    const hours = String(pDate.getHours()).padStart(2, '0');
+                    const minutes = String(pDate.getMinutes()).padStart(2, '0');
+                    const timePart = `${hours}:${minutes}`;
+                    if (timePart !== '00:00') {
+                        progDateStr += ` a las ${timePart}`;
                     }
                 }
                 drawerOtProgramada.textContent = progDateStr;
@@ -2096,8 +2096,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // OTs for this day
             const dayOts = scheduledOts.filter(ot => {
-                const otDateOnly = ot.fecha_programada.substring(0, 10);
-                return otDateOnly === cellDateStr;
+                const pDate = new Date(ot.fecha_programada);
+                return pDate.getFullYear() === cell.year &&
+                       pDate.getMonth() === cell.month &&
+                       pDate.getDate() === cell.day;
             });
 
             let otTagsHtml = '';
@@ -2927,12 +2929,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ot) {
             assignSelectTecnico.value = ot.tecnico_id || '';
             if (ot.fecha_programada) {
-                dateInput.value = ot.fecha_programada.substring(0, 10);
-                if (ot.fecha_programada.includes('T')) {
-                    timeInput.value = ot.fecha_programada.substring(11, 16);
-                } else {
-                    timeInput.value = '';
-                }
+                const pDate = new Date(ot.fecha_programada);
+                const year = pDate.getFullYear();
+                const month = String(pDate.getMonth() + 1).padStart(2, '0');
+                const day = String(pDate.getDate()).padStart(2, '0');
+                dateInput.value = `${year}-${month}-${day}`;
+                
+                const hours = String(pDate.getHours()).padStart(2, '0');
+                const minutes = String(pDate.getMinutes()).padStart(2, '0');
+                timeInput.value = `${hours}:${minutes}`;
             } else {
                 dateInput.value = '';
                 timeInput.value = '';
