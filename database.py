@@ -205,13 +205,99 @@ def normalize_code(code):
 
 def seed_database():
     with Session(engine) as session:
+        # Migrate any existing full names in DB to initials in-place
+        name_map = {
+            "Javier Pinochet": "JP",
+            "Alex Valenzuela": "AV",
+            "Simón Monardes": "SM",
+            "Simon Monardes": "SM",
+            "Víctor Hugo Hurtado": "VHH",
+            "Victor Hugo Hurtado": "VHH",
+            "Víctor Parra": "VP",
+            "Victor Parra": "VP"
+        }
+        
+        def get_initials(name):
+            if not name:
+                return name
+            if name in name_map:
+                return name_map[name]
+            if len(name) <= 3 and name.isupper():
+                return name
+            parts = [p for p in name.split() if p]
+            if not parts:
+                return name
+            return "".join([p[0].upper() for p in parts])
+
+        # 1. Update Tecnico table
+        techs_in_db = session.exec(select(Tecnico)).all()
+        for t in techs_in_db:
+            old_name = t.nombre
+            new_name = get_initials(old_name)
+            if old_name != new_name:
+                t.nombre = new_name
+                session.add(t)
+                print(f"- Migrando Tecnico ID {t.id}: '{old_name}' -> '{new_name}'")
+                
+        # 2. Update OrdenTrabajo table
+        ots = session.exec(select(OrdenTrabajo)).all()
+        for ot in ots:
+            modified = False
+            if ot.reportado_por:
+                orig = ot.reportado_por
+                for full, init in name_map.items():
+                    if full in orig:
+                        orig = orig.replace(full, init)
+                        modified = True
+                if modified:
+                    ot.reportado_por = orig
+                    
+            if ot.comentarios_tecnicos:
+                orig_comments = ot.comentarios_tecnicos
+                temp_comments = orig_comments
+                for full, init in name_map.items():
+                    if full in temp_comments:
+                        temp_comments = temp_comments.replace(full, init)
+                if temp_comments != orig_comments:
+                    ot.comentarios_tecnicos = temp_comments
+                    modified = True
+                    
+            if modified:
+                session.add(ot)
+
+        # 3. Update ComentarioAvanceOT table
+        comments = session.exec(select(ComentarioAvanceOT)).all()
+        for c in comments:
+            modified = False
+            if c.autor:
+                orig_autor = c.autor
+                new_autor = get_initials(orig_autor)
+                if orig_autor != new_autor:
+                    c.autor = new_autor
+                    modified = True
+                    
+            if c.comentario:
+                orig_txt = c.comentario
+                temp_txt = orig_txt
+                for full, init in name_map.items():
+                    if full in temp_txt:
+                        temp_txt = temp_txt.replace(full, init)
+                if temp_txt != orig_txt:
+                    c.comentario = temp_txt
+                    modified = True
+                    
+            if modified:
+                session.add(c)
+                
+        session.commit()
+
         # Check and update technicians if they do not match the new requested list
         new_tech_names = [
-            "Javier Pinochet",
-            "Alex Valenzuela",
-            "Simón Monardes",
-            "Víctor Hugo Hurtado",
-            "Víctor Parra"
+            "JP",
+            "AV",
+            "SM",
+            "VHH",
+            "VP"
         ]
         try:
             techs_in_db = session.exec(select(Tecnico).order_by(Tecnico.id)).all()
@@ -237,11 +323,11 @@ def seed_database():
                 session.commit()
 
                 # Insert new techs
-                t1 = Tecnico(nombre="Javier Pinochet", email="javier.pinochet@emaresa.cl", especialidad="Climatización")
-                t2 = Tecnico(nombre="Alex Valenzuela", email="alex.valenzuela@emaresa.cl", especialidad="Climatización")
-                t3 = Tecnico(nombre="Simón Monardes", email="simon.monardes@emaresa.cl", especialidad="Climatización")
-                t4 = Tecnico(nombre="Víctor Hugo Hurtado", email="victor.hurtado@emaresa.cl", especialidad="Climatización")
-                t5 = Tecnico(nombre="Víctor Parra", email="victor.parra@emaresa.cl", especialidad="Climatización")
+                t1 = Tecnico(nombre="JP", email="javier.pinochet@emaresa.cl", especialidad="Climatización")
+                t2 = Tecnico(nombre="AV", email="alex.valenzuela@emaresa.cl", especialidad="Climatización")
+                t3 = Tecnico(nombre="SM", email="simon.monardes@emaresa.cl", especialidad="Climatización")
+                t4 = Tecnico(nombre="VHH", email="victor.hurtado@emaresa.cl", especialidad="Climatización")
+                t5 = Tecnico(nombre="VP", email="victor.parra@emaresa.cl", especialidad="Climatización")
                 session.add_all([t1, t2, t3, t4, t5])
                 session.commit()
                 print("Lista de técnicos actualizada exitosamente.")
@@ -303,11 +389,11 @@ def seed_database():
             session.add(Edificio(nombre=name, planta_id=p3.id))
             
         # Add some initial Technicians
-        t1 = Tecnico(nombre="Javier Pinochet", email="javier.pinochet@emaresa.cl", especialidad="Climatización")
-        t2 = Tecnico(nombre="Alex Valenzuela", email="alex.valenzuela@emaresa.cl", especialidad="Climatización")
-        t3 = Tecnico(nombre="Simón Monardes", email="simon.monardes@emaresa.cl", especialidad="Climatización")
-        t4 = Tecnico(nombre="Víctor Hugo Hurtado", email="victor.hurtado@emaresa.cl", especialidad="Climatización")
-        t5 = Tecnico(nombre="Víctor Parra", email="victor.parra@emaresa.cl", especialidad="Climatización")
+        t1 = Tecnico(nombre="JP", email="javier.pinochet@emaresa.cl", especialidad="Climatización")
+        t2 = Tecnico(nombre="AV", email="alex.valenzuela@emaresa.cl", especialidad="Climatización")
+        t3 = Tecnico(nombre="SM", email="simon.monardes@emaresa.cl", especialidad="Climatización")
+        t4 = Tecnico(nombre="VHH", email="victor.hurtado@emaresa.cl", especialidad="Climatización")
+        t5 = Tecnico(nombre="VP", email="victor.parra@emaresa.cl", especialidad="Climatización")
         session.add_all([t1, t2, t3, t4, t5])
         session.commit()
 

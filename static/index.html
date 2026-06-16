@@ -363,9 +363,20 @@
                             
                             <!-- 1. Distribución por Especialidad / Tipo de Activo -->
                             <div>
-                                <h3 style="font-size: 1rem; margin-bottom: 1rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">⚙️ Distribución por Especialidad</h3>
-                                <div style="display: flex; flex-direction: column; gap: 0.8rem;" id="kpis-specialty-chart">
-                                    <!-- Dynamic Bars -->
+                                <h3 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">⚙️ Distribución por Especialidad</h3>
+                                <div style="overflow-x: auto;">
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; text-align: left;">
+                                        <thead>
+                                            <tr style="border-bottom: 1px solid rgba(255,255,255,0.08); color: var(--text-muted);">
+                                                <th style="padding: 0.5rem 0.25rem;">Especialidad</th>
+                                                <th style="padding: 0.5rem; text-align: center;">OTs Totales</th>
+                                                <th style="padding: 0.5rem; text-align: right;">Porcentaje</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="kpis-specialty-table-body">
+                                            <!-- Dynamically loaded rows -->
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                             

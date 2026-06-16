@@ -32,11 +32,11 @@ with Session(engine) as session:
 
     print("\n3. Creando los nuevos técnicos en el orden solicitado...")
     new_techs = [
-        Tecnico(nombre="Javier Pinochet", email="javier.pinochet@emaresa.cl", especialidad="Climatización"),
-        Tecnico(nombre="Alex Valenzuela", email="alex.valenzuela@emaresa.cl", especialidad="Climatización"),
-        Tecnico(nombre="Simón Monardes", email="simon.monardes@emaresa.cl", especialidad="Climatización"),
-        Tecnico(nombre="Víctor Hugo Hurtado", email="victor.hurtado@emaresa.cl", especialidad="Climatización"),
-        Tecnico(nombre="Víctor Parra", email="victor.parra@emaresa.cl", especialidad="Climatización")
+        Tecnico(nombre="JP", email="javier.pinochet@emaresa.cl", especialidad="Climatización"),
+        Tecnico(nombre="AV", email="alex.valenzuela@emaresa.cl", especialidad="Climatización"),
+        Tecnico(nombre="SM", email="simon.monardes@emaresa.cl", especialidad="Climatización"),
+        Tecnico(nombre="VHH", email="victor.hurtado@emaresa.cl", especialidad="Climatización"),
+        Tecnico(nombre="VP", email="victor.parra@emaresa.cl", especialidad="Climatización")
     ]
     
     # Save them one by one to ensure exact auto-increment ID order

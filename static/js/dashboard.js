@@ -541,6 +541,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function prefillOTFormLocationAndAsset(plantaId, edificioId, ubicacionId, assetName = null) {
+        resetOtComponents();
+        
         const otPlanta = document.getElementById('ot-select-planta');
         const otEdificio = document.getElementById('ot-select-edificio');
         const otUbicacion = document.getElementById('ot-select-ubicacion');
@@ -584,6 +586,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const matchedAsset = activeActivos.find(a => a.nombre === assetName);
                     if (matchedAsset) {
                         otActivo.value = matchedAsset.id;
+                        otActivo.dispatchEvent(new Event('change'));
                     } else {
                         otActivo.value = '';
                     }
@@ -2564,6 +2567,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Helper to open New OT Modal pre-filled for a specific asset
     function openNewOTModalForAsset(plantaId, edificioId, ubicacionId, activoId) {
+        resetOtComponents();
+
         // Close drawers
         assetDrawer.classList.remove('open');
         if (otDrawer) otDrawer.classList.remove('open');
@@ -2641,6 +2646,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
                     });
                     otActivo.value = activoId || '';
+                    
+                    // Trigger change to load components!
+                    if (activoId) {
+                        otActivo.dispatchEvent(new Event('change'));
+                    }
                 } else {
                     otActivo.innerHTML = '<option value="">Selecciona ubicación...</option>';
                     otActivo.disabled = true;
@@ -3990,7 +4000,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
         });
 
-        // 5.1 Specialty / Asset Type Distribution Chart
+        // 5.1 Specialty / Asset Type Distribution Table
         const specialties = {};
         filtered.forEach(ot => {
             const spec = normalizeType(ot.activo_tipo);
@@ -3998,38 +4008,43 @@ document.addEventListener('DOMContentLoaded', () => {
             specialties[spec]++;
         });
         
-        const specialtyChart = document.getElementById('kpis-specialty-chart');
-        specialtyChart.innerHTML = '';
-        
-        const specialtyColors = {
-            'Climatización': '#3b82f6',
-            'Gasfitería': '#10b981',
-            'Electricidad': '#f59e0b',
-            'Dispensadores': '#a855f7',
-            'Mobiliario': '#ec4899',
-            'Edificación': '#64748b',
-            'Otros': '#6b7280'
-        };
-        
-        const sortedSpecs = Object.keys(specialties).sort((a, b) => specialties[b] - specialties[a]);
-        
-        sortedSpecs.forEach(s => {
-            const count = specialties[s];
-            const pct = filtered.length > 0 ? Math.round((count / filtered.length) * 100) : 0;
-            const color = specialtyColors[s] || '#6366f1';
+        const specialtyTableBody = document.getElementById('kpis-specialty-table-body');
+        if (specialtyTableBody) {
+            specialtyTableBody.innerHTML = '';
             
-            specialtyChart.innerHTML += `
-                <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
-                        <span style="font-weight: 500;">${s}</span>
-                        <span style="color: var(--text-muted);">${count} OTs (${pct}%)</span>
-                    </div>
-                    <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
-                        <div style="width: ${pct}%; height: 100%; background: ${color}; border-radius: 4px; transition: width 0.3s ease;"></div>
-                    </div>
-                </div>
-            `;
-        });
+            const specialtyColors = {
+                'Climatización': '#3b82f6',
+                'Gasfitería': '#10b981',
+                'Electricidad': '#f59e0b',
+                'Dispensadores': '#a855f7',
+                'Mobiliario': '#ec4899',
+                'Edificación': '#64748b',
+                'Otros': '#6b7280'
+            };
+            
+            const sortedSpecs = Object.keys(specialties).sort((a, b) => specialties[b] - specialties[a]);
+            
+            if (sortedSpecs.length === 0) {
+                specialtyTableBody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: var(--text-muted); padding: 1rem;">No hay registros en este período.</td></tr>`;
+            } else {
+                sortedSpecs.forEach(s => {
+                    const count = specialties[s];
+                    const pct = filtered.length > 0 ? Math.round((count / filtered.length) * 100) : 0;
+                    const color = specialtyColors[s] || '#6366f1';
+                    
+                    specialtyTableBody.innerHTML += `
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <td style="padding: 0.65rem 0.25rem; font-weight: 500; display: flex; align-items: center; gap: 0.5rem; color: var(--text-main);">
+                                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${color};"></span>
+                                ${s}
+                            </td>
+                            <td style="padding: 0.65rem; text-align: center; font-weight: 600; color: var(--text-main);">${count} OTs</td>
+                            <td style="padding: 0.65rem; text-align: right; color: var(--accent-color); font-weight: 500;">${pct}%</td>
+                        </tr>
+                    `;
+                });
+            }
+        }
 
         // 6. Technicians Ranking
         const techStats = {};
