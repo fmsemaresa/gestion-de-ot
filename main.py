@@ -1011,6 +1011,14 @@ def exportar_ordenes(db: Session = Depends(get_db)):
         cell.font = header_font
         cell.fill = header_fill
         
+    # Congelar primera fila
+    ws.freeze_panes = 'A2'
+    
+    # Filtros de cabecera
+    if ws.max_column > 0 and ws.max_row > 0:
+        last_col_letter = openpyxl.utils.get_column_letter(ws.max_column)
+        ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
+        
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = openpyxl.utils.get_column_letter(col[0].column)
@@ -1065,6 +1073,14 @@ def exportar_activos(db: Session = Depends(get_db)):
         cell = ws.cell(row=1, column=col)
         cell.font = header_font
         cell.fill = header_fill
+        
+    # Congelar primera fila
+    ws.freeze_panes = 'A2'
+    
+    # Filtros de cabecera
+    if ws.max_column > 0 and ws.max_row > 0:
+        last_col_letter = openpyxl.utils.get_column_letter(ws.max_column)
+        ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
         
     for col in ws.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
