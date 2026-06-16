@@ -1182,8 +1182,16 @@ def descargar_plantilla_importacion(db: Session = Depends(get_db)):
         cell.font = header_font
         cell.fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
         
-    # Ajuste automático del ancho de columna
+    # Ajuste automático del ancho de columna, filtros y congelamiento
     for ws in [ws_plantilla, ws_ubicaciones]:
+        # Congelar primera fila
+        ws.freeze_panes = 'A2'
+        
+        # Filtros de cabecera
+        if ws.max_column > 0 and ws.max_row > 0:
+            last_col_letter = openpyxl.utils.get_column_letter(ws.max_column)
+            ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
+
         for col in ws.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
             col_letter = openpyxl.utils.get_column_letter(col[0].column)
@@ -1441,8 +1449,16 @@ def descargar_plantilla_despiece(db: Session = Depends(get_db)):
         cell.font = header_font
         cell.fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
         
-    # Autoajuste de columnas
+    # Autoajuste de columnas, filtros y congelamiento
     for ws in [ws_import, ws_ref]:
+        # Congelar primera fila
+        ws.freeze_panes = 'A2'
+        
+        # Filtros de cabecera
+        if ws.max_column > 0 and ws.max_row > 0:
+            last_col_letter = openpyxl.utils.get_column_letter(ws.max_column)
+            ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
+
         for col in ws.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
             col_letter = openpyxl.utils.get_column_letter(col[0].column)
@@ -1719,6 +1735,19 @@ def descargar_plantilla_checklists(db: Session = Depends(get_db)):
     ws_instr.append(["   - Para modificar o añadir ítems a una plantilla existente, mantén el 'ID Plantilla' (ej. PL-1)."])
     ws_instr.append(["   - Si dejas el 'ID Plantilla' vacío, el sistema buscará la plantilla por su nombre, y si no existe la creará."])
     
+    # Autoajuste de columnas, filtros y congelamiento
+    for ws in [ws_import]:
+        ws.freeze_panes = 'A2'
+        if ws.max_column > 0 and ws.max_row > 0:
+            last_col_letter = openpyxl.utils.get_column_letter(ws.max_column)
+            ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
+            
+    for ws in [ws_import, ws_instr]:
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = openpyxl.utils.get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
     # Stream file
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -2136,8 +2165,16 @@ def descargar_plantilla_unificada(db: Session = Depends(get_db)):
         cell.font = header_font
         cell.fill = header_fill_ref_act
         
-    # Autoajuste de columnas en todas las hojas
+    # Autoajuste de columnas, filtros y congelamiento de cabecera en todas las hojas
     for ws in [ws_ubicaciones, ws_activos, ws_despieces, ws_ref_act]:
+        # Congelar primera fila
+        ws.freeze_panes = 'A2'
+        
+        # Filtros de cabecera
+        if ws.max_column > 0 and ws.max_row > 0:
+            last_col_letter = openpyxl.utils.get_column_letter(ws.max_column)
+            ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
+
         for col in ws.columns:
             max_len = max(len(str(cell.value or '')) for cell in col)
             col_letter = openpyxl.utils.get_column_letter(col[0].column)
