@@ -2451,7 +2451,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 </div>
                                 <div class="meta-row" style="justify-content: space-between; margin-top: 0.5rem; align-items: center;">
                                     <span class="status-badge ${statusBadgeClass}" style="padding: 0.15rem 0.45rem; font-size: 0.75rem;">${a.estado}</span>
-                                    <span style="font-size: 0.75rem; color: var(--accent-color); font-weight: 600;">Ficha &gt;</span>
+                                    <span style="font-size: 0.75rem; color: var(--accent-color); font-weight: 600;">Ficha (${a.cantidad_despiece || 0}) &gt;</span>
                                 </div>
                             </div>
                         `;

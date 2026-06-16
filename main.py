@@ -198,7 +198,8 @@ def get_activos(
             "ubicacion_id": a.ubicacion_id,
             "ubicacion_nombre": ubicacion.nombre if ubicacion else None,
             "edificio_nombre": edificio.nombre if edificio else None,
-            "planta_nombre": planta.nombre if planta else None
+            "planta_nombre": planta.nombre if planta else None,
+            "cantidad_despiece": len(a.componentes) if a.componentes else 0
         })
         
     return results
