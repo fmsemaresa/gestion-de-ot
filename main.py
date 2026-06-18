@@ -585,6 +585,29 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
     if not ot:
         raise HTTPException(status_code=404, detail="Orden de Trabajo no encontrada")
         
+    # Process basic creation fields if updated
+    if "planta_id" in updated_ot:
+        val = updated_ot["planta_id"]
+        ot.planta_id = int(val) if val is not None else ot.planta_id
+    if "edificio_id" in updated_ot:
+        val = updated_ot["edificio_id"]
+        ot.edificio_id = int(val) if val is not None else ot.edificio_id
+    if "ubicacion_id" in updated_ot:
+        val = updated_ot["ubicacion_id"]
+        ot.ubicacion_id = int(val) if (val is not None and val != "" and str(val).isdigit()) else None
+    if "activo_id" in updated_ot:
+        val = updated_ot["activo_id"]
+        ot.activo_id = int(val) if (val is not None and val != "" and str(val).isdigit()) else None
+    if "tipo" in updated_ot:
+        ot.tipo = updated_ot["tipo"]
+    if "descripcion" in updated_ot:
+        ot.descripcion = updated_ot["descripcion"]
+    if "plantilla_id" in updated_ot:
+        val = updated_ot["plantilla_id"]
+        ot.plantilla_id = int(val) if (val is not None and val != "" and str(val).isdigit()) else None
+    if "reportado_por" in updated_ot:
+        ot.reportado_por = updated_ot["reportado_por"]
+
     # Process technician assignment
     if "tecnico_id" in updated_ot:
         val = updated_ot["tecnico_id"]
@@ -666,6 +689,13 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
                     db.add(activo)
         elif req_estado == "Cancelada":
             ot.estado = "Cancelada"
+        else:
+            ot.estado = req_estado
+            # If manually moved back to CREADA/ASIGNADA/PROGRAMADA, adjust execution status if needed
+            if req_estado in ("CREADA", "ASIGNADA", "PROGRAMADA"):
+                if ot.estado_ejecucion == "REALIZADA":
+                    ot.estado_ejecucion = "NO_INICIADA"
+                    ot.fecha_resolucion = None
 
     if "estado_ejecucion" in updated_ot:
         val_ej = updated_ot["estado_ejecucion"]
@@ -726,6 +756,28 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
                 )
                 db.add(new_resp)
         db.commit()
+
+    if "componentes_trabajados" in updated_ot:
+        # Delete existing OrdenTrabajoComponente associations
+        existing_links = db.exec(select(OrdenTrabajoComponente).where(OrdenTrabajoComponente.orden_trabajo_id == ot_id)).all()
+        for link in existing_links:
+            db.delete(link)
+        db.commit()
+        
+        # Save new ones
+        comps_in = updated_ot["componentes_trabajados"]
+        if comps_in:
+            for comp_in in comps_in:
+                comp_id = comp_in.get("componente_id")
+                comp_comentario = comp_in.get("comentario")
+                if comp_id is not None:
+                    link = OrdenTrabajoComponente(
+                        orden_trabajo_id=ot_id,
+                        componente_id=int(comp_id),
+                        comentario=comp_comentario
+                    )
+                    db.add(link)
+            db.commit()
         
     db.add(ot)
     db.commit()

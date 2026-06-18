@@ -747,6 +747,128 @@
         </div>
     </div>
 
+    <!-- MODAL: EDIT OT -->
+    <div class="modal-overlay" id="edit-ot-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Editar Orden de Trabajo #<span id="edit-ot-id-title"></span></h3>
+                <button class="btn-icon" id="close-edit-ot-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-ot-form">
+                    <input type="hidden" id="edit-ot-id">
+                    
+                    <!-- Smart Location Search -->
+                    <div class="form-group" style="position: relative; margin-bottom: 1.25rem;">
+                        <label for="edit-ot-search-location">🔍 Buscador Rápido de Ubicación o Equipo (Opcional)</label>
+                        <input type="text" id="edit-ot-search-location" class="form-control" placeholder="Escribe para buscar (ej: Oficina RRHH, ecp1on, FC-P1A-E6)..." autocomplete="off">
+                        <div id="edit-ot-search-location-results" class="search-results-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 6px; z-index: 1000; box-shadow: var(--shadow-lg); padding: 0.25rem 0;">
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-ot-select-planta">Planta *</label>
+                            <select id="edit-ot-select-planta" class="form-control" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-ot-select-edificio">Edificio / Sector *</label>
+                            <select id="edit-ot-select-edificio" class="form-control" required disabled>
+                                <option value="">Selecciona planta...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-ot-select-ubicacion">Ubicación *</label>
+                            <select id="edit-ot-select-ubicacion" class="form-control" required disabled>
+                                <option value="">Selecciona edificio...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-ot-select-activo">Activo / Equipo (Opcional)</label>
+                            <select id="edit-ot-select-activo" class="form-control" disabled>
+                                <option value="">Selecciona ubicación...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="edit-ot-components-container" style="display:none; margin-bottom: 1.25rem; border: 1px solid var(--border-color); border-radius: 8px; padding: 0.75rem; background-color: var(--bg-primary);">
+                        <label style="font-weight: 500; margin-bottom: 0.5rem; display: block; font-size: 0.875rem; color: var(--text-muted);">Componentes / Despieces a trabajar (Opcional)</label>
+                        <div id="edit-ot-components-list" style="max-height: 180px; overflow-y: auto; padding-right: 5px; display: flex; flex-direction: column; gap: 0.5rem;">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-ot-tipo">Tipo de Mantenimiento *</label>
+                            <select id="edit-ot-tipo" class="form-control" required>
+                                <option value="Correctiva">Correctiva (Falla inesperada)</option>
+                                <option value="Preventiva">Preventiva (Planificada)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-ot-prioridad">Prioridad</label>
+                            <select id="edit-ot-prioridad" class="form-control">
+                                <option value="Baja">Baja</option>
+                                <option value="Media">Media</option>
+                                <option value="Alta">Alta</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit-ot-status">Estado *</label>
+                            <select id="edit-ot-status" class="form-control" required>
+                                <option value="CREADA">Creada</option>
+                                <option value="ASIGNADA">Asignada</option>
+                                <option value="PROGRAMADA">Programada</option>
+                                <option value="REALIZADA">Realizada</option>
+                                <option value="Cancelada">Cancelada</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-ot-select-plantilla">Plantilla de Chequeo / Inspección (Opcional)</label>
+                            <select id="edit-ot-select-plantilla" class="form-control">
+                                <option value="">-- Sin plantilla / Pauta estándar --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="edit-ot-descripcion">Descripción del Problema / Tarea *</label>
+                        <textarea id="edit-ot-descripcion" class="form-control" rows="3" required placeholder="Ej: Realizar mantención de filtros, etc."></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                            <label for="edit-ot-tecnico">Asignar Técnico (Opcional)</label>
+                            <select id="edit-ot-tecnico" class="form-control">
+                                <option value="">No Asignado</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1.2; display: flex; gap: 0.5rem; margin-bottom: 0;">
+                            <div class="form-group" style="flex: 1.5; margin-bottom: 0;">
+                                <label for="edit-ot-fecha-programada">Fecha Programada (Opcional)</label>
+                                <input type="date" id="edit-ot-fecha-programada" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <label for="edit-ot-hora-programada">Hora</label>
+                                <input type="time" id="edit-ot-hora-programada" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem;">
+                        Guardar Cambios
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: REGISTER NEW ASSET -->
     <div class="modal-overlay" id="asset-modal">
         <div class="modal-content">

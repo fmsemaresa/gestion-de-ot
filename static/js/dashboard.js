@@ -119,6 +119,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const componentEditForm = document.getElementById('component-edit-form');
     const closeComponentEditModal = document.getElementById('close-component-edit-modal');
 
+    // Edit OT Modal
+    const editOtModal = document.getElementById('edit-ot-modal');
+    const editOtForm = document.getElementById('edit-ot-form');
+    const closeEditOtModal = document.getElementById('close-edit-ot-modal');
+    let initialEditSnapshot = null;
+
     let currentAssetData = null;
 
     // Drawer
@@ -1074,6 +1080,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
             targetGrid.appendChild(card);
+
+            card.addEventListener('click', (e) => {
+                if (e.target.closest('button') || e.target.closest('input') || e.target.closest('a') || e.target.closest('img') || e.target.closest('.btn-view-checklist')) {
+                    return;
+                }
+                openEditOTModal(ot.id);
+            });
 
             card.querySelectorAll('.btn-assign').forEach(btn => {
                 btn.addEventListener('click', (e) => {
@@ -2163,7 +2176,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tag.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const otId = tag.dataset.otId;
-                openOtDrawer(otId);
+                openEditOTModal(otId);
             });
         });
 
@@ -2175,7 +2188,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // If schedule button clicked, do not trigger drawer open
                     if (e.target.classList.contains('btn-schedule-ot')) return;
                     const otId = card.dataset.otId;
-                    openOtDrawer(otId);
+                    openEditOTModal(otId);
                 });
             });
 
@@ -4115,6 +4128,612 @@ document.addEventListener('DOMContentLoaded', () => {
                     </tr>
                 `;
             });
+        }
+    }
+
+    // --- EDIT OT MODAL FUNCTIONALITY ---
+    function getEditFormSnapshot() {
+        const componentes = [];
+        document.querySelectorAll('.edit-ot-comp-checkbox').forEach(checkbox => {
+            if (checkbox.checked) {
+                const compId = parseInt(checkbox.value);
+                const commentEl = document.getElementById(`edit-ot-comp-comment-${compId}`);
+                const comment = commentEl ? commentEl.value.trim() : '';
+                componentes.push({ componente_id: compId, comentario: comment });
+            }
+        });
+        componentes.sort((a, b) => a.componente_id - b.componente_id);
+
+        return {
+            planta_id: document.getElementById('edit-ot-select-planta').value,
+            edificio_id: document.getElementById('edit-ot-select-edificio').value,
+            ubicacion_id: document.getElementById('edit-ot-select-ubicacion').value,
+            activo_id: document.getElementById('edit-ot-select-activo').value,
+            tipo: document.getElementById('edit-ot-tipo').value,
+            prioridad: document.getElementById('edit-ot-prioridad').value,
+            descripcion: document.getElementById('edit-ot-descripcion').value.trim(),
+            tecnico_id: document.getElementById('edit-ot-tecnico').value,
+            fecha_programada: document.getElementById('edit-ot-fecha-programada').value,
+            hora_programada: document.getElementById('edit-ot-hora-programada').value,
+            plantilla_id: document.getElementById('edit-ot-select-plantilla').value,
+            estado: document.getElementById('edit-ot-status').value,
+            componentes: componentes
+        };
+    }
+
+    async function openEditOTModal(otId) {
+        // Fetch OT details
+        const res = await fetch(`/api/ordenes/${otId}`);
+        if (!res.ok) {
+            alert("Error al cargar la orden de trabajo");
+            return;
+        }
+        const ot = await res.json();
+
+        // Set hidden OT ID and title
+        document.getElementById('edit-ot-id').value = ot.id;
+        document.getElementById('edit-ot-id-title').textContent = ot.id;
+
+        // Clear quick search
+        document.getElementById('edit-ot-search-location').value = '';
+        document.getElementById('edit-ot-search-location-results').style.display = 'none';
+
+        // Populate simple inputs
+        document.getElementById('edit-ot-tipo').value = ot.tipo;
+        document.getElementById('edit-ot-prioridad').value = ot.prioridad;
+        document.getElementById('edit-ot-status').value = ot.estado;
+        document.getElementById('edit-ot-descripcion').value = ot.descripcion;
+
+        // Populate scheduled date & time
+        const dateInput = document.getElementById('edit-ot-fecha-programada');
+        const timeInput = document.getElementById('edit-ot-hora-programada');
+        if (ot.fecha_programada) {
+            const pDate = new Date(ot.fecha_programada);
+            dateInput.value = pDate.toISOString().substring(0, 10);
+            timeInput.value = String(pDate.getHours()).padStart(2, '0') + ':' + String(pDate.getMinutes()).padStart(2, '0');
+        } else {
+            dateInput.value = '';
+            timeInput.value = '';
+        }
+
+        // Populate checklists dropdown
+        const checklistSelect = document.getElementById('edit-ot-select-plantilla');
+        checklistSelect.innerHTML = '<option value="">-- Sin plantilla / Pauta estándar --</option>';
+        const pcRes = await fetch('/api/plantillas');
+        if (pcRes.ok) {
+            const plantillas = await pcRes.json();
+            plantillas.forEach(p => {
+                checklistSelect.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+            });
+        }
+        checklistSelect.value = ot.plantilla_id || '';
+
+        // Populate technicians dropdown
+        const tecnicoSelect = document.getElementById('edit-ot-tecnico');
+        tecnicoSelect.innerHTML = '<option value="">No Asignado</option>';
+        techniciansList.forEach(t => {
+            tecnicoSelect.innerHTML += `<option value="${t.id}">${t.nombre}</option>`;
+        });
+        tecnicoSelect.value = ot.tecnico_id || '';
+
+        // Populate Planta select and trigger chains
+        const plantaSelect = document.getElementById('edit-ot-select-planta');
+        const edificioSelect = document.getElementById('edit-ot-select-edificio');
+        const ubicacionSelect = document.getElementById('edit-ot-select-ubicacion');
+        const activoSelect = document.getElementById('edit-ot-select-activo');
+
+        // Load plants
+        const plantsRes = await fetch('/api/plantas');
+        if (plantsRes.ok) {
+            const plantas = await plantsRes.json();
+            plantaSelect.innerHTML = '<option value="">-- Selecciona Planta --</option>';
+            plantas.forEach(p => {
+                plantaSelect.innerHTML += `<option value="${p.id}">${p.nombre}</option>`;
+            });
+        }
+        plantaSelect.value = ot.planta_id || '';
+
+        // Load buildings for plant
+        if (ot.planta_id) {
+            edificioSelect.disabled = false;
+            edificioSelect.innerHTML = '<option value="">Cargando...</option>';
+            const bRes = await fetch(`/api/plantas/${ot.planta_id}/edificios`);
+            if (bRes.ok) {
+                const edificios = await bRes.json();
+                edificioSelect.innerHTML = '<option value="">-- Selecciona --</option>';
+                edificios.forEach(b => {
+                    edificioSelect.innerHTML += `<option value="${b.id}">${b.nombre}</option>`;
+                });
+                edificioSelect.value = ot.edificio_id || '';
+            }
+        } else {
+            edificioSelect.innerHTML = '<option value="">Selecciona planta...</option>';
+            edificioSelect.disabled = true;
+        }
+
+        // Load locations for building
+        if (ot.edificio_id) {
+            ubicacionSelect.disabled = false;
+            ubicacionSelect.innerHTML = '<option value="">Cargando...</option>';
+            const uRes = await fetch(`/api/edificios/${ot.edificio_id}/ubicaciones`);
+            if (uRes.ok) {
+                const ubicaciones = await uRes.json();
+                ubicacionSelect.innerHTML = '<option value="">-- Selecciona --</option>';
+                ubicaciones.forEach(u => {
+                    ubicacionSelect.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+                });
+                ubicacionSelect.value = ot.ubicacion_id || '';
+            }
+        } else {
+            ubicacionSelect.innerHTML = '<option value="">Selecciona edificio...</option>';
+            ubicacionSelect.disabled = true;
+        }
+
+        // Load assets for location
+        if (ot.ubicacion_id) {
+            activoSelect.disabled = false;
+            activoSelect.innerHTML = '<option value="">Cargando...</option>';
+            const aRes = await fetch(`/api/activos?ubicacion_id=${ot.ubicacion_id}`);
+            if (aRes.ok) {
+                const activos = await aRes.json();
+                activoSelect.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                activeActivos.forEach(a => {
+                    activoSelect.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
+                });
+                activoSelect.value = ot.activo_id || '';
+            }
+        } else {
+            activoSelect.innerHTML = '<option value="">Selecciona ubicación...</option>';
+            activoSelect.disabled = true;
+        }
+
+        // Load components for active asset (if selected)
+        const componentsContainer = document.getElementById('edit-ot-components-container');
+        const componentsList = document.getElementById('edit-ot-components-list');
+        componentsList.innerHTML = '';
+        componentsContainer.style.display = 'none';
+
+        if (ot.activo_id) {
+            const compRes = await fetch(`/api/activos/${ot.activo_id}`);
+            if (compRes.ok) {
+                const data = await compRes.json();
+                if (data.componentes && data.componentes.length > 0) {
+                    componentsContainer.style.display = 'block';
+                    data.componentes.forEach(comp => {
+                        const matchedComp = ot.componentes_trabajados.find(c => c.id === comp.id);
+                        const isChecked = matchedComp !== undefined;
+                        const commentVal = isChecked ? (matchedComp.comentario || '') : '';
+                        const displayStyle = isChecked ? 'block' : 'none';
+
+                        const itemHtml = `
+                            <div class="edit-ot-component-item" style="display: flex; flex-direction: column; gap: 0.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <input type="checkbox" id="edit-ot-comp-${comp.id}" class="edit-ot-comp-checkbox" value="${comp.id}" style="width: 16px; height: 16px; cursor: pointer;" ${isChecked ? 'checked' : ''}>
+                                    <label for="edit-ot-comp-${comp.id}" style="margin-bottom: 0; cursor: pointer; font-weight: 500; font-size: 0.85rem; color: var(--text-main);">${comp.nombre} (${comp.estado})</label>
+                                </div>
+                                <div id="edit-ot-comp-comment-container-${comp.id}" style="display: ${displayStyle}; padding-left: 1.5rem;">
+                                    <input type="text" id="edit-ot-comp-comment-${comp.id}" class="form-control" placeholder="Comentario técnico para este componente..." value="${commentVal}" style="padding: 0.35rem 0.5rem; font-size: 0.8rem; border-radius: 6px;">
+                                </div>
+                            </div>
+                        `;
+                        componentsList.insertAdjacentHTML('beforeend', itemHtml);
+
+                        const checkbox = document.getElementById(`edit-ot-comp-${comp.id}`);
+                        const commentContainer = document.getElementById(`edit-ot-comp-comment-container-${comp.id}`);
+                        checkbox.addEventListener('change', () => {
+                            if (checkbox.checked) {
+                                commentContainer.style.display = 'block';
+                            } else {
+                                commentContainer.style.display = 'none';
+                                document.getElementById(`edit-ot-comp-comment-${comp.id}`).value = '';
+                            }
+                        });
+                    });
+                }
+            }
+        }
+
+        editOtModal.style.display = 'flex';
+        initialEditSnapshot = getEditFormSnapshot();
+    }
+
+    function checkChangesAndCloseEditModal() {
+        const currentSnapshot = getEditFormSnapshot();
+        if (JSON.stringify(currentSnapshot) !== JSON.stringify(initialEditSnapshot)) {
+            const confirmSave = confirm("ha realizado cambios en esta ot, ¿desea guardar los cambios?");
+            if (confirmSave) {
+                saveEditOT();
+            } else {
+                editOtModal.style.display = 'none';
+            }
+        } else {
+            editOtModal.style.display = 'none';
+        }
+    }
+
+    async function saveEditOT() {
+        const otId = document.getElementById('edit-ot-id').value;
+        const plantaId = parseInt(document.getElementById('edit-ot-select-planta').value);
+        const edificioId = parseInt(document.getElementById('edit-ot-select-edificio').value);
+        const ubicacionIdVal = document.getElementById('edit-ot-select-ubicacion').value;
+        const ubicacionId = ubicacionIdVal ? parseInt(ubicacionIdVal) : null;
+        const activoIdVal = document.getElementById('edit-ot-select-activo').value;
+        const activoId = activoIdVal ? parseInt(activoIdVal) : null;
+        
+        const tipo = document.getElementById('edit-ot-tipo').value;
+        const prioridad = document.getElementById('edit-ot-prioridad').value;
+        const estado = document.getElementById('edit-ot-status').value;
+        const descripcion = document.getElementById('edit-ot-descripcion').value.trim();
+        const tecnicoIdVal = document.getElementById('edit-ot-tecnico').value;
+        const tecnicoId = tecnicoIdVal ? parseInt(tecnicoIdVal) : null;
+        const plantillaIdVal = document.getElementById('edit-ot-select-plantilla').value;
+        const plantillaId = plantillaIdVal ? parseInt(plantillaIdVal) : null;
+
+        const fechaProgramadaVal = document.getElementById('edit-ot-fecha-programada').value || null;
+        const horaProgramadaVal = document.getElementById('edit-ot-hora-programada').value || '';
+        
+        let fechaProgramadaFull = null;
+        if (fechaProgramadaVal) {
+            if (horaProgramadaVal) {
+                fechaProgramadaFull = `${fechaProgramadaVal}T${horaProgramadaVal}:00`;
+            } else {
+                fechaProgramadaFull = `${fechaProgramadaVal}T00:00:00`;
+            }
+        }
+
+        const componentes_trabajados = [];
+        document.querySelectorAll('.edit-ot-comp-checkbox').forEach(cb => {
+            if (cb.checked) {
+                const compId = parseInt(cb.value);
+                const commentInput = document.getElementById(`edit-ot-comp-comment-${compId}`);
+                componentes_trabajados.push({
+                    componente_id: compId,
+                    comentario: commentInput ? commentInput.value.trim() || null : null
+                });
+            }
+        });
+
+        const payload = {
+            planta_id: plantaId,
+            edificio_id: edificioId,
+            ubicacion_id: ubicacionId,
+            activo_id: activoId,
+            tipo: tipo,
+            prioridad: prioridad,
+            estado: estado,
+            descripcion: descripcion,
+            tecnico_id: tecnicoId,
+            fecha_programada: fechaProgramadaFull,
+            plantilla_id: plantillaId,
+            componentes_trabajados: componentes_trabajados
+        };
+
+        try {
+            const res = await fetch(`/api/ordenes/${otId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.detail || 'Error al guardar los cambios');
+            }
+
+            editOtModal.style.display = 'none';
+            loadKPIs();
+            loadWorkOrders();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    // Event listeners for Edit modal controls
+    closeEditOtModal.addEventListener('click', checkChangesAndCloseEditModal);
+    editOtModal.addEventListener('click', (e) => {
+        if (e.target === editOtModal) {
+            checkChangesAndCloseEditModal();
+        }
+    });
+
+    editOtForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        saveEditOT();
+    });
+
+    document.getElementById('edit-ot-select-planta').addEventListener('change', (e) => {
+        const plantaId = e.target.value;
+        const bSelect = document.getElementById('edit-ot-select-edificio');
+        const uSelect = document.getElementById('edit-ot-select-ubicacion');
+        const aSelect = document.getElementById('edit-ot-select-activo');
+        
+        bSelect.innerHTML = '<option value="">Selecciona edificio...</option>';
+        bSelect.disabled = true;
+        uSelect.innerHTML = '<option value="">Selecciona edificio...</option>';
+        uSelect.disabled = true;
+        aSelect.innerHTML = '<option value="">Selecciona ubicación...</option>';
+        aSelect.disabled = true;
+        
+        const container = document.getElementById('edit-ot-components-container');
+        if (container) container.style.display = 'none';
+        const listDiv = document.getElementById('edit-ot-components-list');
+        if (listDiv) listDiv.innerHTML = '';
+
+        if (!plantaId) return;
+
+        fetch(`/api/plantas/${plantaId}/edificios`)
+            .then(res => res.json())
+            .then(edificios => {
+                bSelect.disabled = false;
+                bSelect.innerHTML = '<option value="">-- Selecciona --</option>';
+                edificios.forEach(b => {
+                    bSelect.innerHTML += `<option value="${b.id}">${b.nombre}</option>`;
+                });
+            });
+    });
+
+    document.getElementById('edit-ot-select-edificio').addEventListener('change', (e) => {
+        const edificioId = e.target.value;
+        const uSelect = document.getElementById('edit-ot-select-ubicacion');
+        const aSelect = document.getElementById('edit-ot-select-activo');
+
+        uSelect.innerHTML = '<option value="">Selecciona ubicación...</option>';
+        uSelect.disabled = true;
+        aSelect.innerHTML = '<option value="">Selecciona ubicación...</option>';
+        aSelect.disabled = true;
+        
+        const container = document.getElementById('edit-ot-components-container');
+        if (container) container.style.display = 'none';
+        const listDiv = document.getElementById('edit-ot-components-list');
+        if (listDiv) listDiv.innerHTML = '';
+
+        if (!edificioId) return;
+
+        fetch(`/api/edificios/${edificioId}/ubicaciones`)
+            .then(res => res.json())
+            .then(ubicaciones => {
+                uSelect.disabled = false;
+                uSelect.innerHTML = '<option value="">-- Selecciona --</option>';
+                ubicaciones.forEach(u => {
+                    uSelect.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+                });
+            });
+    });
+
+    document.getElementById('edit-ot-select-ubicacion').addEventListener('change', (e) => {
+        const ubicacionId = e.target.value;
+        const aSelect = document.getElementById('edit-ot-select-activo');
+
+        aSelect.innerHTML = '<option value="">Selecciona activo...</option>';
+        aSelect.disabled = true;
+        
+        const container = document.getElementById('edit-ot-components-container');
+        if (container) container.style.display = 'none';
+        const listDiv = document.getElementById('edit-ot-components-list');
+        if (listDiv) listDiv.innerHTML = '';
+
+        if (!ubicacionId) return;
+
+        fetch(`/api/activos?ubicacion_id=${ubicacionId}`)
+            .then(res => res.json())
+            .then(activos => {
+                aSelect.disabled = false;
+                aSelect.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                activeActivos.forEach(a => {
+                    aSelect.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
+                });
+            });
+    });
+
+    document.getElementById('edit-ot-select-activo').addEventListener('change', (e) => {
+        const activoId = e.target.value;
+        const container = document.getElementById('edit-ot-components-container');
+        const listDiv = document.getElementById('edit-ot-components-list');
+        
+        listDiv.innerHTML = '';
+        container.style.display = 'none';
+        
+        if (!activoId) return;
+        
+        fetch(`/api/activos/${activoId}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.componentes && data.componentes.length > 0) {
+                    container.style.display = 'block';
+                    data.componentes.forEach(comp => {
+                        const itemHtml = `
+                            <div class="edit-ot-component-item" style="display: flex; flex-direction: column; gap: 0.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.25rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <input type="checkbox" id="edit-ot-comp-${comp.id}" class="edit-ot-comp-checkbox" value="${comp.id}" style="width: 16px; height: 16px; cursor: pointer;">
+                                    <label for="edit-ot-comp-${comp.id}" style="margin-bottom: 0; cursor: pointer; font-weight: 500; font-size: 0.85rem; color: var(--text-main);">${comp.nombre} (${comp.estado})</label>
+                                </div>
+                                <div id="edit-ot-comp-comment-container-${comp.id}" style="display: none; padding-left: 1.5rem;">
+                                    <input type="text" id="edit-ot-comp-comment-${comp.id}" class="form-control" placeholder="Comentario técnico para este componente..." style="padding: 0.35rem 0.5rem; font-size: 0.8rem; border-radius: 6px;">
+                                </div>
+                            </div>
+                        `;
+                        listDiv.insertAdjacentHTML('beforeend', itemHtml);
+                        
+                        const checkbox = document.getElementById(`edit-ot-comp-${comp.id}`);
+                        const commentContainer = document.getElementById(`edit-ot-comp-comment-container-${comp.id}`);
+                        checkbox.addEventListener('change', () => {
+                            if (checkbox.checked) {
+                                commentContainer.style.display = 'block';
+                            } else {
+                                commentContainer.style.display = 'none';
+                                document.getElementById(`edit-ot-comp-comment-${comp.id}`).value = '';
+                            }
+                        });
+                    });
+                }
+            })
+            .catch(err => console.error('Error al obtener componentes:', err));
+    });
+
+    // Smart search in Edit OT Form
+    const editOtSearchInput = document.getElementById('edit-ot-search-location');
+    const editOtSearchResults = document.getElementById('edit-ot-search-location-results');
+
+    if (editOtSearchInput && editOtSearchResults) {
+        editOtSearchInput.addEventListener('input', () => {
+            const query = editOtSearchInput.value.trim().toLowerCase();
+            if (!query) {
+                editOtSearchResults.style.display = 'none';
+                editOtSearchResults.innerHTML = '';
+                return;
+            }
+
+            const cleanQuery = query.replace(/[^a-z0-9]/g, '');
+            let filtered = [];
+
+            if (cleanQuery === '') {
+                filtered = locationsSearchList.filter(u => {
+                    const matchName = u.nombre.toLowerCase().includes(query) || 
+                                      u.planta_nombre.toLowerCase().includes(query) || 
+                                      u.edificio_nombre.toLowerCase().includes(query);
+                    const matchMeta = (u.codigo && u.codigo.toLowerCase().includes(query)) ||
+                                      (u.uso && u.uso.toLowerCase().includes(query)) ||
+                                      (u.cargo && u.cargo.toLowerCase().includes(query));
+                    const matchOcupante = u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().includes(query));
+                    
+                    return matchName || matchMeta || matchOcupante;
+                });
+            } else {
+                filtered = locationsSearchList.filter(u => {
+                    const cleanName = u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanPlanta = u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanEdificio = u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                    if (cleanName.includes(cleanQuery) || cleanPlanta.includes(cleanQuery) || cleanEdificio.includes(cleanQuery)) {
+                        return true;
+                    }
+
+                    const cleanCodigo = u.codigo ? u.codigo.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanUso = u.uso ? u.uso.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanCargo = u.cargo ? u.cargo.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    
+                    if (cleanCodigo.includes(cleanQuery) || cleanUso.includes(cleanQuery) || cleanCargo.includes(cleanQuery)) {
+                        return true;
+                    }
+
+                    if (u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                        return true;
+                    }
+
+                    if (u.activos && u.activos.some(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                        return true;
+                    }
+                    return false;
+                });
+            }
+
+            if (filtered.length === 0) {
+                editOtSearchResults.innerHTML = '<div style="padding: 0.5rem 1rem; color: var(--text-muted); font-size: 0.85rem;">No se encontraron ubicaciones</div>';
+            } else {
+                editOtSearchResults.innerHTML = '';
+                filtered.slice(0, 10).forEach(u => {
+                    const item = document.createElement('div');
+                    item.className = 'search-result-dropdown-item';
+                    
+                    let matchingAsset = '';
+                    if (query && u.activos) {
+                        const foundAsset = u.activos.find(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery));
+                        if (foundAsset) {
+                            matchingAsset = `<div class="result-active-badge">⚡ Equipo coincidente: <strong>${foundAsset}</strong></div>`;
+                        }
+                    }
+
+                    item.innerHTML = `
+                        <div style="font-weight: 600; color: var(--text-main);">${u.nombre}</div>
+                        <div class="result-path">📍 ${u.planta_nombre} &gt; ${u.edificio_nombre}</div>
+                        ${matchingAsset}
+                    `;
+                    
+                    item.addEventListener('click', () => {
+                        let assetName = null;
+                        if (query && u.activos) {
+                            assetName = u.activos.find(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery));
+                        }
+                        
+                        prefillEditOTFormLocationAndAsset(u.planta_id, u.edificio_id, u.id, assetName);
+                        
+                        editOtSearchInput.value = u.nombre;
+                        editOtSearchResults.style.display = 'none';
+                    });
+                    editOtSearchResults.appendChild(item);
+                });
+            }
+            editOtSearchResults.style.display = 'block';
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!editOtSearchInput.contains(e.target) && !editOtSearchResults.contains(e.target)) {
+                editOtSearchResults.style.display = 'none';
+            }
+        });
+    }
+
+    async function prefillEditOTFormLocationAndAsset(plantaId, edificioId, ubicacionId, assetName = null) {
+        const container = document.getElementById('edit-ot-components-container');
+        if (container) container.style.display = 'none';
+        const listDiv = document.getElementById('edit-ot-components-list');
+        if (listDiv) listDiv.innerHTML = '';
+        
+        const otPlanta = document.getElementById('edit-ot-select-planta');
+        const otEdificio = document.getElementById('edit-ot-select-edificio');
+        const otUbicacion = document.getElementById('edit-ot-select-ubicacion');
+        const otActivo = document.getElementById('edit-ot-select-activo');
+
+        otPlanta.value = plantaId;
+        
+        otEdificio.disabled = false;
+        otEdificio.innerHTML = '<option value="">Cargando...</option>';
+        const bRes = await fetch(`/api/plantas/${plantaId}/edificios`);
+        if (bRes.ok) {
+            const edificios = await bRes.json();
+            otEdificio.innerHTML = '<option value="">-- Selecciona --</option>';
+            edificios.forEach(b => {
+                otEdificio.innerHTML += `<option value="${b.id}">${b.nombre}</option>`;
+            });
+            otEdificio.value = edificioId;
+        }
+
+        otUbicacion.disabled = false;
+        otUbicacion.innerHTML = '<option value="">Cargando...</option>';
+        const uRes = await fetch(`/api/edificios/${edificioId}/ubicaciones`);
+        if (uRes.ok) {
+            const ubicaciones = await uRes.json();
+            otUbicacion.innerHTML = '<option value="">-- Selecciona --</option>';
+            ubicaciones.forEach(u => {
+                otUbicacion.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+            });
+            otUbicacion.value = ubicacionId;
+        }
+
+        otActivo.disabled = false;
+        otActivo.innerHTML = '<option value="">Cargando...</option>';
+        const aRes = await fetch(`/api/activos?ubicacion_id=${ubicacionId}`);
+        if (aRes.ok) {
+            const activos = await aRes.json();
+            otActivo.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
+            const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+            activeActivos.forEach(a => {
+                otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
+            });
+            
+            if (assetName) {
+                const found = activeActivos.find(a => a.nombre === assetName);
+                if (found) {
+                    otActivo.value = found.id;
+                    otActivo.dispatchEvent(new Event('change'));
+                } else {
+                    otActivo.value = '';
+                }
+            } else {
+                otActivo.value = '';
+            }
         }
     }
 
