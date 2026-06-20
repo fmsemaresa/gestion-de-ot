@@ -2582,6 +2582,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function openNewOTModalForAsset(plantaId, edificioId, ubicacionId, activoId) {
         resetOtComponents();
 
+        const otUbicacion = document.getElementById('ot-select-ubicacion');
+        const otULabel = document.querySelector('label[for="ot-select-ubicacion"]');
+        if (otULabel && otUbicacion) {
+            otUbicacion.required = true;
+            otULabel.innerHTML = 'Ubicación *';
+        }
+
         // Close drawers
         assetDrawer.classList.remove('open');
         if (otDrawer) otDrawer.classList.remove('open');
@@ -3144,6 +3151,19 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(err => alert(err.message));
     });    // --- 9. MANUAL OT CREATION MODAL ---
+    function updateUbicacionRequirement(isNZ, uSelect, uLabel) {
+        if (!uSelect || !uLabel) return;
+        if (isNZ) {
+            uSelect.required = false;
+            uLabel.innerHTML = 'Ubicación (Opcional)';
+            uSelect.disabled = false;
+            uSelect.innerHTML = '<option value="">-- No requerido para NZ --</option>';
+        } else {
+            uSelect.required = true;
+            uLabel.innerHTML = 'Ubicación *';
+        }
+    }
+
     function openNewOTModal(prefilledDate = null) {
         // Clear search inputs
         const otSearchInput = document.getElementById('ot-search-location');
@@ -3160,6 +3180,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const otEdificio = document.getElementById('ot-select-edificio');
         const otUbicacion = document.getElementById('ot-select-ubicacion');
         const otActivo = document.getElementById('ot-select-activo');
+        const otULabel = document.querySelector('label[for="ot-select-ubicacion"]');
+
+        // Reset required
+        updateUbicacionRequirement(false, otUbicacion, otULabel);
 
         // Handle date pre-filling
         const otFechaProgramada = document.getElementById('ot-fecha-programada');
@@ -3230,10 +3254,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (selectedEdificioId) {
                     otEdificio.value = selectedEdificioId;
                     
-                    // Load locations
-                    otUbicacion.disabled = false;
-                    otUbicacion.innerHTML = '<option value="">Cargando ubicaciones...</option>';
-                    return fetch(`/api/edificios/${selectedEdificioId}/ubicaciones`);
+                    const selectedEd = edificios.find(b => b.id === selectedEdificioId);
+                    const isNZ = selectedEd && selectedEd.nombre === 'NZ';
+                    const otULabel = document.querySelector('label[for="ot-select-ubicacion"]');
+                    if (isNZ) {
+                        updateUbicacionRequirement(true, otUbicacion, otULabel);
+                        throw new Error('no_selection');
+                    } else {
+                        updateUbicacionRequirement(false, otUbicacion, otULabel);
+                        // Load locations
+                        otUbicacion.disabled = false;
+                        otUbicacion.innerHTML = '<option value="">Cargando ubicaciones...</option>';
+                        return fetch(`/api/edificios/${selectedEdificioId}/ubicaciones`);
+                    }
                 } else {
                     otUbicacion.innerHTML = '<option value="">Selecciona edificio...</option>';
                     otUbicacion.disabled = true;
@@ -3327,6 +3360,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const edificioId = e.target.value;
         const uSelect = document.getElementById('ot-select-ubicacion');
         const aSelect = document.getElementById('ot-select-activo');
+        const uLabel = document.querySelector('label[for="ot-select-ubicacion"]');
 
         uSelect.innerHTML = '<option value="">Selecciona ubicación...</option>';
         uSelect.disabled = true;
@@ -3336,15 +3370,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!edificioId) return;
 
-        fetch(`/api/edificios/${edificioId}/ubicaciones`)
-            .then(res => res.json())
-            .then(ubicaciones => {
-                uSelect.disabled = false;
-                uSelect.innerHTML = '<option value="">-- Selecciona --</option>';
-                ubicaciones.forEach(u => {
-                    uSelect.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+        const isNZ = e.target.options[e.target.selectedIndex].text.trim() === 'NZ';
+        updateUbicacionRequirement(isNZ, uSelect, uLabel);
+
+        if (!isNZ) {
+            fetch(`/api/edificios/${edificioId}/ubicaciones`)
+                .then(res => res.json())
+                .then(ubicaciones => {
+                    uSelect.disabled = false;
+                    uSelect.innerHTML = '<option value="">-- Selecciona --</option>';
+                    ubicaciones.forEach(u => {
+                        uSelect.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+                    });
                 });
-            });
+        }
     });
 
     document.getElementById('ot-select-ubicacion').addEventListener('change', (e) => {
@@ -4234,6 +4273,7 @@ document.addEventListener('DOMContentLoaded', () => {
         plantaSelect.value = ot.planta_id || '';
 
         // Load buildings for plant
+        let isNZ = false;
         if (ot.planta_id) {
             edificioSelect.disabled = false;
             edificioSelect.innerHTML = '<option value="">Cargando...</option>';
@@ -4245,14 +4285,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     edificioSelect.innerHTML += `<option value="${b.id}">${b.nombre}</option>`;
                 });
                 edificioSelect.value = ot.edificio_id || '';
+                
+                const selectedEd = edificios.find(b => b.id === ot.edificio_id);
+                isNZ = selectedEd && selectedEd.nombre === 'NZ';
             }
         } else {
             edificioSelect.innerHTML = '<option value="">Selecciona planta...</option>';
             edificioSelect.disabled = true;
         }
 
+        const editULabel = document.querySelector('label[for="edit-ot-select-ubicacion"]');
+        updateUbicacionRequirement(isNZ, ubicacionSelect, editULabel);
+
         // Load locations for building
-        if (ot.edificio_id) {
+        if (ot.edificio_id && !isNZ) {
             ubicacionSelect.disabled = false;
             ubicacionSelect.innerHTML = '<option value="">Cargando...</option>';
             const uRes = await fetch(`/api/edificios/${ot.edificio_id}/ubicaciones`);
@@ -4265,8 +4311,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 ubicacionSelect.value = ot.ubicacion_id || '';
             }
         } else {
-            ubicacionSelect.innerHTML = '<option value="">Selecciona edificio...</option>';
-            ubicacionSelect.disabled = true;
+            if (!isNZ) {
+                ubicacionSelect.innerHTML = '<option value="">Selecciona edificio...</option>';
+                ubicacionSelect.disabled = true;
+            }
         }
 
         // Load assets for location
@@ -4477,6 +4525,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const edificioId = e.target.value;
         const uSelect = document.getElementById('edit-ot-select-ubicacion');
         const aSelect = document.getElementById('edit-ot-select-activo');
+        const uLabel = document.querySelector('label[for="edit-ot-select-ubicacion"]');
 
         uSelect.innerHTML = '<option value="">Selecciona ubicación...</option>';
         uSelect.disabled = true;
@@ -4490,15 +4539,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!edificioId) return;
 
-        fetch(`/api/edificios/${edificioId}/ubicaciones`)
-            .then(res => res.json())
-            .then(ubicaciones => {
-                uSelect.disabled = false;
-                uSelect.innerHTML = '<option value="">-- Selecciona --</option>';
-                ubicaciones.forEach(u => {
-                    uSelect.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+        const isNZ = e.target.options[e.target.selectedIndex].text.trim() === 'NZ';
+        updateUbicacionRequirement(isNZ, uSelect, uLabel);
+
+        if (!isNZ) {
+            fetch(`/api/edificios/${edificioId}/ubicaciones`)
+                .then(res => res.json())
+                .then(ubicaciones => {
+                    uSelect.disabled = false;
+                    uSelect.innerHTML = '<option value="">-- Selecciona --</option>';
+                    ubicaciones.forEach(u => {
+                        uSelect.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
+                    });
                 });
-            });
+        }
     });
 
     document.getElementById('edit-ot-select-ubicacion').addEventListener('change', (e) => {

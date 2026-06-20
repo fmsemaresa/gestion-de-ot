@@ -526,6 +526,14 @@ def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
     if not planta or not edificio:
         raise HTTPException(status_code=404, detail="Planta o Edificio no válido")
         
+    if edificio.nombre == "NZ":
+        # Ubicación es opcional para el sector especial NZ
+        pass
+    else:
+        # Ubicación es obligatoria para cualquier otro edificio
+        if not ot_in.ubicacion_id:
+            raise HTTPException(status_code=400, detail="La ubicación es obligatoria para este edificio.")
+            
     if ot_in.ubicacion_id:
         ubicacion = db.get(Ubicacion, ot_in.ubicacion_id)
         if not ubicacion:
@@ -607,6 +615,13 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
         ot.plantilla_id = int(val) if (val is not None and val != "" and str(val).isdigit()) else None
     if "reportado_por" in updated_ot:
         ot.reportado_por = updated_ot["reportado_por"]
+
+    # Validate location requirement based on final building
+    edificio = db.get(Edificio, ot.edificio_id)
+    if not edificio:
+        raise HTTPException(status_code=404, detail="Edificio no encontrado")
+    if edificio.nombre != "NZ" and not ot.ubicacion_id:
+        raise HTTPException(status_code=400, detail="La ubicación es obligatoria para este edificio.")
 
     # Process technician assignment
     if "tecnico_id" in updated_ot:

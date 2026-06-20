@@ -339,7 +339,13 @@ def seed_database():
         statement = select(Planta)
         existing_plants = session.exec(statement).all()
         if existing_plants:
-            print("Base de datos ya inicializada con plantas.")
+            print("Base de datos ya inicializada con plantas. Verificando edificios NZ...")
+            for p in existing_plants:
+                nz_ed = session.exec(select(Edificio).where(Edificio.nombre == "NZ", Edificio.planta_id == p.id)).first()
+                if not nz_ed:
+                    session.add(Edificio(nombre="NZ", planta_id=p.id))
+                    print(f"Edificio NZ creado para planta: {p.nombre}")
+            session.commit()
             return
 
         print("Iniciando carga de datos de plantas...")
@@ -360,7 +366,7 @@ def seed_database():
         b_santa_adela = [
             "Edificio Corporativo", "Galpón 1", "Galpón 2", 
             "Galpón 3", "Galpón 4", "Galpón 5", "Galpón 6", 
-            "Centro de Distriducion", "Patio las torres"
+            "Centro de Distriducion", "Patio las torres", "NZ"
         ]
         edificios_sta_adela = {}
         for name in b_santa_adela:
@@ -373,7 +379,7 @@ def seed_database():
         # Buildings for La Divisa
         b_la_divisa = [
             "Edificio Corporativo", "Nave 0", "Nave 1", 
-            "Nave 2", "Nave 3", "Camarines", "Casino"
+            "Nave 2", "Nave 3", "Camarines", "Casino", "NZ"
         ]
         for name in b_la_divisa:
             session.add(Edificio(nombre=name, planta_id=p2.id))
@@ -383,7 +389,7 @@ def seed_database():
             "Galpón 1", "Galpón 2", "Galpón 3", 
             "Galpón 4A", "Galpón 4B", "Galpón 5", 
             "Galpón 6", "Galpón 7", "Comedor", 
-            "Camarines P1", "Horno secado"
+            "Camarines P1", "Horno secado", "NZ"
         ]
         for name in b_sta_a:
             session.add(Edificio(nombre=name, planta_id=p3.id))
