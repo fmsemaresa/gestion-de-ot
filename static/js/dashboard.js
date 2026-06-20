@@ -2604,7 +2604,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const otPlanta = document.getElementById('ot-select-planta');
         const otEdificio = document.getElementById('ot-select-edificio');
-        const otUbicacion = document.getElementById('ot-select-ubicacion');
         const otActivo = document.getElementById('ot-select-activo');
 
         // Load plants
