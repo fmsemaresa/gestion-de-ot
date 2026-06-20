@@ -1657,10 +1657,9 @@ async def importar_despiece(file: UploadFile = File(...), db: Session = Depends(
                 updated_count += 1
                 continue
                 
-            # Si se especificó un ID pero no se encontró en base de datos
+            # Si se especificó un ID pero no se encontró en base de datos, lo tratamos como nuevo
             if comp_id and not existing_comp:
-                unmatched_rows.append(f"Fila {idx}: no se encontró componente con ID '{id_comp_str}'")
-                continue
+                pass
                 
             # Buscar activo para nuevo componente
             activo = None
@@ -2627,10 +2626,9 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
                     comps_updated += 1
                     continue
                     
-                # Si se especificó un ID pero no se encontró en base de datos
+                # Si se especificó un ID pero no se encontró en base de datos, lo tratamos como nuevo
                 if comp_id and not existing_comp:
-                    unmatched_comps.append(f"Fila {idx}: no se encontró componente con ID '{id_comp_str}'")
-                    continue
+                    pass
                     
                 # Buscar activo para nuevo componente
                 activo = None
