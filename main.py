@@ -1063,9 +1063,9 @@ def exportar_ordenes(db: Session = Depends(get_db)):
             ot.estado_ejecucion,
             ot.prioridad,
             ot.fecha_creacion.strftime("%y-%m-%d %H:%M") if ot.fecha_creacion else "",
-            ot.fecha_programada.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_programada else "",
-            ot.fecha_inicio.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_inicio else "",
-            ot.fecha_resolucion.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_resolucion else "",
+            ot.fecha_programada.strftime("%y-%m-%d %H:%M") if ot.fecha_programada else "",
+            ot.fecha_inicio.strftime("%y-%m-%d %H:%M") if ot.fecha_inicio else "",
+            ot.fecha_resolucion.strftime("%y-%m-%d %H:%M") if ot.fecha_resolucion else "",
             ot.reportado_por or "",
             ot.comentarios_tecnicos or ""
         ])
