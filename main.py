@@ -1023,10 +1023,13 @@ def exportar_ordenes(db: Session = Depends(get_db)):
     ws = wb.active
     ws.title = "Ordenes de Trabajo"
     
+    # Configurar zoom al 70%
+    ws.sheet_view.zoomScale = 70
+    
     headers = [
-        "ID OT", "Planta", "Edificio", "Activo Afectado", "Técnico Asignado", "Ubicación",
+        "ID OT", "Planta", "Edificio", "Activo Afectado", "Técnico Asignado", "Reportado Por", "Ubicación",
         "Descripción", "Tipo Mantenimiento", "Estado", "Estado Ejecución", "Prioridad",
-        "Fecha Creación", "Fecha Programada", "Fecha Inicio", "Fecha Realización", "Reportado Por", "Comentarios Técnicos"
+        "Fecha Creación", "Fecha Programada", "Fecha Inicio", "Fecha Realización", "Comentarios Técnicos"
     ]
     ws.append(headers)
     
@@ -1056,6 +1059,7 @@ def exportar_ordenes(db: Session = Depends(get_db)):
             edificio.nombre if edificio else "",
             activo.nombre if activo else "Reporte de Área",
             tecnico.nombre if tecnico else "No asignado",
+            ot.reportado_por or "",
             ubicacion.nombre if ubicacion else "",
             ot.descripcion,
             ot.tipo,
@@ -1066,7 +1070,6 @@ def exportar_ordenes(db: Session = Depends(get_db)):
             ot.fecha_programada.strftime("%y-%m-%d %H:%M") if ot.fecha_programada else "",
             ot.fecha_inicio.strftime("%y-%m-%d %H:%M") if ot.fecha_inicio else "",
             ot.fecha_resolucion.strftime("%y-%m-%d %H:%M") if ot.fecha_resolucion else "",
-            ot.reportado_por or "",
             ot.comentarios_tecnicos or ""
         ])
         
@@ -1086,24 +1089,24 @@ def exportar_ordenes(db: Session = Depends(get_db)):
         last_col_letter = openpyxl.utils.get_column_letter(ws.max_column)
         ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
         
-    # Aplicar anchos de columnas fijos del archivo de referencia
+    # Aplicar anchos de columnas fijos alineados con el nuevo orden
     column_widths = {
         "A": 8.63,   # ID OT
         "B": 12.63,  # Planta
         "C": 17.45,  # Edificio
         "D": 22.73,  # Activo Afectado
         "E": 10.63,  # Técnico Asignado
-        "F": 29.73,  # Ubicación
-        "G": 40.54,  # Descripción
-        "H": 8.82,   # Tipo Mantenimiento
-        "I": 6.91,   # Estado
-        "J": 12.45,  # Estado Ejecución
-        "K": 9.09,   # Prioridad
-        "L": 14.09,  # Fecha Creación
-        "M": 13.91,  # Fecha Programada
-        "N": 13.45,  # Fecha Inicio
-        "O": 14.18,  # Fecha Realización
-        "P": 14.63,  # Reportado Por
+        "F": 14.63,  # Reportado Por
+        "G": 29.73,  # Ubicación
+        "H": 40.54,  # Descripción
+        "I": 8.82,   # Tipo Mantenimiento
+        "J": 6.91,   # Estado
+        "K": 12.45,  # Estado Ejecución
+        "L": 9.09,   # Prioridad
+        "M": 14.09,  # Fecha Creación
+        "N": 13.91,  # Fecha Programada
+        "O": 13.45,  # Fecha Inicio
+        "P": 14.18,  # Fecha Realización
         "Q": 26.27   # Comentarios Técnicos
     }
     
