@@ -1023,8 +1023,8 @@ def exportar_ordenes(db: Session = Depends(get_db)):
     ws = wb.active
     ws.title = "Ordenes de Trabajo"
     
-    # Configurar zoom al 70%
-    ws.sheet_view.zoomScale = 70
+    # Configurar zoom al 67%
+    ws.sheet_view.zoomScale = 67
     
     headers = [
         "ID OT", "Planta", "Edificio", "Activo Afectado", "Técnico Asignado", "Reportado Por", "Ubicación",
@@ -1089,24 +1089,24 @@ def exportar_ordenes(db: Session = Depends(get_db)):
         last_col_letter = openpyxl.utils.get_column_letter(ws.max_column)
         ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
         
-    # Aplicar anchos de columnas fijos alineados con el nuevo orden
+    # Aplicar anchos de columnas fijos del archivo de referencia (1020)
     column_widths = {
         "A": 8.63,   # ID OT
-        "B": 12.63,  # Planta
+        "B": 10.91,  # Planta
         "C": 17.45,  # Edificio
         "D": 22.73,  # Activo Afectado
-        "E": 10.63,  # Técnico Asignado
-        "F": 14.63,  # Reportado Por
-        "G": 29.73,  # Ubicación
-        "H": 40.54,  # Descripción
+        "E": 4.0,    # Técnico Asignado
+        "F": 10.63,  # Reportado Por
+        "G": 28.54,  # Ubicación
+        "H": 38.91,  # Descripción
         "I": 8.82,   # Tipo Mantenimiento
         "J": 6.91,   # Estado
         "K": 12.45,  # Estado Ejecución
         "L": 9.09,   # Prioridad
-        "M": 14.09,  # Fecha Creación
-        "N": 13.91,  # Fecha Programada
-        "O": 13.45,  # Fecha Inicio
-        "P": 14.18,  # Fecha Realización
+        "M": 12.63,  # Fecha Creación
+        "N": 10.27,  # Fecha Programada
+        "O": 12.0,   # Fecha Inicio
+        "P": 12.09,  # Fecha Realización
         "Q": 26.27   # Comentarios Técnicos
     }
     
