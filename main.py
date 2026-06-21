@@ -1113,6 +1113,15 @@ def exportar_ordenes(db: Session = Depends(get_db)):
     for col_letter, width in column_widths.items():
         ws.column_dimensions[col_letter].width = width
         
+    # Aplicar alineación vertical superior a toda la planilla y ajustar texto en Descripción (Columna H)
+    from openpyxl.styles import Alignment
+    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+        for cell in row:
+            if cell.column_letter == "H" and cell.row > 1:
+                cell.alignment = Alignment(vertical="top", wrap_text=True)
+            else:
+                cell.alignment = Alignment(vertical="top")
+                
     file_stream = io.BytesIO()
     wb.save(file_stream)
     file_stream.seek(0)
