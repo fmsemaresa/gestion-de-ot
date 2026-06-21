@@ -1024,9 +1024,9 @@ def exportar_ordenes(db: Session = Depends(get_db)):
     ws.title = "Ordenes de Trabajo"
     
     headers = [
-        "ID OT", "Descripción", "Tipo Mantenimiento", "Estado", "Estado Ejecución", "Prioridad",
-        "Fecha Creación", "Fecha Programada", "Fecha Inicio", "Fecha Realización", "Reportado Por", "Comentarios Técnicos",
-        "Planta", "Edificio", "Ubicación", "Activo Afectado", "Técnico Asignado"
+        "ID OT", "Planta", "Edificio", "Activo Afectado", "Técnico Asignado", "Ubicación",
+        "Descripción", "Tipo Mantenimiento", "Estado", "Estado Ejecución", "Prioridad",
+        "Fecha Creación", "Fecha Programada", "Fecha Inicio", "Fecha Realización", "Reportado Por", "Comentarios Técnicos"
     ]
     ws.append(headers)
     
@@ -1052,22 +1052,22 @@ def exportar_ordenes(db: Session = Depends(get_db)):
                 
         ws.append([
             f"OT-{ot.id}",
+            planta.nombre if planta else "",
+            edificio.nombre if edificio else "",
+            activo.nombre if activo else "Reporte de Área",
+            tecnico.nombre if tecnico else "No asignado",
+            ubicacion.nombre if ubicacion else "",
             ot.descripcion,
             ot.tipo,
             mapped_estado,
             ot.estado_ejecucion,
             ot.prioridad,
-            ot.fecha_creacion.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_creacion else "",
+            ot.fecha_creacion.strftime("%y-%m-%d %H:%M") if ot.fecha_creacion else "",
             ot.fecha_programada.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_programada else "",
             ot.fecha_inicio.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_inicio else "",
             ot.fecha_resolucion.strftime("%Y-%m-%d %H:%M:%S") if ot.fecha_resolucion else "",
             ot.reportado_por or "",
-            ot.comentarios_tecnicos or "",
-            planta.nombre if planta else "",
-            edificio.nombre if edificio else "",
-            ubicacion.nombre if ubicacion else "",
-            activo.nombre if activo else "Reporte de Área",
-            tecnico.nombre if tecnico else "No asignado"
+            ot.comentarios_tecnicos or ""
         ])
         
     from openpyxl.styles import Font, PatternFill
@@ -1086,10 +1086,29 @@ def exportar_ordenes(db: Session = Depends(get_db)):
         last_col_letter = openpyxl.utils.get_column_letter(ws.max_column)
         ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
         
-    for col in ws.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = openpyxl.utils.get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = max(max_len + 3, 10)
+    # Aplicar anchos de columnas fijos del archivo de referencia
+    column_widths = {
+        "A": 8.63,   # ID OT
+        "B": 12.63,  # Planta
+        "C": 17.45,  # Edificio
+        "D": 22.73,  # Activo Afectado
+        "E": 10.63,  # Técnico Asignado
+        "F": 29.73,  # Ubicación
+        "G": 40.54,  # Descripción
+        "H": 8.82,   # Tipo Mantenimiento
+        "I": 6.91,   # Estado
+        "J": 12.45,  # Estado Ejecución
+        "K": 9.09,   # Prioridad
+        "L": 14.09,  # Fecha Creación
+        "M": 13.91,  # Fecha Programada
+        "N": 13.45,  # Fecha Inicio
+        "O": 14.18,  # Fecha Realización
+        "P": 14.63,  # Reportado Por
+        "Q": 26.27   # Comentarios Técnicos
+    }
+    
+    for col_letter, width in column_widths.items():
+        ws.column_dimensions[col_letter].width = width
         
     file_stream = io.BytesIO()
     wb.save(file_stream)
