@@ -731,8 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 containerElement.innerHTML = '';
                 edificios.forEach(e => {
                     const activeOtsCount = allLoadedOts.filter(ot => 
-                        ot.edificio_nombre === e.nombre && 
-                        ot.planta_nombre === plantaNombre && 
+                        ot.edificio_id == e.id && 
                         ot.estado !== 'REALIZADA' && 
                         ot.estado !== 'Resuelta' &&
                         ot.estado !== 'Cancelada'
@@ -1220,13 +1219,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Filter OTs in javascript for edificio_id or ubicacion_id
                 let filteredOts = ots;
                 if (selectedEdificioId && !selectedUbicacionId) {
-                    const bEl = document.querySelector(`[data-edificio-id="${selectedEdificioId}"]`);
-                    const bName = bEl ? bEl.getAttribute('data-edificio-nombre') : '';
-                    filteredOts = ots.filter(ot => ot.edificio_nombre === bName);
+                    filteredOts = ots.filter(ot => ot.edificio_id == selectedEdificioId);
                 } else if (selectedUbicacionId) {
-                    const uEl = document.querySelector(`[data-ubicacion-id="${selectedUbicacionId}"]`);
-                    const uName = uEl ? uEl.getAttribute('data-ubicacion-nombre') : '';
-                    filteredOts = ots.filter(ot => ot.ubicacion_nombre === uName);
+                    filteredOts = ots.filter(ot => ot.ubicacion_id == selectedUbicacionId);
                 }
 
                 // Add or update to allLoadedOts
@@ -3891,25 +3886,13 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 1. Filter by hierarchy selections
         if (selectedPlantaId) {
-            const plantaEl = document.querySelector(`[data-planta-id="${selectedPlantaId}"]`);
-            const plantaName = plantaEl ? plantaEl.getAttribute('data-planta-nombre') : '';
-            if (plantaName) {
-                filtered = filtered.filter(ot => ot.planta_nombre === plantaName);
-            }
+            filtered = filtered.filter(ot => ot.planta_id == selectedPlantaId);
         }
         if (selectedEdificioId) {
-            const edificioEl = document.querySelector(`[data-edificio-id="${selectedEdificioId}"]`);
-            const edificioName = edificioEl ? edificioEl.getAttribute('data-edificio-nombre') : '';
-            if (edificioName) {
-                filtered = filtered.filter(ot => ot.edificio_nombre === edificioName);
-            }
+            filtered = filtered.filter(ot => ot.edificio_id == selectedEdificioId);
         }
         if (selectedUbicacionId) {
-            const ubicacionEl = document.querySelector(`[data-ubicacion-id="${selectedUbicacionId}"]`);
-            const ubicacionName = ubicacionEl ? ubicacionEl.getAttribute('data-ubicacion-nombre') : '';
-            if (ubicacionName) {
-                filtered = filtered.filter(ot => ot.ubicacion_nombre === ubicacionName);
-            }
+            filtered = filtered.filter(ot => ot.ubicacion_id == selectedUbicacionId);
         }
 
         // 2. Filter by date range (inclusive)
