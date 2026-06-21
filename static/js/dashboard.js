@@ -2197,11 +2197,160 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function loadPlantLocationsDetail(plantaId) {
+        const locationsListContainer = document.getElementById('plant-detail-locations-list');
+        if (!locationsListContainer) return;
+
+        locationsListContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">Cargando ubicaciones...</p>';
+
+        // 1. Fetch buildings for this plant
+        fetch(`/api/plantas/${plantaId}/edificios`)
+            .then(res => res.json())
+            .then(async edificios => {
+                locationsListContainer.innerHTML = '';
+                if (edificios.length === 0) {
+                    locationsListContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">Sin edificios registrados.</p>';
+                    return;
+                }
+
+                // 2. Fetch locations for each building in parallel
+                const promises = edificios.map(e => 
+                    fetch(`/api/edificios/${e.id}/ubicaciones`)
+                        .then(res => res.json())
+                        .then(ubicaciones => ({ building: e, locations: ubicaciones }))
+                );
+
+                const results = await Promise.all(promises);
+
+                results.forEach(({ building, locations }) => {
+                    // Create building section container
+                    const bSection = document.createElement('div');
+                    bSection.className = 'building-location-group';
+                    bSection.style.marginBottom = '1.25rem';
+                    bSection.style.display = 'flex';
+                    bSection.style.flexDirection = 'column';
+                    bSection.style.gap = '0.5rem';
+
+                    // Building header row with "+ Agregar Ubicación" button
+                    const bHeader = document.createElement('div');
+                    bHeader.style.display = 'flex';
+                    bHeader.style.justifyContent = 'space-between';
+                    bHeader.style.alignItems = 'center';
+                    bHeader.style.borderBottom = '1px solid rgba(255, 255, 255, 0.05)';
+                    bHeader.style.paddingBottom = '0.25rem';
+
+                    bHeader.innerHTML = `
+                        <strong style="color: var(--accent-color); font-size: 0.9rem; display: flex; align-items: center; gap: 0.25rem;">
+                            🏢 ${building.nombre}
+                        </strong>
+                        <button class="btn-secondary btn-add-loc-trigger" data-building-id="${building.id}" style="padding: 0.2rem 0.45rem; font-size: 0.72rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--accent-color); cursor: pointer; display: flex; align-items: center; gap: 0.2rem;">
+                            ➕ Agregar
+                        </button>
+                    `;
+                    bSection.appendChild(bHeader);
+
+                    // Locations list under this building
+                    const locsWrapper = document.createElement('div');
+                    locsWrapper.style.display = 'flex';
+                    locsWrapper.style.flexDirection = 'column';
+                    locsWrapper.style.gap = '0.4rem';
+                    locsWrapper.style.paddingLeft = '0.5rem';
+
+                    if (locations.length === 0) {
+                        locsWrapper.innerHTML = '<span style="color: var(--text-muted); font-size: 0.8rem; font-style: italic; padding: 0.2rem 0;">Sin ubicaciones</span>';
+                    } else {
+                        locations.forEach(u => {
+                            const uRow = document.createElement('div');
+                            uRow.style.display = 'flex';
+                            uRow.style.justifyContent = 'space-between';
+                            uRow.style.alignItems = 'center';
+                            uRow.style.padding = '0.35rem 0.5rem';
+                            uRow.style.borderRadius = '4px';
+                            uRow.style.background = 'rgba(255,255,255,0.01)';
+                            uRow.style.border = '1px solid rgba(255,255,255,0.02)';
+
+                            // Determine display name (with occupants if any)
+                            let displayName = u.nombre;
+                            if (u.ocupantes && u.ocupantes.length > 0) {
+                                const names = u.ocupantes.map(o => o.nombre).join(', ');
+                                displayName = `${u.nombre} <span style="font-size: 0.72rem; color: var(--success); font-weight: normal;">(${names})</span>`;
+                            }
+
+                            uRow.innerHTML = `
+                                <span style="font-size: 0.8rem; color: var(--text-color); font-weight: 500;">
+                                    📍 ${displayName}
+                                </span>
+                                <button class="btn-secondary btn-create-ot-loc-trigger" data-plant-id="${plantaId}" data-building-id="${building.id}" data-loc-id="${u.id}" style="padding: 0.2rem 0.45rem; font-size: 0.72rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--accent-color); cursor: pointer; display: flex; align-items: center; gap: 0.2rem;">
+                                    🛠️ Crear OT
+                                </button>
+                            `;
+                            locsWrapper.appendChild(uRow);
+
+                            // Event listener to open OT creation modal pre-selecting this location!
+                            uRow.querySelector('.btn-create-ot-loc-trigger').addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                openNewOTModalForAsset(plantaId, building.id, u.id, null);
+                            });
+                        });
+                    }
+
+                    bSection.appendChild(locsWrapper);
+                    locationsListContainer.appendChild(bSection);
+
+                    // Event listener to add location
+                    bHeader.querySelector('.btn-add-loc-trigger').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        // Call openLocationModalDirect but override reload behavior to update our list!
+                        const buildingId = building.id;
+                        const name = prompt("Introduce el nombre de la nueva ubicación / sala:");
+                        if (!name || name.trim() === "") return;
+
+                        fetch('/api/ubicaciones', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                nombre: name.trim(),
+                                edificio_id: buildingId
+                            })
+                        })
+                        .then(res => {
+                            if (!res.ok) throw new Error('Error al guardar la ubicación');
+                            return res.json();
+                        })
+                        .then(data => {
+                            alert(`Ubicación "${data.nombre}" creada con éxito.`);
+                            // Reload local list and search list
+                            loadPlantLocationsDetail(plantaId);
+                            preloadSearchList();
+                            // Also reload main sidebar hierarchy in case it's loaded
+                            loadHierarchy();
+                        })
+                        .catch(err => alert(err.message));
+                    });
+                });
+            })
+            .catch(err => {
+                console.error(err);
+                locationsListContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">Error al cargar ubicaciones.</p>';
+            });
+    }
+
     function renderPlantDetail(plantName) {
         currentSelectedPlantName = plantName;
         if (plantDetailTitle) {
             plantDetailTitle.textContent = `Órdenes de Trabajo en ${plantName}`;
         }
+        
+        // Find plant and load locations reactively
+        fetch('/api/plantas')
+            .then(res => res.json())
+            .then(plantas => {
+                const targetPlant = plantas.find(p => p.nombre === plantName);
+                if (targetPlant) {
+                    loadPlantLocationsDetail(targetPlant.id);
+                }
+            })
+            .catch(err => console.error('Error al obtener plantas para vista detalle:', err));
         
         const filteredOts = allLoadedOts.filter(ot => ot.planta_nombre === plantName);
         

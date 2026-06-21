@@ -270,14 +270,15 @@
 
                     <!-- Sub-view 2: Plant OTs Detail View -->
                     <div id="plant-detail-view" style="display: none;">
-                        <div class="card-header-actions" style="margin-bottom: 1.5rem;">
+                        <!-- Header (Full Width) -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
                             <div style="display: flex; align-items: center; gap: 1rem;">
                                 <button class="btn-secondary" id="btn-back-to-plants" style="padding: 0.45rem 0.85rem; font-size: 0.85rem; display: flex; align-items: center; gap: 0.35rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-color); cursor: pointer;">
                                     ⬅️ Volver al Resumen
                                 </button>
                                 <div>
                                     <h2 style="font-size: 1.25rem;" id="plant-detail-title">Órdenes de Trabajo</h2>
-                                    <span style="font-size: 0.85rem; color: var(--text-muted);">Listado de órdenes correspondientes a la planta seleccionada</span>
+                                    <span style="font-size: 0.85rem; color: var(--text-muted);" id="plant-detail-subtitle">Listado de órdenes correspondientes a la planta seleccionada</span>
                                 </div>
                             </div>
                             <div style="display: flex; gap: 0.5rem; background: var(--bg-secondary); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border-color);" id="plant-view-selectors">
@@ -292,8 +293,26 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="grid-container" id="plant-ot-grid">
-                            <!-- Dynamic OT Cards for selected plant -->
+
+                        <!-- 2-Column Layout -->
+                        <div class="plant-detail-layout" style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem;">
+                            
+                            <!-- Left Column: Locations list grouped by building -->
+                            <div class="plant-locations-panel" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; align-self: start;">
+                                <h3 style="font-size: 1rem; color: var(--text-main); font-weight: 600; display: flex; align-items: center; gap: 0.4rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.5rem; margin-bottom: 0.25rem;">📍 Ubicaciones (Sectores)</h3>
+                                <div id="plant-detail-locations-list" style="display: flex; flex-direction: column; gap: 1rem; max-height: 600px; overflow-y: auto; padding-right: 0.25rem;">
+                                    <!-- Loaded dynamically -->
+                                    <p style="color: var(--text-muted); font-size: 0.85rem;">Cargando ubicaciones...</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Right Column: Work Orders list/grid -->
+                            <div class="plant-ots-panel" style="display: flex; flex-direction: column; gap: 1rem;">
+                                <div class="grid-container" id="plant-ot-grid">
+                                    <!-- Dynamic OT Cards for selected plant -->
+                                </div>
+                            </div>
+                            
                         </div>
                     </div>
                 </div>
