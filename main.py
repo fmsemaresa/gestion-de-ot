@@ -42,6 +42,7 @@ class OrdenTrabajoCreate(BaseModel):
     fecha_programada: Optional[datetime] = None
     reportado_por: Optional[str] = "Administración"
     componentes_trabajados: Optional[List[ComponenteTrabajadoInput]] = None
+    custom_checklist_items: Optional[List[dict]] = None
 
 app = FastAPI(
     title="Gestión de OTs - FMS Climatización API", 
@@ -186,6 +187,9 @@ def get_activos(
         edificio = db.get(Edificio, ubicacion.edificio_id) if ubicacion else None
         planta = db.get(Planta, edificio.planta_id) if edificio else None
         
+        # Check if there is an associated PlantillaChequeo for this asset
+        plantilla = db.exec(select(PlantillaChequeo).where(PlantillaChequeo.activo_id == a.id)).first()
+        
         results.append({
             "id": a.id,
             "nombre": a.nombre,
@@ -199,7 +203,8 @@ def get_activos(
             "ubicacion_nombre": ubicacion.nombre if ubicacion else None,
             "edificio_nombre": edificio.nombre if edificio else None,
             "planta_nombre": planta.nombre if planta else None,
-            "cantidad_despiece": len(a.componentes) if a.componentes else 0
+            "cantidad_despiece": len(a.componentes) if a.componentes else 0,
+            "plantilla_id": plantilla.id if plantilla else None
         })
         
     return results
@@ -220,6 +225,9 @@ def get_activo_detail(activo_id: int, db: Session = Depends(get_db)):
     edificio = db.get(Edificio, ubicacion.edificio_id) if ubicacion else None
     planta = db.get(Planta, edificio.planta_id) if edificio else None
     
+    # Check if there is an associated PlantillaChequeo for this asset
+    plantilla = db.exec(select(PlantillaChequeo).where(PlantillaChequeo.activo_id == activo_id)).first()
+    
     return {
         "id": activo.id,
         "nombre": activo.nombre,
@@ -235,7 +243,8 @@ def get_activo_detail(activo_id: int, db: Session = Depends(get_db)):
         "planta_id": planta.id if planta else None,
         "planta_nombre": planta.nombre if planta else None,
         "componentes": componentes,
-        "ordenes_trabajo": ots
+        "ordenes_trabajo": ots,
+        "plantilla_id": plantilla.id if plantilla else None
     }
 
 @app.post("/api/activos", response_model=Activo)
@@ -585,6 +594,48 @@ def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(ot)
         
+    # Guardar items de checklist personalizados si existen
+    if ot_in.custom_checklist_items:
+        # 1. Crear plantilla personalizada para esta OT
+        custom_plantilla = PlantillaChequeo(
+            nombre=f"Chequeo Personalizado OT #{ot.id}",
+            descripcion=f"Plantilla creada para el chequeo de la OT #{ot.id}",
+            tipo_revision="Chequeo Preventivo"
+        )
+        db.add(custom_plantilla)
+        db.commit()
+        db.refresh(custom_plantilla)
+        
+        # 2. Si ya había seleccionado una plantilla base, copiar sus preguntas primero
+        if ot_in.plantilla_id:
+            base_items = db.exec(select(ItemPlantillaChequeo).where(ItemPlantillaChequeo.plantilla_id == ot_in.plantilla_id)).all()
+            for bi in base_items:
+                copied_item = ItemPlantillaChequeo(
+                    texto_pregunta=bi.texto_pregunta,
+                    tipo_respuesta=bi.tipo_respuesta,
+                    unidad_medida=bi.unidad_medida,
+                    plantilla_id=custom_plantilla.id
+                )
+                db.add(copied_item)
+                
+        # 3. Guardar las preguntas adicionales personalizadas
+        for item_in in ot_in.custom_checklist_items:
+            new_item = ItemPlantillaChequeo(
+                texto_pregunta=item_in.get("texto_pregunta"),
+                tipo_respuesta=item_in.get("tipo_respuesta", "booleano"),
+                unidad_medida=item_in.get("unidad_medida") or None,
+                plantilla_id=custom_plantilla.id
+            )
+            db.add(new_item)
+            
+        db.commit()
+        
+        # 4. Asignar la plantilla personalizada a la OT
+        ot.plantilla_id = custom_plantilla.id
+        db.add(ot)
+        db.commit()
+        db.refresh(ot)
+        
     return ot
 
 @app.put("/api/ordenes/{ot_id}", response_model=OrdenTrabajo)
@@ -794,6 +845,63 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
                     db.add(link)
             db.commit()
         
+    if "custom_checklist_items" in updated_ot:
+        custom_items = updated_ot["custom_checklist_items"]
+        if custom_items:
+            plantilla_actual = db.get(PlantillaChequeo, ot.plantilla_id) if ot.plantilla_id else None
+            
+            if plantilla_actual and plantilla_actual.nombre == f"Chequeo Personalizado OT #{ot.id}":
+                for item_in in custom_items:
+                    exists = db.exec(
+                        select(ItemPlantillaChequeo)
+                        .where(ItemPlantillaChequeo.plantilla_id == plantilla_actual.id)
+                        .where(ItemPlantillaChequeo.texto_pregunta == item_in.get("texto_pregunta"))
+                    ).first()
+                    if not exists:
+                        new_item = ItemPlantillaChequeo(
+                            texto_pregunta=item_in.get("texto_pregunta"),
+                            tipo_respuesta=item_in.get("tipo_respuesta", "booleano"),
+                            unidad_medida=item_in.get("unidad_medida") or None,
+                            plantilla_id=plantilla_actual.id
+                        )
+                        db.add(new_item)
+                db.commit()
+            else:
+                custom_plantilla = PlantillaChequeo(
+                    nombre=f"Chequeo Personalizado OT #{ot.id}",
+                    descripcion=f"Plantilla creada para el chequeo de la OT #{ot.id}",
+                    tipo_revision="Chequeo Preventivo"
+                )
+                db.add(custom_plantilla)
+                db.commit()
+                db.refresh(custom_plantilla)
+                
+                if ot.plantilla_id:
+                    base_items = db.exec(select(ItemPlantillaChequeo).where(ItemPlantillaChequeo.plantilla_id == ot.plantilla_id)).all()
+                    for bi in base_items:
+                        copied_item = ItemPlantillaChequeo(
+                            texto_pregunta=bi.texto_pregunta,
+                            tipo_respuesta=bi.tipo_respuesta,
+                            unidad_medida=bi.unidad_medida,
+                            plantilla_id=custom_plantilla.id
+                        )
+                        db.add(copied_item)
+                
+                for item_in in custom_items:
+                    new_item = ItemPlantillaChequeo(
+                        texto_pregunta=item_in.get("texto_pregunta"),
+                        tipo_respuesta=item_in.get("tipo_respuesta", "booleano"),
+                        unidad_medida=item_in.get("unidad_medida") or None,
+                        plantilla_id=custom_plantilla.id
+                    )
+                    db.add(new_item)
+                    
+                db.commit()
+                ot.plantilla_id = custom_plantilla.id
+                db.add(ot)
+                db.commit()
+                db.refresh(ot)
+                
     db.add(ot)
     db.commit()
     db.refresh(ot)
@@ -1782,7 +1890,8 @@ def descargar_plantilla_checklists(db: Session = Depends(get_db)):
         "Tipo de Revisión * (Ronda o Chequeo Preventivo)",
         "Pregunta / Ítem * (Obligatorio)",
         "Tipo de Respuesta * (booleano, numerico, o texto)",
-        "Unidad de Medida (Opcional, ej: V, A, psi, C)"
+        "Unidad de Medida (Opcional, ej: V, A, psi, C)",
+        "Activo Asociado (Opcional, ej: 304 - Fancoil 5 o dejar vacío)"
     ]
     ws_import.append(headers)
     
@@ -1792,6 +1901,15 @@ def descargar_plantilla_checklists(db: Session = Depends(get_db)):
     rows_written = 0
     for p in plantillas:
         items = db.exec(select(ItemPlantillaChequeo).where(ItemPlantillaChequeo.plantilla_id == p.id)).all()
+        
+        activo_info = ""
+        if p.activo_id:
+            activo = db.get(Activo, p.activo_id)
+            if activo:
+                activo_info = f"{activo.id} - {activo.nombre}"
+            else:
+                activo_info = str(p.activo_id)
+
         for item in items:
             ws_import.append([
                 f"PL-{p.id}",
@@ -1800,7 +1918,8 @@ def descargar_plantilla_checklists(db: Session = Depends(get_db)):
                 p.tipo_revision or "Chequeo Preventivo",
                 item.texto_pregunta,
                 item.tipo_respuesta,
-                item.unidad_medida or ""
+                item.unidad_medida or "",
+                activo_info
             ])
             rows_written += 1
             
@@ -1813,7 +1932,8 @@ def descargar_plantilla_checklists(db: Session = Depends(get_db)):
             "Chequeo Preventivo",
             "Limpieza de filtros de aire de unidad evaporadora",
             "booleano",
-            ""
+            "",
+            "304 - Fancoil 5"
         ])
         ws_import.append([
             "PL-Ejemplo",
@@ -1822,7 +1942,8 @@ def descargar_plantilla_checklists(db: Session = Depends(get_db)):
             "Chequeo Preventivo",
             "Medición de consumo eléctrico del motor",
             "numerico",
-            "A"
+            "A",
+            "304 - Fancoil 5"
         ])
         ws_import.append([
             "PL-Ejemplo",
@@ -1831,6 +1952,7 @@ def descargar_plantilla_checklists(db: Session = Depends(get_db)):
             "Ronda",
             "Comprobar fugas de agua o vapor",
             "booleano",
+            "",
             ""
         ])
         
@@ -1901,6 +2023,7 @@ async def importar_checklists(file: UploadFile = File(...), db: Session = Depend
         items_updated = 0
         
         resolved_templates = {}
+        processed_templates = set()
         
         for idx, row in enumerate(rows[1:], start=2):
             if not row or not any(row):
@@ -1913,6 +2036,7 @@ async def importar_checklists(file: UploadFile = File(...), db: Session = Depend
             pregunta = str(row[4]).strip() if row[4] is not None else ""
             tipo_resp_val = str(row[5]).strip() if row[5] is not None else "booleano"
             unidad_medida = str(row[6]).strip() if row[6] is not None else ""
+            activo_asociado_str = str(row[7]).strip() if len(row) > 7 and row[7] is not None else ""
             
             # Omitir filas de ejemplo
             if id_plantilla_str == "PL-Ejemplo" or nombre_plantilla == "Mantenimiento Preventivo Fancoil" and pregunta == "Limpieza de filtros de aire de unidad evaporadora":
@@ -1951,32 +2075,65 @@ async def importar_checklists(file: UploadFile = File(...), db: Session = Depend
                 else:
                     plantilla = db.exec(select(PlantillaChequeo).where(PlantillaChequeo.nombre == nombre_plantilla)).first()
             
-            if plantilla:
-                has_changed = False
-                if descripcion_plantilla and plantilla.descripcion != descripcion_plantilla:
-                    plantilla.descripcion = descripcion_plantilla
-                    has_changed = True
-                if tipo_rev and plantilla.tipo_revision != tipo_rev:
-                    plantilla.tipo_revision = tipo_rev
-                    has_changed = True
-                if has_changed:
-                    db.add(plantilla)
-                    db.commit()
-                    db.refresh(plantilla)
-                    templates_updated += 1
+            # Resolve Asset
+            activo_id = None
+            if activo_asociado_str:
+                parts = [p.strip() for p in activo_asociado_str.split("-", 1)]
+                if parts[0].isdigit():
+                    act_id = int(parts[0])
+                    activo = db.get(Activo, act_id)
+                    if activo:
+                        activo_id = activo.id
                 
+                if not activo_id:
+                    activo = db.exec(select(Activo).where(Activo.nombre == activo_asociado_str)).first()
+                    if activo:
+                        activo_id = activo.id
+                    elif len(parts) > 1:
+                        activo = db.exec(select(Activo).where(Activo.nombre == parts[1])).first()
+                        if activo:
+                            activo_id = activo.id
+
+            if plantilla:
                 resolved_templates[nombre_plantilla] = plantilla
+                if plantilla.id not in processed_templates:
+                    has_changed = False
+                    if descripcion_plantilla and plantilla.descripcion != descripcion_plantilla:
+                        plantilla.descripcion = descripcion_plantilla
+                        has_changed = True
+                    if tipo_rev and plantilla.tipo_revision != tipo_rev:
+                        plantilla.tipo_revision = tipo_rev
+                        has_changed = True
+                    
+                    # Update asset association
+                    if activo_asociado_str:
+                        if plantilla.activo_id != activo_id:
+                            plantilla.activo_id = activo_id
+                            has_changed = True
+                    else:
+                        if plantilla.activo_id is not None:
+                            plantilla.activo_id = None
+                            has_changed = True
+                            
+                    if has_changed:
+                        db.add(plantilla)
+                        db.commit()
+                        db.refresh(plantilla)
+                        templates_updated += 1
+                    processed_templates.add(plantilla.id)
             else:
                 plantilla = PlantillaChequeo(
                     nombre=nombre_plantilla,
                     descripcion=descripcion_plantilla or None,
-                    tipo_revision=tipo_rev
+                    tipo_revision=tipo_rev,
+                    activo_id=activo_id
                 )
                 db.add(plantilla)
                 db.commit()
                 db.refresh(plantilla)
                 templates_created += 1
                 resolved_templates[nombre_plantilla] = plantilla
+                processed_templates.add(plantilla.id)
                 
             # Procesar el item de la plantilla
             existing_item = db.exec(

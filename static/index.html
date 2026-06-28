@@ -758,6 +758,29 @@
                         </select>
                     </div>
 
+                    <!-- Custom Checklist Section -->
+                    <div class="form-group" style="border: 1px dashed var(--border-color); border-radius: 8px; padding: 1rem; margin-top: 1rem; background-color: var(--bg-primary);">
+                        <label style="font-weight: 600; margin-bottom: 0.5rem; display: block; font-size: 0.9rem;">📋 Puntos de Inspección Personalizados</label>
+                        <div id="ot-custom-checklist-list" style="margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 150px; overflow-y: auto;">
+                            <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 0.5rem;">No hay puntos de inspección adicionales</div>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                            <input type="text" id="ot-new-point-text" class="form-control" placeholder="Texto del punto o pregunta..." style="font-size: 0.85rem; padding: 0.4rem 0.6rem;">
+                            <div style="display: flex; gap: 0.5rem;">
+                                <select id="ot-new-point-type" class="form-control" style="flex: 1; font-size: 0.85rem; padding: 0.4rem 0.6rem;">
+                                    <option value="booleano">OK / Falla (Booleano)</option>
+                                    <option value="numerico">Numérico</option>
+                                    <option value="texto">Texto / Comentario</option>
+                                </select>
+                                <input type="text" id="ot-new-point-unit" class="form-control" placeholder="Unidad (ej: psi, A)" style="flex: 1; font-size: 0.85rem; padding: 0.4rem 0.6rem; display: none;">
+                            </div>
+                            <button type="button" id="ot-add-point-btn" class="btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.75rem; width: fit-content; align-self: flex-end; cursor: pointer;">
+                                ➕ Agregar Punto
+                            </button>
+                        </div>
+                    </div>
+
                     <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 0.8rem; margin-top: 1rem;">
                         Crear Orden de Trabajo
                     </button>
@@ -877,6 +900,29 @@
                                 <label for="edit-ot-hora-programada">Hora</label>
                                 <input type="time" id="edit-ot-hora-programada" class="form-control">
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Custom Checklist Section for Edit -->
+                    <div class="form-group" style="border: 1px dashed var(--border-color); border-radius: 8px; padding: 1rem; margin-top: 1rem; background-color: var(--bg-primary);">
+                        <label style="font-weight: 600; margin-bottom: 0.5rem; display: block; font-size: 0.9rem;">📋 Puntos de Inspección Personalizados</label>
+                        <div id="edit-ot-custom-checklist-list" style="margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 150px; overflow-y: auto;">
+                            <div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 0.5rem;">No hay puntos de inspección adicionales</div>
+                        </div>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px solid var(--border-color); padding-top: 0.75rem;">
+                            <input type="text" id="edit-ot-new-point-text" class="form-control" placeholder="Texto del punto o pregunta..." style="font-size: 0.85rem; padding: 0.4rem 0.6rem;">
+                            <div style="display: flex; gap: 0.5rem;">
+                                <select id="edit-ot-new-point-type" class="form-control" style="flex: 1; font-size: 0.85rem; padding: 0.4rem 0.6rem;">
+                                    <option value="booleano">OK / Falla (Booleano)</option>
+                                    <option value="numerico">Numérico</option>
+                                    <option value="texto">Texto / Comentario</option>
+                                </select>
+                                <input type="text" id="edit-ot-new-point-unit" class="form-control" placeholder="Unidad (ej: psi, A)" style="flex: 1; font-size: 0.85rem; padding: 0.4rem 0.6rem; display: none;">
+                            </div>
+                            <button type="button" id="edit-ot-add-point-btn" class="btn-secondary" style="font-size: 0.85rem; padding: 0.4rem 0.75rem; width: fit-content; align-self: flex-end; cursor: pointer;">
+                                ➕ Agregar Punto
+                            </button>
                         </div>
                     </div>
 

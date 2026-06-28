@@ -55,6 +55,10 @@ class Activo(SQLModel, table=True):
     
     componentes: List["ComponenteActivo"] = Relationship(back_populates="activo")
     ordenes_trabajo: List["OrdenTrabajo"] = Relationship(back_populates="activo")
+    plantillas_chequeo: List["PlantillaChequeo"] = Relationship(
+        back_populates="activo",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
 
 class ComponenteActivo(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -77,7 +81,9 @@ class PlantillaChequeo(SQLModel, table=True):
     nombre: str = Field(index=True)
     descripcion: Optional[str] = None
     tipo_revision: Optional[str] = Field(default="Chequeo Preventivo", index=True)
+    activo_id: Optional[int] = Field(default=None, foreign_key="activo.id", nullable=True)
 
+    activo: Optional[Activo] = Relationship(back_populates="plantillas_chequeo")
     items: List["ItemPlantillaChequeo"] = Relationship(
         back_populates="plantilla",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}

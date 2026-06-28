@@ -52,6 +52,11 @@ def create_db_and_tables():
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE plantillachequeo ADD COLUMN tipo_revision VARCHAR(100) DEFAULT 'Chequeo Preventivo'"))
             print("Columna 'tipo_revision' agregada exitosamente.")
+        if 'activo_id' not in columns_pc:
+            print("Migrando base de datos: agregando columna 'activo_id' a la tabla 'plantillachequeo'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE plantillachequeo ADD COLUMN activo_id INTEGER REFERENCES activo(id)"))
+            print("Columna 'activo_id' agregada exitosamente.")
         
         # Ensure existing templates are categorized correctly
         with engine.begin() as conn:

@@ -13,6 +13,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentOtViewMode = 'flat'; // 'flat', 'building', 'type', or 'calendar'
     let calendarYear = new Date().getFullYear();
     let calendarMonth = new Date().getMonth();
+    let customChecklistItems = [];
+    let editCustomChecklistItems = [];
+    let calendarViewSubMode = 'month'; // 'day', 'week', 'month'
+    let calendarCurrentDate = new Date();
 
     // DOM Elements
     const kpiTotalOts = document.getElementById('kpi-total-ots');
@@ -1965,9 +1969,23 @@ document.addEventListener('DOMContentLoaded', () => {
             "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
         ];
         
+        // Day names in Spanish
+        const dayNames = [
+            "Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"
+        ];
+        
         // Split OTs: scheduled vs unscheduled
         const unscheduledOts = filteredOts.filter(ot => !ot.fecha_programada);
         const scheduledOts = filteredOts.filter(ot => ot.fecha_programada);
+
+        // Priority weights helper
+        const getPriorityWeight = (priority) => {
+            const p = (priority || '').toLowerCase();
+            if (p === 'alta') return 3;
+            if (p === 'media') return 2;
+            if (p === 'baja') return 1;
+            return 0;
+        };
 
         // 1. Sidebar (Unscheduled OTs)
         let sidebarOtsHtml = '';
@@ -2001,19 +2019,55 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        // 2. Main Calendar Grid
+        // Compute title based on sub-view mode
+        let titleText = '';
+        if (calendarViewSubMode === 'month') {
+            titleText = `${monthNames[calendarMonth]} ${calendarYear}`;
+        } else if (calendarViewSubMode === 'week') {
+            const currentDayOfWeek = calendarCurrentDate.getDay();
+            const distanceToMonday = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+            const mondayDate = new Date(calendarCurrentDate);
+            mondayDate.setDate(calendarCurrentDate.getDate() + distanceToMonday);
+            
+            const weekDays = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(mondayDate);
+                d.setDate(mondayDate.getDate() + i);
+                weekDays.push(d);
+            }
+            
+            const startDay = weekDays[0].getDate();
+            const startMonthName = monthNames[weekDays[0].getMonth()];
+            const endDay = weekDays[6].getDate();
+            const endMonthName = monthNames[weekDays[6].getMonth()];
+            const weekYear = weekDays[6].getFullYear();
+            titleText = `Semana del ${startDay} de ${startMonthName} al ${endDay} de ${endMonthName}, ${weekYear}`;
+        } else if (calendarViewSubMode === 'day') {
+            const dayName = dayNames[calendarCurrentDate.getDay()];
+            const dayNum = calendarCurrentDate.getDate();
+            const monthName = monthNames[calendarCurrentDate.getMonth()];
+            const yearNum = calendarCurrentDate.getFullYear();
+            titleText = `${dayName} ${dayNum} de ${monthName}, ${yearNum}`;
+        }
+
+        // 2. Main Calendar Grid Area
         const mainAreaHtml = `
             <div class="calendar-main-area">
-                <div class="calendar-navbar">
-                    <button class="btn-secondary" id="calendar-prev-month" style="padding: 0.4rem 0.6rem; cursor: pointer; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main);">◀</button>
-                    <span class="calendar-nav-title" id="calendar-month-title">${monthNames[calendarMonth]} ${calendarYear}</span>
-                    <div class="calendar-nav-buttons">
+                <div class="calendar-navbar" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <button class="btn-secondary" id="calendar-prev-month" style="padding: 0.4rem 0.6rem; cursor: pointer; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main);">◀</button>
                         <button class="btn-secondary" id="calendar-today" style="padding: 0.4rem 0.75rem; cursor: pointer; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main); font-weight: 500;">Hoy</button>
                         <button class="btn-secondary" id="calendar-next-month" style="padding: 0.4rem 0.6rem; cursor: pointer; background: transparent; border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-main);">▶</button>
                     </div>
+                    <span class="calendar-nav-title" id="calendar-month-title" style="font-weight: bold; font-size: 1.1rem; color: var(--text-main);">${titleText}</span>
+                    <div class="calendar-view-toggles" style="display: flex; gap: 0.25rem; background: var(--bg-primary); padding: 0.25rem; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <button class="btn-calendar-toggle ${calendarViewSubMode === 'day' ? 'active' : ''}" id="calendar-view-day" style="padding: 0.35rem 0.7rem; border: none; background: ${calendarViewSubMode === 'day' ? 'var(--bg-card)' : 'transparent'}; border-radius: 6px; color: var(--text-main); cursor: pointer; font-size: 0.85rem; font-weight: 600; box-shadow: ${calendarViewSubMode === 'day' ? 'var(--shadow-sm)' : 'none'};">Día</button>
+                        <button class="btn-calendar-toggle ${calendarViewSubMode === 'week' ? 'active' : ''}" id="calendar-view-week" style="padding: 0.35rem 0.7rem; border: none; background: ${calendarViewSubMode === 'week' ? 'var(--bg-card)' : 'transparent'}; border-radius: 6px; color: var(--text-main); cursor: pointer; font-size: 0.85rem; font-weight: 600; box-shadow: ${calendarViewSubMode === 'week' ? 'var(--shadow-sm)' : 'none'};">Semana</button>
+                        <button class="btn-calendar-toggle ${calendarViewSubMode === 'month' ? 'active' : ''}" id="calendar-view-month" style="padding: 0.35rem 0.7rem; border: none; background: ${calendarViewSubMode === 'month' ? 'var(--bg-card)' : 'transparent'}; border-radius: 6px; color: var(--text-main); cursor: pointer; font-size: 0.85rem; font-weight: 600; box-shadow: ${calendarViewSubMode === 'month' ? 'var(--shadow-sm)' : 'none'};">Mes</button>
+                    </div>
                 </div>
                 <div class="calendar-grid-wrapper">
-                    <div class="calendar-days-header">
+                    <div class="calendar-days-header" id="calendar-grid-days-header" style="${calendarViewSubMode === 'day' ? 'display: none;' : ''}">
                         <div>Lun</div>
                         <div>Mar</div>
                         <div>Mié</div>
@@ -2032,142 +2086,421 @@ document.addEventListener('DOMContentLoaded', () => {
         layout.innerHTML = sidebarHtml + mainAreaHtml;
         targetGrid.appendChild(layout);
 
-        // Calendar math & cells rendering
         const cellsContainer = document.getElementById('calendar-grid-cells');
-        const cells = [];
-        
-        let firstDayIndex = new Date(calendarYear, calendarMonth, 1).getDay();
-        let startColumnIndex = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
-        let totalDaysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
-        let totalDaysInPrevMonth = new Date(calendarYear, calendarMonth, 0).getDate();
 
-        // Prev Month padding
-        for (let i = startColumnIndex - 1; i >= 0; i--) {
-            const prevMonth = calendarMonth === 0 ? 11 : calendarMonth - 1;
-            const prevYear = calendarMonth === 0 ? calendarYear - 1 : calendarYear;
-            const prevDay = totalDaysInPrevMonth - i;
-            
-            const today = new Date();
-            const isToday = today.getDate() === prevDay && today.getMonth() === prevMonth && today.getFullYear() === prevYear;
+        // 3. Render content based on active sub-view mode
+        if (calendarViewSubMode === 'month') {
+            cellsContainer.style.display = 'grid';
+            cellsContainer.style.gridTemplateColumns = 'repeat(7, 1fr)';
+            cellsContainer.parentElement.style.display = '';
 
-            cells.push({
-                day: prevDay,
-                month: prevMonth,
-                year: prevYear,
-                isCurrentMonth: false,
-                isToday: isToday
-            });
-        }
+            const cells = [];
+            let firstDayIndex = new Date(calendarYear, calendarMonth, 1).getDay();
+            let startColumnIndex = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+            let totalDaysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+            let totalDaysInPrevMonth = new Date(calendarYear, calendarMonth, 0).getDate();
 
-        // Current Month
-        for (let d = 1; d <= totalDaysInMonth; d++) {
-            const today = new Date();
-            const isToday = today.getDate() === d && today.getMonth() === calendarMonth && today.getFullYear() === calendarYear;
+            // Prev Month padding
+            for (let i = startColumnIndex - 1; i >= 0; i--) {
+                const prevMonth = calendarMonth === 0 ? 11 : calendarMonth - 1;
+                const prevYear = calendarMonth === 0 ? calendarYear - 1 : calendarYear;
+                const prevDay = totalDaysInPrevMonth - i;
+                
+                const today = new Date();
+                const isToday = today.getDate() === prevDay && today.getMonth() === prevMonth && today.getFullYear() === prevYear;
 
-            cells.push({
-                day: d,
-                month: calendarMonth,
-                year: calendarYear,
-                isCurrentMonth: true,
-                isToday: isToday
-            });
-        }
+                cells.push({
+                    day: prevDay,
+                    month: prevMonth,
+                    year: prevYear,
+                    isCurrentMonth: false,
+                    isToday: isToday
+                });
+            }
 
-        // Next Month padding
-        let nextMonthDaysCount = 42 - cells.length;
-        for (let d = 1; d <= nextMonthDaysCount; d++) {
-            const nextMonth = calendarMonth === 11 ? 0 : calendarMonth + 1;
-            const nextYear = calendarMonth === 11 ? calendarYear + 1 : calendarYear;
-            
-            const today = new Date();
-            const isToday = today.getDate() === d && today.getMonth() === nextMonth && today.getFullYear() === nextYear;
+            // Current Month
+            for (let d = 1; d <= totalDaysInMonth; d++) {
+                const today = new Date();
+                const isToday = today.getDate() === d && today.getMonth() === calendarMonth && today.getFullYear() === calendarYear;
 
-            cells.push({
-                day: d,
-                month: nextMonth,
-                year: nextYear,
-                isCurrentMonth: false,
-                isToday: isToday
-            });
-        }
+                cells.push({
+                    day: d,
+                    month: calendarMonth,
+                    year: calendarYear,
+                    isCurrentMonth: true,
+                    isToday: isToday
+                });
+            }
 
-        // Render cells
-        cells.forEach(cell => {
-            const cellDiv = document.createElement('div');
-            let cellClass = 'calendar-day-cell';
-            if (!cell.isCurrentMonth) cellClass += ' other-month';
-            if (cell.isToday) cellClass += ' today';
-            cellDiv.className = cellClass;
-            
-            // Format cell date string: YYYY-MM-DD
-            const cellDateStr = `${cell.year}-${String(cell.month + 1).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}`;
-            cellDiv.dataset.date = cellDateStr;
+            // Next Month padding
+            let nextMonthDaysCount = 42 - cells.length;
+            for (let d = 1; d <= nextMonthDaysCount; d++) {
+                const nextMonth = calendarMonth === 11 ? 0 : calendarMonth + 1;
+                const nextYear = calendarMonth === 11 ? calendarYear + 1 : calendarYear;
+                
+                const today = new Date();
+                const isToday = today.getDate() === d && today.getMonth() === nextMonth && today.getFullYear() === nextYear;
 
-            // OTs for this day
-            const dayOts = scheduledOts.filter(ot => {
-                const pDate = new Date(ot.fecha_programada);
-                return pDate.getFullYear() === cell.year &&
-                       pDate.getMonth() === cell.month &&
-                       pDate.getDate() === cell.day;
-            });
+                cells.push({
+                    day: d,
+                    month: nextMonth,
+                    year: nextYear,
+                    isCurrentMonth: false,
+                    isToday: isToday
+                });
+            }
 
-            let otTagsHtml = '';
-            dayOts.forEach(ot => {
-                otTagsHtml += `
-                    <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}">
-                        <div class="ot-tag-id">#OT-${ot.id}</div>
-                        <div class="ot-tag-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
+            // Render cells
+            cells.forEach(cell => {
+                const cellDiv = document.createElement('div');
+                let cellClass = 'calendar-day-cell';
+                if (!cell.isCurrentMonth) cellClass += ' other-month';
+                if (cell.isToday) cellClass += ' today';
+                cellDiv.className = cellClass;
+                
+                const cellDateStr = `${cell.year}-${String(cell.month + 1).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}`;
+                cellDiv.dataset.date = cellDateStr;
+
+                const dayOts = scheduledOts.filter(ot => {
+                    const pDate = new Date(ot.fecha_programada);
+                    return pDate.getFullYear() === cell.year &&
+                           pDate.getMonth() === cell.month &&
+                           pDate.getDate() === cell.day;
+                });
+
+                let otTagsHtml = '';
+                dayOts.forEach(ot => {
+                    const pDate = new Date(ot.fecha_programada);
+                    let timeStr = '';
+                    if (pDate.getHours() !== 0 || pDate.getMinutes() !== 0) {
+                        timeStr = ` <span style="font-weight: 600; font-size: 0.75rem; opacity: 0.85;">(${String(pDate.getHours()).padStart(2, '0')}:${String(pDate.getMinutes()).padStart(2, '0')})</span>`;
+                    }
+                    otTagsHtml += `
+                        <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}">
+                            <div class="ot-tag-id">#OT-${ot.id}${timeStr}</div>
+                            <div class="ot-tag-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
+                        </div>
+                    `;
+                });
+
+                cellDiv.innerHTML = `
+                    <span class="day-number-label">${cell.day}</span>
+                    <div class="calendar-ot-list">
+                        ${otTagsHtml}
                     </div>
                 `;
+                
+                cellsContainer.appendChild(cellDiv);
+
+                // Click listener on cell for new OT
+                cellDiv.addEventListener('click', (e) => {
+                    if (e.target.closest('.calendar-ot-tag') || e.target.closest('.day-number-label')) return;
+                    openNewOTModal(cellDateStr);
+                });
+
+                // day label button to switch to day view
+                const dayLabel = cellDiv.querySelector('.day-number-label');
+                if (dayLabel) {
+                    dayLabel.style.cursor = 'pointer';
+                    dayLabel.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        calendarCurrentDate = new Date(cell.year, cell.month, cell.day);
+                        calendarViewSubMode = 'day';
+                        loadWorkOrders();
+                    });
+                }
             });
 
-            cellDiv.innerHTML = `
-                <span class="day-number-label">${cell.day}</span>
-                <div class="calendar-ot-list">
-                    ${otTagsHtml}
+        } else if (calendarViewSubMode === 'week') {
+            cellsContainer.style.display = 'grid';
+            cellsContainer.style.gridTemplateColumns = 'repeat(7, 1fr)';
+            cellsContainer.parentElement.style.display = '';
+
+            const currentDayOfWeek = calendarCurrentDate.getDay();
+            const distanceToMonday = currentDayOfWeek === 0 ? -6 : 1 - currentDayOfWeek;
+            const mondayDate = new Date(calendarCurrentDate);
+            mondayDate.setDate(calendarCurrentDate.getDate() + distanceToMonday);
+
+            const weekDays = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(mondayDate);
+                d.setDate(mondayDate.getDate() + i);
+                weekDays.push(d);
+            }
+
+            weekDays.forEach(d => {
+                const cellDiv = document.createElement('div');
+                const isToday = d.getDate() === new Date().getDate() && 
+                                d.getMonth() === new Date().getMonth() && 
+                                d.getFullYear() === new Date().getFullYear();
+                
+                let cellClass = 'calendar-day-cell week-cell';
+                if (isToday) cellClass += ' today';
+                cellDiv.className = cellClass;
+                cellDiv.style.backgroundColor = 'var(--bg-card)';
+                cellDiv.style.padding = '0.75rem';
+                cellDiv.style.minHeight = '450px';
+                cellDiv.style.display = 'flex';
+                cellDiv.style.flexDirection = 'column';
+                cellDiv.style.gap = '0.5rem';
+                
+                const cellDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                cellDiv.dataset.date = cellDateStr;
+
+                const dayOts = scheduledOts.filter(ot => {
+                    const pDate = new Date(ot.fecha_programada);
+                    return pDate.getFullYear() === d.getFullYear() &&
+                           pDate.getMonth() === d.getMonth() &&
+                           pDate.getDate() === d.getDate();
+                });
+
+                // Sort week day OTs by priority desc, then creation date asc
+                dayOts.sort((a, b) => {
+                    const wA = getPriorityWeight(a.prioridad);
+                    const wB = getPriorityWeight(b.prioridad);
+                    if (wB !== wA) return wB - wA;
+                    return new Date(a.fecha_creacion) - new Date(b.fecha_creacion);
+                });
+
+                let otTagsHtml = '';
+                dayOts.forEach(ot => {
+                    const pDate = new Date(ot.fecha_programada);
+                    let timeStr = '';
+                    if (pDate.getHours() !== 0 || pDate.getMinutes() !== 0) {
+                        timeStr = ` <span style="font-weight: 600; font-size: 0.75rem; opacity: 0.85;">(${String(pDate.getHours()).padStart(2, '0')}:${String(pDate.getMinutes()).padStart(2, '0')})</span>`;
+                    }
+                    otTagsHtml += `
+                        <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}">
+                            <div class="ot-tag-id">#OT-${ot.id}${timeStr}</div>
+                            <div class="ot-tag-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
+                        </div>
+                    `;
+                });
+
+                const formattedDayName = dayNames[d.getDay()].substring(0, 3);
+                cellDiv.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
+                        <span style="font-weight: bold; font-size: 0.85rem; color: var(--text-main);">${formattedDayName}</span>
+                        <span class="day-number-label" style="${isToday ? 'background: var(--primary-color, #2563eb); color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;' : 'font-size: 0.85rem; color: var(--text-muted);'}">${d.getDate()}</span>
+                    </div>
+                    <div class="calendar-ot-list" style="flex: 1; display: flex; flex-direction: column; gap: 0.5rem; overflow-y: auto; min-height: 380px;">
+                        ${otTagsHtml}
+                    </div>
+                `;
+
+                cellsContainer.appendChild(cellDiv);
+
+                cellDiv.addEventListener('click', (e) => {
+                    if (e.target.closest('.calendar-ot-tag') || e.target.closest('.day-number-label')) return;
+                    openNewOTModal(cellDateStr);
+                });
+
+                const dayLabelBtn = cellDiv.querySelector('.day-number-label');
+                if (dayLabelBtn) {
+                    dayLabelBtn.style.cursor = 'pointer';
+                    dayLabelBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        calendarCurrentDate = new Date(d);
+                        calendarViewSubMode = 'day';
+                        loadWorkOrders();
+                    });
+                }
+            });
+
+        } else if (calendarViewSubMode === 'day') {
+            const cellDateStr = `${calendarCurrentDate.getFullYear()}-${String(calendarCurrentDate.getMonth() + 1).padStart(2, '0')}-${String(calendarCurrentDate.getDate()).padStart(2, '0')}`;
+            
+            const dayOts = scheduledOts.filter(ot => {
+                const pDate = new Date(ot.fecha_programada);
+                return pDate.getFullYear() === calendarCurrentDate.getFullYear() &&
+                       pDate.getMonth() === calendarCurrentDate.getMonth() &&
+                       pDate.getDate() === calendarCurrentDate.getDate();
+            });
+
+            // Split into unassigned (time 00:00) vs assigned
+            const unassignedHourOts = dayOts.filter(ot => {
+                const pDate = new Date(ot.fecha_programada);
+                return pDate.getHours() === 0 && pDate.getMinutes() === 0 && pDate.getSeconds() === 0;
+            });
+            
+            const assignedHourOts = dayOts.filter(ot => {
+                const pDate = new Date(ot.fecha_programada);
+                return pDate.getHours() !== 0 || pDate.getMinutes() !== 0 || pDate.getSeconds() !== 0;
+            });
+
+            // Sort unassigned OTs by priority desc, then creation date asc
+            unassignedHourOts.sort((a, b) => {
+                const wA = getPriorityWeight(a.prioridad);
+                const wB = getPriorityWeight(b.prioridad);
+                if (wB !== wA) return wB - wA;
+                return new Date(a.fecha_creacion) - new Date(b.fecha_creacion);
+            });
+
+            let unassignedOtsHtml = '';
+            if (unassignedHourOts.length > 0) {
+                unassignedHourOts.forEach(ot => {
+                    unassignedOtsHtml += `
+                        <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" style="margin: 0; width: 100%; max-width: 250px;">
+                            <div class="ot-tag-id">#OT-${ot.id} <span style="font-size:0.7rem; opacity:0.8; font-weight:normal;">(Sin Hora)</span></div>
+                            <div class="ot-tag-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
+                        </div>
+                    `;
+                });
+            } else {
+                unassignedOtsHtml = '<div style="font-size: 0.85rem; color: var(--text-muted); padding: 0.5rem 0;">No hay órdenes sin hora asignada para hoy.</div>';
+            }
+
+            const dailyViewHtml = `
+                <div class="daily-view-container" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%; padding: 0.5rem 0;">
+                    <!-- Section: Unassigned / All Day OTs -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 0.95rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
+                            <span>📅 Todo el Día / Sin Hora Asignada</span>
+                            <span class="badge" style="background: var(--bg-primary); padding: 0.15rem 0.4rem; border-radius: 10px; font-size: 0.75rem; font-weight: normal;">${unassignedHourOts.length}</span>
+                        </h4>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+                            ${unassignedOtsHtml}
+                        </div>
+                    </div>
+
+                    <!-- Section: Hourly Timeline -->
+                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; box-shadow: var(--shadow-sm);">
+                        <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.95rem; color: var(--text-main);">⏰ Cronograma por Horas</h4>
+                        <div class="hourly-timeline" id="daily-timeline-rows" style="display: flex; flex-direction: column; border-top: 1px solid var(--border-color);">
+                            <!-- hourly rows will go here -->
+                        </div>
+                    </div>
                 </div>
             `;
             
-            cellsContainer.appendChild(cellDiv);
+            cellsContainer.innerHTML = dailyViewHtml;
+            cellsContainer.style.display = 'block';
+            cellsContainer.parentElement.style.display = 'block';
 
-            // Click listener for empty cells to create a new OT
-            cellDiv.addEventListener('click', (e) => {
-                // If clicking an OT tag or button, don't trigger cell click
-                if (e.target.closest('.calendar-ot-tag')) return;
+            const timelineRows = document.getElementById('daily-timeline-rows');
+            for (let hour = 0; hour < 24; hour++) {
+                const hourStr = String(hour).padStart(2, '0') + ':00';
                 
-                openNewOTModal(cellDateStr);
-            });
+                const hourOts = assignedHourOts.filter(ot => {
+                    const pDate = new Date(ot.fecha_programada);
+                    return pDate.getHours() === hour;
+                });
+
+                // Sort hour OTs by priority desc, then creation date asc
+                hourOts.sort((a, b) => {
+                    const wA = getPriorityWeight(a.prioridad);
+                    const wB = getPriorityWeight(b.prioridad);
+                    if (wB !== wA) return wB - wA;
+                    return new Date(a.fecha_creacion) - new Date(b.fecha_creacion);
+                });
+
+                let hourOtsHtml = '';
+                hourOts.forEach(ot => {
+                    const pDate = new Date(ot.fecha_programada);
+                    const timeStr = String(pDate.getHours()).padStart(2, '0') + ':' + String(pDate.getMinutes()).padStart(2, '0');
+                    hourOtsHtml += `
+                        <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" style="margin: 0; min-width: 150px; max-width: 250px;">
+                            <div class="ot-tag-id">#OT-${ot.id} <span style="font-size:0.7rem; opacity:0.8; font-weight:normal;">(${timeStr})</span></div>
+                            <div class="ot-tag-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
+                        </div>
+                    `;
+                });
+
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'timeline-hour-row';
+                rowDiv.style.display = 'flex';
+                rowDiv.style.borderBottom = '1px solid var(--border-color)';
+                rowDiv.style.minHeight = '3.5rem';
+                rowDiv.style.cursor = 'pointer';
+                rowDiv.style.transition = 'background-color 0.2s';
+                
+                rowDiv.innerHTML = `
+                    <div class="hour-label" style="width: 70px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.85rem; color: var(--text-muted); border-right: 1px solid var(--border-color); padding: 0.5rem; background: var(--bg-primary); user-select: none;">
+                        ${hourStr}
+                    </div>
+                    <div class="hour-content" style="flex: 1; display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; overflow-x: auto; flex-wrap: wrap;">
+                        ${hourOtsHtml}
+                    </div>
+                `;
+
+                rowDiv.addEventListener('mouseenter', () => { rowDiv.style.backgroundColor = 'var(--bg-primary)'; });
+                rowDiv.addEventListener('mouseleave', () => { rowDiv.style.backgroundColor = ''; });
+
+                rowDiv.addEventListener('click', (e) => {
+                    if (e.target.closest('.calendar-ot-tag')) return;
+                    openNewOTModal(cellDateStr, hourStr);
+                });
+
+                timelineRows.appendChild(rowDiv);
+            }
+        }
+
+        // Add view toggles event listeners
+        document.getElementById('calendar-view-day').addEventListener('click', () => {
+            calendarViewSubMode = 'day';
+            loadWorkOrders();
+        });
+        document.getElementById('calendar-view-week').addEventListener('click', () => {
+            calendarViewSubMode = 'week';
+            loadWorkOrders();
+        });
+        document.getElementById('calendar-view-month').addEventListener('click', () => {
+            calendarViewSubMode = 'month';
+            loadWorkOrders();
         });
 
-        // Add event listeners to navbar controls
+        // Add navbar navigation controls listeners
         document.getElementById('calendar-prev-month').addEventListener('click', () => {
-            if (calendarMonth === 0) {
-                calendarMonth = 11;
-                calendarYear--;
-            } else {
-                calendarMonth--;
+            if (calendarViewSubMode === 'month') {
+                if (calendarMonth === 0) {
+                    calendarMonth = 11;
+                    calendarYear--;
+                } else {
+                    calendarMonth--;
+                }
+                calendarCurrentDate = new Date(calendarYear, calendarMonth, 1);
+            } else if (calendarViewSubMode === 'week') {
+                calendarCurrentDate.setDate(calendarCurrentDate.getDate() - 7);
+                calendarYear = calendarCurrentDate.getFullYear();
+                calendarMonth = calendarCurrentDate.getMonth();
+            } else if (calendarViewSubMode === 'day') {
+                calendarCurrentDate.setDate(calendarCurrentDate.getDate() - 1);
+                calendarYear = calendarCurrentDate.getFullYear();
+                calendarMonth = calendarCurrentDate.getMonth();
             }
             loadWorkOrders();
         });
 
         document.getElementById('calendar-next-month').addEventListener('click', () => {
-            if (calendarMonth === 11) {
-                calendarMonth = 0;
-                calendarYear++;
-            } else {
-                calendarMonth++;
+            if (calendarViewSubMode === 'month') {
+                if (calendarMonth === 11) {
+                    calendarMonth = 0;
+                    calendarYear++;
+                } else {
+                    calendarMonth++;
+                }
+                calendarCurrentDate = new Date(calendarYear, calendarMonth, 1);
+            } else if (calendarViewSubMode === 'week') {
+                calendarCurrentDate.setDate(calendarCurrentDate.getDate() + 7);
+                calendarYear = calendarCurrentDate.getFullYear();
+                calendarMonth = calendarCurrentDate.getMonth();
+            } else if (calendarViewSubMode === 'day') {
+                calendarCurrentDate.setDate(calendarCurrentDate.getDate() + 1);
+                calendarYear = calendarCurrentDate.getFullYear();
+                calendarMonth = calendarCurrentDate.getMonth();
             }
             loadWorkOrders();
         });
 
         document.getElementById('calendar-today').addEventListener('click', () => {
-            calendarMonth = new Date().getMonth();
-            calendarYear = new Date().getFullYear();
+            calendarCurrentDate = new Date();
+            calendarYear = calendarCurrentDate.getFullYear();
+            calendarMonth = calendarCurrentDate.getMonth();
             loadWorkOrders();
         });
 
-        // Add click listener to calendar OT tags to open details drawer
-        cellsContainer.querySelectorAll('.calendar-ot-tag').forEach(tag => {
+        // Add details drawer link on OT click
+        layout.querySelectorAll('.calendar-ot-tag').forEach(tag => {
             tag.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const otId = tag.dataset.otId;
@@ -2175,7 +2508,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
-        // Add click listeners to sidebar cards to open details drawer, and button to schedule
+        // Add details drawer link on unscheduled card click
         const sidebarContainer = layout.querySelector('.unscheduled-ots-container');
         if (sidebarContainer) {
             sidebarContainer.querySelectorAll('.unscheduled-ot-card').forEach(card => {
@@ -3306,8 +3639,7 @@ document.addEventListener('DOMContentLoaded', () => {
             uLabel.innerHTML = 'Ubicación *';
         }
     }
-
-    function openNewOTModal(prefilledDate = null) {
+    function openNewOTModal(prefilledDate = null, prefilledTime = null) {
         // Clear search inputs
         const otSearchInput = document.getElementById('ot-search-location');
         const otSearchResults = document.getElementById('ot-search-location-results');
@@ -3318,6 +3650,19 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         resetOtComponents();
+
+        // Reset custom checklist items
+        customChecklistItems = [];
+        const otNewPointText = document.getElementById('ot-new-point-text');
+        const otNewPointType = document.getElementById('ot-new-point-type');
+        const otNewPointUnit = document.getElementById('ot-new-point-unit');
+        if (otNewPointText) otNewPointText.value = '';
+        if (otNewPointType) otNewPointType.value = 'booleano';
+        if (otNewPointUnit) {
+            otNewPointUnit.value = '';
+            otNewPointUnit.style.display = 'none';
+        }
+        renderCustomChecklistItems();
 
         const otPlanta = document.getElementById('ot-select-planta');
         const otEdificio = document.getElementById('ot-select-edificio');
@@ -3333,13 +3678,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const otHoraProgramada = document.getElementById('ot-hora-programada');
         if (prefilledDate) {
             otFechaProgramada.value = prefilledDate;
-            otHoraProgramada.value = '08:00';
+            otHoraProgramada.value = prefilledTime || '08:00';
         } else {
             otFechaProgramada.value = '';
             otHoraProgramada.value = '';
-        }
-
-        // Clear checklist template selector dropdown
+        }        // Clear checklist template selector dropdown
         const otSelectPlantilla = document.getElementById('ot-select-plantilla');
         otSelectPlantilla.innerHTML = '<option value="">Cargando...</option>';
 
@@ -3564,6 +3907,9 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch(`/api/activos/${activoId}`)
             .then(res => res.json())
             .then(data => {
+                if (data.plantilla_id) {
+                    document.getElementById('ot-select-plantilla').value = data.plantilla_id;
+                }
                 if (data.componentes && data.componentes.length > 0) {
                     container.style.display = 'block';
                     data.componentes.forEach(comp => {
@@ -3643,7 +3989,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tecnico_id: tecnicoId,
             plantilla_id: plantillaId,
             fecha_programada: fullFechaProgramada,
-            componentes_trabajados: componentes_trabajados
+            componentes_trabajados: componentes_trabajados,
+            custom_checklist_items: customChecklistItems
         };
 
         fetch('/api/ordenes', {
@@ -4332,6 +4679,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function openEditOTModal(otId) {
+        // Reset edit custom checklist items
+        editCustomChecklistItems = [];
+        const editOtNewPointText = document.getElementById('edit-ot-new-point-text');
+        const editOtNewPointType = document.getElementById('edit-ot-new-point-type');
+        const editOtNewPointUnit = document.getElementById('edit-ot-new-point-unit');
+        if (editOtNewPointText) editOtNewPointText.value = '';
+        if (editOtNewPointType) editOtNewPointType.value = 'booleano';
+        if (editOtNewPointUnit) {
+            editOtNewPointUnit.value = '';
+            editOtNewPointUnit.style.display = 'none';
+        }
+        renderEditCustomChecklistItems();
+
         // Fetch OT details
         const res = await fetch(`/api/ordenes/${otId}`);
         if (!res.ok) {
@@ -4585,7 +4945,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tecnico_id: tecnicoId,
             fecha_programada: fechaProgramadaFull,
             plantilla_id: plantillaId,
-            componentes_trabajados: componentes_trabajados
+            componentes_trabajados: componentes_trabajados,
+            custom_checklist_items: editCustomChecklistItems
         };
 
         try {
@@ -4725,6 +5086,9 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch(`/api/activos/${activoId}`)
             .then(res => res.json())
             .then(data => {
+                if (data.plantilla_id) {
+                    document.getElementById('edit-ot-select-plantilla').value = data.plantilla_id;
+                }
                 if (data.componentes && data.componentes.length > 0) {
                     container.style.display = 'block';
                     data.componentes.forEach(comp => {
@@ -4920,6 +5284,155 @@ document.addEventListener('DOMContentLoaded', () => {
                 otActivo.value = '';
             }
         }
+    }
+
+    // --- CUSTOM CHECKLIST POINTS FOR CREATION & EDIT MODALS ---
+    function renderCustomChecklistItems() {
+        const listDiv = document.getElementById('ot-custom-checklist-list');
+        if (!listDiv) return;
+        
+        if (customChecklistItems.length === 0) {
+            listDiv.innerHTML = '<div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 0.5rem;">No hay puntos de inspección adicionales</div>';
+            return;
+        }
+        
+        listDiv.innerHTML = '';
+        customChecklistItems.forEach((item, idx) => {
+            const unitStr = item.unidad_medida ? ` [${item.unidad_medida}]` : '';
+            const itemHtml = `
+                <div class="custom-checklist-badge" style="display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                    <div>
+                        <strong>${item.texto_pregunta}</strong> 
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(${item.tipo_respuesta}${unitStr})</span>
+                    </div>
+                    <button type="button" class="btn-delete-point" data-index="${idx}" style="background: none; border: none; color: var(--text-danger, #ff4d4d); cursor: pointer; font-weight: bold; font-size: 1rem; padding: 0 0.25rem;">✕</button>
+                </div>
+            `;
+            listDiv.insertAdjacentHTML('beforeend', itemHtml);
+        });
+        
+        listDiv.querySelectorAll('.btn-delete-point').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(e.target.dataset.index);
+                customChecklistItems.splice(idx, 1);
+                renderCustomChecklistItems();
+            });
+        });
+    }
+
+    function renderEditCustomChecklistItems() {
+        const listDiv = document.getElementById('edit-ot-custom-checklist-list');
+        if (!listDiv) return;
+        
+        if (editCustomChecklistItems.length === 0) {
+            listDiv.innerHTML = '<div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 0.5rem;">No hay puntos de inspección adicionales</div>';
+            return;
+        }
+        
+        listDiv.innerHTML = '';
+        editCustomChecklistItems.forEach((item, idx) => {
+            const unitStr = item.unidad_medida ? ` [${item.unidad_medida}]` : '';
+            const itemHtml = `
+                <div class="custom-checklist-badge" style="display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.4rem 0.6rem; font-size: 0.85rem;">
+                    <div>
+                        <strong>${item.texto_pregunta}</strong> 
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(${item.tipo_respuesta}${unitStr})</span>
+                    </div>
+                    <button type="button" class="btn-edit-delete-point" data-index="${idx}" style="background: none; border: none; color: var(--text-danger, #ff4d4d); cursor: pointer; font-weight: bold; font-size: 1rem; padding: 0 0.25rem;">✕</button>
+                </div>
+            `;
+            listDiv.insertAdjacentHTML('beforeend', itemHtml);
+        });
+        
+        listDiv.querySelectorAll('.btn-edit-delete-point').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(e.target.dataset.index);
+                editCustomChecklistItems.splice(idx, 1);
+                renderEditCustomChecklistItems();
+            });
+        });
+    }
+
+    // Toggle units visibility
+    const otNewPointType = document.getElementById('ot-new-point-type');
+    if (otNewPointType) {
+        otNewPointType.addEventListener('change', (e) => {
+            const unitInput = document.getElementById('ot-new-point-unit');
+            if (unitInput) {
+                if (e.target.value === 'numerico') {
+                    unitInput.style.display = 'block';
+                } else {
+                    unitInput.style.display = 'none';
+                    unitInput.value = '';
+                }
+            }
+        });
+    }
+
+    const editOtNewPointType = document.getElementById('edit-ot-new-point-type');
+    if (editOtNewPointType) {
+        editOtNewPointType.addEventListener('change', (e) => {
+            const unitInput = document.getElementById('edit-ot-new-point-unit');
+            if (unitInput) {
+                if (e.target.value === 'numerico') {
+                    unitInput.style.display = 'block';
+                } else {
+                    unitInput.style.display = 'none';
+                    unitInput.value = '';
+                }
+            }
+        });
+    }
+
+    // Add points buttons
+    const otAddPointBtn = document.getElementById('ot-add-point-btn');
+    if (otAddPointBtn) {
+        otAddPointBtn.addEventListener('click', () => {
+            const textInput = document.getElementById('ot-new-point-text');
+            const typeSelect = document.getElementById('ot-new-point-type');
+            const unitInput = document.getElementById('ot-new-point-unit');
+            
+            const text = textInput ? textInput.value.trim() : '';
+            if (!text) {
+                alert('Por favor ingrese el texto de la pregunta.');
+                return;
+            }
+            
+            customChecklistItems.push({
+                texto_pregunta: text,
+                tipo_respuesta: typeSelect ? typeSelect.value : 'booleano',
+                unidad_medida: (typeSelect && typeSelect.value === 'numerico' && unitInput) ? unitInput.value.trim() || null : null
+            });
+            
+            if (textInput) textInput.value = '';
+            if (unitInput) unitInput.value = '';
+            renderCustomChecklistItems();
+        });
+    }
+
+    const editOtAddPointBtn = document.getElementById('edit-ot-add-point-btn');
+    if (editOtAddPointBtn) {
+        editOtAddPointBtn.addEventListener('click', () => {
+            const textInput = document.getElementById('edit-ot-new-point-text');
+            const typeSelect = document.getElementById('edit-ot-new-point-type');
+            const unitInput = document.getElementById('edit-ot-new-point-unit');
+            
+            const text = textInput ? textInput.value.trim() : '';
+            if (!text) {
+                alert('Por favor ingrese el texto de la pregunta.');
+                return;
+            }
+            
+            editCustomChecklistItems.push({
+                texto_pregunta: text,
+                tipo_respuesta: typeSelect ? typeSelect.value : 'booleano',
+                unidad_medida: (typeSelect && typeSelect.value === 'numerico' && unitInput) ? unitInput.value.trim() || null : null
+            });
+            
+            if (textInput) textInput.value = '';
+            if (unitInput) unitInput.value = '';
+            renderEditCustomChecklistItems();
+        });
     }
 
     // --- INITIALIZE APPLICATION ---
