@@ -2074,7 +2074,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div>Jue</div>
                         <div>Vie</div>
                         <div>Sáb</div>
-                        <div>Dom</div>
                     </div>
                     <div class="calendar-grid" id="calendar-grid-cells">
                         <!-- cells will go here -->
@@ -2091,10 +2090,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // 3. Render content based on active sub-view mode
         if (calendarViewSubMode === 'month') {
             cellsContainer.style.display = 'grid';
-            cellsContainer.style.gridTemplateColumns = 'repeat(7, 1fr)';
+            cellsContainer.style.gridTemplateColumns = 'repeat(6, minmax(0, 1fr))';
+            cellsContainer.style.flexDirection = '';
+            cellsContainer.style.gap = '';
+            cellsContainer.style.alignItems = '';
             cellsContainer.parentElement.style.display = '';
 
-            const cells = [];
+            const daysHeader = document.getElementById('calendar-grid-days-header');
+            if (daysHeader) {
+                daysHeader.style.display = 'grid';
+                daysHeader.style.gridTemplateColumns = 'repeat(6, minmax(0, 1fr))';
+            }
+
+            const allCandidates = [];
             let firstDayIndex = new Date(calendarYear, calendarMonth, 1).getDay();
             let startColumnIndex = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
             let totalDaysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
@@ -2109,7 +2117,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const today = new Date();
                 const isToday = today.getDate() === prevDay && today.getMonth() === prevMonth && today.getFullYear() === prevYear;
 
-                cells.push({
+                allCandidates.push({
                     day: prevDay,
                     month: prevMonth,
                     year: prevYear,
@@ -2123,7 +2131,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const today = new Date();
                 const isToday = today.getDate() === d && today.getMonth() === calendarMonth && today.getFullYear() === calendarYear;
 
-                cells.push({
+                allCandidates.push({
                     day: d,
                     month: calendarMonth,
                     year: calendarYear,
@@ -2133,7 +2141,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Next Month padding
-            let nextMonthDaysCount = 42 - cells.length;
+            let nextMonthDaysCount = 42 - allCandidates.length;
             for (let d = 1; d <= nextMonthDaysCount; d++) {
                 const nextMonth = calendarMonth === 11 ? 0 : calendarMonth + 1;
                 const nextYear = calendarMonth === 11 ? calendarYear + 1 : calendarYear;
@@ -2141,7 +2149,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const today = new Date();
                 const isToday = today.getDate() === d && today.getMonth() === nextMonth && today.getFullYear() === nextYear;
 
-                cells.push({
+                allCandidates.push({
                     day: d,
                     month: nextMonth,
                     year: nextYear,
@@ -2149,6 +2157,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     isToday: isToday
                 });
             }
+
+            // Filter out Sundays to render Monday to Saturday only
+            const cells = allCandidates.filter(cell => {
+                const d = new Date(cell.year, cell.month, cell.day);
+                return d.getDay() !== 0;
+            });
 
             // Render cells
             cells.forEach(cell => {
