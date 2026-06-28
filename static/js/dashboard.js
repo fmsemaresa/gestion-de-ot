@@ -2378,7 +2378,7 @@ document.addEventListener('DOMContentLoaded', () => {
             cellsContainer.parentElement.style.display = 'block';
 
             const timelineRows = document.getElementById('daily-timeline-rows');
-            for (let hour = 0; hour < 24; hour++) {
+            for (let hour = 8; hour <= 18; hour++) {
                 const hourStr = String(hour).padStart(2, '0') + ':00';
                 
                 const hourOts = assignedHourOts.filter(ot => {
