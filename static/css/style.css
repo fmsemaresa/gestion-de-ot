@@ -1240,10 +1240,11 @@ textarea.form-control {
 .week-cell .calendar-ot-tag {
     white-space: normal;
     overflow: visible;
-    min-height: 4rem;
+    min-height: auto;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
+    padding-bottom: 0.35rem;
 }
 
 .week-cell .calendar-ot-tag .ot-tag-desc {
