@@ -2030,7 +2030,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mondayDate.setDate(calendarCurrentDate.getDate() + distanceToMonday);
             
             const weekDays = [];
-            for (let i = 0; i < 7; i++) {
+            for (let i = 0; i < 6; i++) {
                 const d = new Date(mondayDate);
                 d.setDate(mondayDate.getDate() + i);
                 weekDays.push(d);
@@ -2038,9 +2038,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const startDay = weekDays[0].getDate();
             const startMonthName = monthNames[weekDays[0].getMonth()];
-            const endDay = weekDays[6].getDate();
-            const endMonthName = monthNames[weekDays[6].getMonth()];
-            const weekYear = weekDays[6].getFullYear();
+            const endDay = weekDays[5].getDate();
+            const endMonthName = monthNames[weekDays[5].getMonth()];
+            const weekYear = weekDays[5].getFullYear();
             titleText = `Semana del ${startDay} de ${startMonthName} al ${endDay} de ${endMonthName}, ${weekYear}`;
         } else if (calendarViewSubMode === 'day') {
             const dayName = dayNames[calendarCurrentDate.getDay()];
@@ -2067,7 +2067,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="calendar-grid-wrapper">
-                    <div class="calendar-days-header" id="calendar-grid-days-header" style="${calendarViewSubMode === 'day' ? 'display: none;' : ''}">
+                    <div class="calendar-days-header" id="calendar-grid-days-header" style="${(calendarViewSubMode === 'day' || calendarViewSubMode === 'week') ? 'display: none;' : ''}">
                         <div>Lun</div>
                         <div>Mar</div>
                         <div>Mié</div>
@@ -2212,8 +2212,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
         } else if (calendarViewSubMode === 'week') {
-            cellsContainer.style.display = 'grid';
-            cellsContainer.style.gridTemplateColumns = 'repeat(7, 1fr)';
+            cellsContainer.style.display = 'flex';
+            cellsContainer.style.flexDirection = 'row';
+            cellsContainer.style.gap = '0.5rem';
+            cellsContainer.style.alignItems = 'stretch';
             cellsContainer.parentElement.style.display = '';
 
             const currentDayOfWeek = calendarCurrentDate.getDay();
@@ -2222,7 +2224,7 @@ document.addEventListener('DOMContentLoaded', () => {
             mondayDate.setDate(calendarCurrentDate.getDate() + distanceToMonday);
 
             const weekDays = [];
-            for (let i = 0; i < 7; i++) {
+            for (let i = 0; i < 6; i++) { // Monday to Saturday (6 days)
                 const d = new Date(mondayDate);
                 d.setDate(mondayDate.getDate() + i);
                 weekDays.push(d);
@@ -2234,25 +2236,40 @@ document.addEventListener('DOMContentLoaded', () => {
                                 d.getMonth() === new Date().getMonth() && 
                                 d.getFullYear() === new Date().getFullYear();
                 
-                let cellClass = 'calendar-day-cell week-cell';
-                if (isToday) cellClass += ' today';
-                cellDiv.className = cellClass;
-                cellDiv.style.backgroundColor = 'var(--bg-card)';
-                cellDiv.style.padding = '0.75rem';
-                cellDiv.style.minHeight = '450px';
-                cellDiv.style.display = 'flex';
-                cellDiv.style.flexDirection = 'column';
-                cellDiv.style.gap = '0.5rem';
-                
-                const cellDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                cellDiv.dataset.date = cellDateStr;
-
                 const dayOts = scheduledOts.filter(ot => {
                     const pDate = new Date(ot.fecha_programada);
                     return pDate.getFullYear() === d.getFullYear() &&
                            pDate.getMonth() === d.getMonth() &&
                            pDate.getDate() === d.getDate();
                 });
+
+                const hasOts = dayOts.length > 0;
+
+                let cellClass = 'calendar-day-cell week-cell';
+                if (isToday) cellClass += ' today';
+                cellDiv.className = cellClass;
+                
+                cellDiv.style.backgroundColor = hasOts ? 'var(--bg-card)' : 'var(--bg-primary)';
+                cellDiv.style.border = hasOts ? '1px solid var(--border-color)' : '1px dashed var(--border-color)';
+                cellDiv.style.padding = '0.75rem';
+                cellDiv.style.minHeight = '450px';
+                cellDiv.style.display = 'flex';
+                cellDiv.style.flexDirection = 'column';
+                cellDiv.style.gap = '0.5rem';
+                cellDiv.style.transition = 'all 0.25s ease';
+                
+                if (hasOts) {
+                    cellDiv.style.flex = '2 1 0%';
+                    cellDiv.style.minWidth = '160px';
+                } else {
+                    cellDiv.style.flex = '1 1 0%';
+                    cellDiv.style.minWidth = '80px';
+                    cellDiv.style.maxWidth = '120px';
+                    cellDiv.style.opacity = '0.75';
+                }
+                
+                const cellDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                cellDiv.dataset.date = cellDateStr;
 
                 // Sort week day OTs by priority desc, then creation date asc
                 dayOts.sort((a, b) => {
