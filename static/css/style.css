@@ -1236,11 +1236,11 @@ textarea.form-control {
     text-overflow: ellipsis;
 }
 
-/* Weekly view specific tall tags for displaying first two lines of description */
+/* Weekly view specific tall tags for displaying first three lines of description */
 .week-cell .calendar-ot-tag {
     white-space: normal;
     overflow: visible;
-    min-height: 3.2rem;
+    min-height: 4rem;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -1249,12 +1249,12 @@ textarea.form-control {
 .week-cell .calendar-ot-tag .ot-tag-desc {
     white-space: normal;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.25;
-    max-height: 2.5em;
+    max-height: 3.75em;
     margin-top: 1px;
 }
 
