@@ -2644,11 +2644,44 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <span style="font-size: 0.8rem; color: var(--text-color); font-weight: 500;">
                                     📍 ${displayName}
                                 </span>
-                                <button class="btn-secondary btn-create-ot-loc-trigger" data-plant-id="${plantaId}" data-building-id="${building.id}" data-loc-id="${u.id}" style="padding: 0.2rem 0.45rem; font-size: 0.72rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--accent-color); cursor: pointer; display: flex; align-items: center; gap: 0.2rem;">
-                                    🛠️ Crear OT
-                                </button>
+                                <div style="display: flex; gap: 0.4rem;">
+                                    <button class="btn-secondary btn-edit-loc-trigger" data-loc-id="${u.id}" style="padding: 0.2rem 0.45rem; font-size: 0.72rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 0.2rem;">
+                                        ✏️ Editar
+                                    </button>
+                                    <button class="btn-secondary btn-create-ot-loc-trigger" data-plant-id="${plantaId}" data-building-id="${building.id}" data-loc-id="${u.id}" style="padding: 0.2rem 0.45rem; font-size: 0.72rem; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-secondary); color: var(--accent-color); cursor: pointer; display: flex; align-items: center; gap: 0.2rem;">
+                                        🛠️ Crear OT
+                                    </button>
+                                </div>
                             `;
                             locsWrapper.appendChild(uRow);
+
+                            // Event listener to rename location
+                            uRow.querySelector('.btn-edit-loc-trigger').addEventListener('click', (e) => {
+                                e.stopPropagation();
+                                const newName = prompt("Introduce el nuevo nombre para la ubicación:", u.nombre);
+                                if (!newName || newName.trim() === "" || newName.trim() === u.nombre) return;
+
+                                fetch(`/api/ubicaciones/${u.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        id: u.id,
+                                        nombre: newName.trim(),
+                                        edificio_id: building.id
+                                    })
+                                })
+                                .then(res => {
+                                    if (!res.ok) throw new Error('Error al renombrar la ubicación');
+                                    return res.json();
+                                })
+                                .then(data => {
+                                    alert(`Ubicación renombrada a "${data.nombre}" con éxito.`);
+                                    loadPlantLocationsDetail(plantaId);
+                                    preloadSearchList();
+                                    loadHierarchy();
+                                })
+                                .catch(err => alert(err.message));
+                            });
 
                             // Event listener to open OT creation modal pre-selecting this location!
                             uRow.querySelector('.btn-create-ot-loc-trigger').addEventListener('click', (e) => {

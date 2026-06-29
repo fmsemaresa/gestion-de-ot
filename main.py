@@ -159,6 +159,29 @@ def create_ubicacion(ubicacion: Ubicacion, db: Session = Depends(get_db)):
     db.refresh(ubicacion)
     return ubicacion
 
+@app.put("/api/ubicaciones/{ubicacion_id}", response_model=Ubicacion)
+def update_ubicacion(ubicacion_id: int, updated_ubic: Ubicacion, db: Session = Depends(get_db)):
+    ubic = db.get(Ubicacion, ubicacion_id)
+    if not ubic:
+        raise HTTPException(status_code=404, detail="Ubicación no encontrada")
+        
+    ubic.nombre = updated_ubic.nombre
+    if updated_ubic.codigo:
+        ubic.codigo = updated_ubic.codigo
+    if updated_ubic.uso:
+        ubic.uso = updated_ubic.uso
+    if updated_ubic.cargo:
+        ubic.cargo = updated_ubic.cargo
+    if updated_ubic.color:
+        ubic.color = updated_ubic.color
+    if updated_ubic.edificio_id:
+        ubic.edificio_id = updated_ubic.edificio_id
+        
+    db.add(ubic)
+    db.commit()
+    db.refresh(ubic)
+    return ubic
+
 # --- ENDPOINTS ACTIVOS Y DESPIECE ---
 
 @app.get("/api/activos")
