@@ -587,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(activos => {
                 otActivo.disabled = false;
                 otActivo.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
-                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo' && a.estado !== 'Limpieza DB');
                 activeActivos.forEach(a => {
                     otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
                 });
@@ -3168,7 +3168,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (ubicacionId) {
                     otActivo.disabled = false;
                     otActivo.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
-                    const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                    const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo' && a.estado !== 'Limpieza DB');
                     activeActivos.forEach(a => {
                         otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
                     });
@@ -3816,7 +3816,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(activos => {
                 otActivo.disabled = false;
                 otActivo.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
-                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo' && a.estado !== 'Limpieza DB');
                 activeActivos.forEach(a => {
                     otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
                 });
@@ -3918,7 +3918,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(activos => {
                 aSelect.disabled = false;
                 aSelect.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
-                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo' && a.estado !== 'Limpieza DB');
                 activeActivos.forEach(a => {
                     aSelect.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
                 });
@@ -4847,7 +4847,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (aRes.ok) {
                 const activos = await aRes.json();
                 activoSelect.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
-                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo' && a.estado !== 'Limpieza DB');
                 activeActivos.forEach(a => {
                     activoSelect.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
                 });
@@ -5097,7 +5097,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(activos => {
                 aSelect.disabled = false;
                 aSelect.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
-                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+                const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo' && a.estado !== 'Limpieza DB');
                 activeActivos.forEach(a => {
                     aSelect.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
                 });
@@ -5298,7 +5298,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (aRes.ok) {
             const activos = await aRes.json();
             otActivo.innerHTML = '<option value="">-- Selecciona Activo (Opcional) --</option>';
-            const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo');
+            const activeActivos = activos.filter(a => a.estado !== 'Reemplazado' && a.estado !== 'Eliminado sin Reemplazo' && a.estado !== 'Limpieza DB');
             activeActivos.forEach(a => {
                 otActivo.innerHTML += `<option value="${a.id}">${a.nombre} (${a.estado})</option>`;
             });
