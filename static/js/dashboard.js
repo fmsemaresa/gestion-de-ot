@@ -4772,7 +4772,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tipo: document.getElementById('edit-ot-tipo').value,
             prioridad: document.getElementById('edit-ot-prioridad').value,
             descripcion: document.getElementById('edit-ot-descripcion').value.trim(),
-            tecnico_id: document.getElementById('edit-ot-tecnico').value,
+            tecnico_ids: Array.from(document.querySelectorAll('input[name="edit-ot-tecnicos"]:checked')).map(cb => parseInt(cb.value)),
             fecha_programada: document.getElementById('edit-ot-fecha-programada').value,
             hora_programada: document.getElementById('edit-ot-hora-programada').value,
             plantilla_id: document.getElementById('edit-ot-select-plantilla').value,
