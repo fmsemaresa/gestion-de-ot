@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const assignModal = document.getElementById('assign-modal');
     const assignForm = document.getElementById('assign-form');
     const closeAssignModal = document.getElementById('close-assign-modal');
-    const assignSelectTecnico = document.getElementById('assign-select-tecnico');
+    const assignSelectTecnicosContainer = document.getElementById('assign-select-tecnicos-container');
     const assignOtId = document.getElementById('assign-ot-id');
 
     // Complete OT Modal
@@ -3216,12 +3216,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     otActivo.disabled = true;
                 }
 
-                // Load technicians in assignment dropdown
-                const otTecnico = document.getElementById('ot-tecnico');
-                otTecnico.innerHTML = '<option value="">No Asignado</option>';
-                techniciansList.forEach(t => {
-                    otTecnico.innerHTML += `<option value="${t.id}">${t.nombre}</option>`;
-                });
+                // Load technicians in assignment checkboxes container
+                const otTecnicosContainer = document.getElementById('ot-tecnicos-container');
+                if (otTecnicosContainer) {
+                    otTecnicosContainer.innerHTML = '';
+                    techniciansList.forEach(t => {
+                        otTecnicosContainer.innerHTML += `
+                            <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; margin-bottom: 0.15rem; cursor: pointer;">
+                                <input type="checkbox" name="ot-tecnicos" value="${t.id}">
+                                <span>${t.nombre}</span>
+                            </label>
+                        `;
+                    });
+                }
 
                 // Load checklists in template selector dropdown
                 return fetch('/api/plantillas');
@@ -3479,10 +3486,17 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(res => res.json())
             .then(tecnicos => {
                 techniciansList = tecnicos;
-                assignSelectTecnico.innerHTML = '<option value="">-- Selecciona Técnico --</option>';
-                tecnicos.forEach(t => {
-                    assignSelectTecnico.innerHTML += `<option value="${t.id}">${t.nombre}</option>`;
-                });
+                if (assignSelectTecnicosContainer) {
+                    assignSelectTecnicosContainer.innerHTML = '';
+                    tecnicos.forEach(t => {
+                        assignSelectTecnicosContainer.innerHTML += `
+                            <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; margin-bottom: 0.15rem; cursor: pointer;">
+                                <input type="checkbox" name="assign-tecnicos" value="${t.id}">
+                                <span>${t.nombre}</span>
+                            </label>
+                        `;
+                    });
+                }
             })
             .catch(err => console.error(err));
     }
@@ -3494,8 +3508,22 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const dateInput = document.getElementById('assign-fecha-programada');
         const timeInput = document.getElementById('assign-hora-programada');
+        
+        // Reset and pre-check checkboxes
+        const checkboxes = document.querySelectorAll('input[name="assign-tecnicos"]');
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+            const tid = parseInt(cb.value);
+            if (ot) {
+                if (ot.tecnico_ids && ot.tecnico_ids.includes(tid)) {
+                    cb.checked = true;
+                } else if (!ot.tecnico_ids && ot.tecnico_id === tid) {
+                    cb.checked = true;
+                }
+            }
+        });
+
         if (ot) {
-            assignSelectTecnico.value = ot.tecnico_id || '';
             if (ot.fecha_programada) {
                 const pDate = new Date(ot.fecha_programada);
                 const year = pDate.getFullYear();
@@ -3511,7 +3539,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 timeInput.value = '';
             }
         } else {
-            assignSelectTecnico.value = '';
             dateInput.value = '';
             timeInput.value = '';
         }
@@ -3525,7 +3552,10 @@ document.addEventListener('DOMContentLoaded', () => {
     assignForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const otId = assignOtId.value;
-        const techId = parseInt(assignSelectTecnico.value) || null;
+        
+        const checkedBoxes = document.querySelectorAll('input[name="assign-tecnicos"]:checked');
+        const selectedTechIds = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
+        
         const fechaProgramadaVal = document.getElementById('assign-fecha-programada').value || null;
         const horaProgramadaVal = document.getElementById('assign-hora-programada').value || '';
 
@@ -3546,7 +3576,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Calcular estado mapeado
         let targetState = 'CREADA';
-        if (techId) {
+        if (selectedTechIds.length > 0) {
             targetState = fechaProgramadaVal ? 'PROGRAMADA' : 'ASIGNADA';
         }
 
@@ -3554,7 +3584,7 @@ document.addEventListener('DOMContentLoaded', () => {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                tecnico_id: techId,
+                tecnico_ids: selectedTechIds,
                 fecha_programada: fullFechaProgramada,
                 estado: targetState
             })
@@ -3750,12 +3780,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const otSelectPlantilla = document.getElementById('ot-select-plantilla');
         otSelectPlantilla.innerHTML = '<option value="">Cargando...</option>';
 
-        // Load technicians in assignment dropdown
-        const otTecnico = document.getElementById('ot-tecnico');
-        otTecnico.innerHTML = '<option value="">No Asignado</option>';
-        techniciansList.forEach(t => {
-            otTecnico.innerHTML += `<option value="${t.id}">${t.nombre}</option>`;
-        });
+        // Load technicians in assignment checkboxes container
+        const otTecnicosContainer = document.getElementById('ot-tecnicos-container');
+        if (otTecnicosContainer) {
+            otTecnicosContainer.innerHTML = '';
+            techniciansList.forEach(t => {
+                otTecnicosContainer.innerHTML += `
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; margin-bottom: 0.15rem; cursor: pointer;">
+                        <input type="checkbox" name="ot-tecnicos" value="${t.id}">
+                        <span>${t.nombre}</span>
+                    </label>
+                `;
+            });
+        }
 
         // Load checklists in template selector dropdown
         fetch('/api/plantillas')
@@ -4017,7 +4054,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const tipo = document.getElementById('ot-tipo').value;
         const prioridad = document.getElementById('ot-prioridad').value;
         const descripcion = document.getElementById('ot-descripcion').value.trim();
-        const tecnicoId = document.getElementById('ot-tecnico').value ? parseInt(document.getElementById('ot-tecnico').value) : null;
+        const checkedTechBoxes = document.querySelectorAll('input[name="ot-tecnicos"]:checked');
+        const tecnicoIds = Array.from(checkedTechBoxes).map(cb => parseInt(cb.value));
         const plantillaIdVal = document.getElementById('ot-select-plantilla').value;
         const plantillaId = plantillaIdVal ? parseInt(plantillaIdVal) : null;
 
@@ -4043,14 +4081,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = {
             descripcion,
             tipo,
-            estado: tecnicoId ? (fechaProgramadaVal ? 'PROGRAMADA' : 'ASIGNADA') : 'CREADA',
+            estado: tecnicoIds.length > 0 ? (fechaProgramadaVal ? 'PROGRAMADA' : 'ASIGNADA') : 'CREADA',
             prioridad,
             reportado_por: 'Administración',
             planta_id: plantaId,
             edificio_id: edificioId,
             ubicacion_id: ubicacionId,
             activo_id: activoId,
-            tecnico_id: tecnicoId,
+            tecnico_id: tecnicoIds.length > 0 ? tecnicoIds[0] : null,
+            tecnico_ids: tecnicoIds,
             plantilla_id: plantillaId,
             fecha_programada: fullFechaProgramada,
             componentes_trabajados: componentes_trabajados,
@@ -4802,13 +4841,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         checklistSelect.value = ot.plantilla_id || '';
 
-        // Populate technicians dropdown
-        const tecnicoSelect = document.getElementById('edit-ot-tecnico');
-        tecnicoSelect.innerHTML = '<option value="">No Asignado</option>';
-        techniciansList.forEach(t => {
-            tecnicoSelect.innerHTML += `<option value="${t.id}">${t.nombre}</option>`;
-        });
-        tecnicoSelect.value = ot.tecnico_id || '';
+        // Populate technicians checkboxes
+        const editTecnicosContainer = document.getElementById('edit-ot-tecnicos-container');
+        if (editTecnicosContainer) {
+            editTecnicosContainer.innerHTML = '';
+            techniciansList.forEach(t => {
+                const checked = (ot.tecnico_ids && ot.tecnico_ids.includes(t.id)) || (!ot.tecnico_ids && ot.tecnico_id === t.id) ? 'checked' : '';
+                editTecnicosContainer.innerHTML += `
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: normal; margin-bottom: 0.15rem; cursor: pointer;">
+                        <input type="checkbox" name="edit-ot-tecnicos" value="${t.id}" ${checked}>
+                        <span>${t.nombre}</span>
+                    </label>
+                `;
+            });
+        }
 
         // Populate Planta select and trigger chains
         const plantaSelect = document.getElementById('edit-ot-select-planta');
@@ -4968,8 +5014,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const prioridad = document.getElementById('edit-ot-prioridad').value;
         const estado = document.getElementById('edit-ot-status').value;
         const descripcion = document.getElementById('edit-ot-descripcion').value.trim();
-        const tecnicoIdVal = document.getElementById('edit-ot-tecnico').value;
-        const tecnicoId = tecnicoIdVal ? parseInt(tecnicoIdVal) : null;
+        const checkedTechBoxes = document.querySelectorAll('input[name="edit-ot-tecnicos"]:checked');
+        const tecnicoIds = Array.from(checkedTechBoxes).map(cb => parseInt(cb.value));
         const plantillaIdVal = document.getElementById('edit-ot-select-plantilla').value;
         const plantillaId = plantillaIdVal ? parseInt(plantillaIdVal) : null;
 
@@ -5006,7 +5052,8 @@ document.addEventListener('DOMContentLoaded', () => {
             prioridad: prioridad,
             estado: estado,
             descripcion: descripcion,
-            tecnico_id: tecnicoId,
+            tecnico_id: tecnicoIds.length > 0 ? tecnicoIds[0] : null,
+            tecnico_ids: tecnicoIds,
             fecha_programada: fechaProgramadaFull,
             plantilla_id: plantillaId,
             componentes_trabajados: componentes_trabajados,

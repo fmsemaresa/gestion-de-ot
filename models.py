@@ -103,13 +103,19 @@ class ItemPlantillaChequeo(SQLModel, table=True):
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
 
+class OrdenTrabajoTecnicoLink(SQLModel, table=True):
+    __tablename__ = "ordentrabajotecnicolink"
+    orden_trabajo_id: int = Field(foreign_key="ordentrabajo.id", primary_key=True)
+    tecnico_id: int = Field(foreign_key="tecnico.id", primary_key=True)
+
 class Tecnico(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     nombre: str = Field(index=True)
     email: str
     especialidad: str  # E.g. "Climatizacion", "Electricidad", "Gasfiteria", "General"
     
-    ordenes_trabajo: List["OrdenTrabajo"] = Relationship(back_populates="tecnico")
+    ordenes_trabajo: List["OrdenTrabajo"] = Relationship(back_populates="tecnicos", link_model=OrdenTrabajoTecnicoLink)
+    ordenes_trabajo_legacy: List["OrdenTrabajo"] = Relationship(back_populates="tecnico")
 
 class OrdenTrabajo(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -135,7 +141,8 @@ class OrdenTrabajo(SQLModel, table=True):
     plantilla_id: Optional[int] = Field(default=None, foreign_key="plantillachequeo.id")
     
     activo: Optional[Activo] = Relationship(back_populates="ordenes_trabajo")
-    tecnico: Optional[Tecnico] = Relationship(back_populates="ordenes_trabajo")
+    tecnico: Optional[Tecnico] = Relationship(back_populates="ordenes_trabajo_legacy")
+    tecnicos: List[Tecnico] = Relationship(back_populates="ordenes_trabajo", link_model=OrdenTrabajoTecnicoLink)
     plantilla: Optional[PlantillaChequeo] = Relationship(back_populates="ordenes_trabajo")
     respuestas_checklist: List["RespuestaChequeo"] = Relationship(
         back_populates="orden_trabajo",

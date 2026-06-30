@@ -734,11 +734,11 @@
                     </div>
 
                      <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label for="ot-tecnico">Asignar Técnico (Opcional)</label>
-                            <select id="ot-tecnico" class="form-control">
-                                <option value="">No Asignado</option>
-                            </select>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0; display: flex; flex-direction: column;">
+                            <label>Asignar Técnicos (Opcional)</label>
+                            <div id="ot-tecnicos-container" class="form-control" style="height: auto; max-height: 120px; overflow-y: auto; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-secondary);">
+                                <!-- Carga dinámica de técnicos -->
+                            </div>
                         </div>
                         <div style="flex: 1.2; display: flex; gap: 0.5rem; margin-bottom: 0;">
                             <div class="form-group" style="flex: 1.5; margin-bottom: 0;">
@@ -886,11 +886,11 @@
                     </div>
 
                     <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                        <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                            <label for="edit-ot-tecnico">Asignar Técnico (Opcional)</label>
-                            <select id="edit-ot-tecnico" class="form-control">
-                                <option value="">No Asignado</option>
-                            </select>
+                        <div class="form-group" style="flex: 1; margin-bottom: 0; display: flex; flex-direction: column;">
+                            <label>Asignar Técnicos (Opcional)</label>
+                            <div id="edit-ot-tecnicos-container" class="form-control" style="height: auto; max-height: 120px; overflow-y: auto; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-secondary);">
+                                <!-- Carga dinámica de técnicos -->
+                            </div>
                         </div>
                         <div style="flex: 1.2; display: flex; gap: 0.5rem; margin-bottom: 0;">
                             <div class="form-group" style="flex: 1.5; margin-bottom: 0;">
@@ -1037,15 +1037,17 @@
     <div class="modal-overlay" id="assign-modal">
         <div class="modal-content" style="max-width: 400px; margin-top: 10%;">
             <div class="modal-header">
-                <h3>Asignar Técnico</h3>
+                <h3>Asignar Técnicos</h3>
                 <button class="btn-icon" id="close-assign-modal">✕</button>
             </div>
             <div class="modal-body">
                 <form id="assign-form">
                     <input type="hidden" id="assign-ot-id">
-                     <div class="form-group">
-                        <label for="assign-select-tecnico">Selecciona el Técnico *</label>
-                        <select id="assign-select-tecnico" class="form-control" required></select>
+                     <div class="form-group" style="display: flex; flex-direction: column;">
+                        <label>Selecciona los Técnicos *</label>
+                        <div id="assign-select-tecnicos-container" class="form-control" style="height: auto; max-height: 120px; overflow-y: auto; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.35rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-secondary);">
+                            <!-- Carga dinámica de técnicos -->
+                        </div>
                     </div>
                     <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
                         <div class="form-group" style="flex: 1.5; margin-bottom: 0;">

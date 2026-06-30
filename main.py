@@ -9,13 +9,14 @@ from contextlib import asynccontextmanager
 import io
 import openpyxl
 
-from database import engine, init_db
 from models import (
     Planta, Edificio, Ubicacion, Activo, 
     ComponenteActivo, Tecnico, OrdenTrabajo,
     PlantillaChequeo, ItemPlantillaChequeo, RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT, OcupanteUbicacion,
-    OrdenTrabajoComponente
+    OrdenTrabajoComponente, OrdenTrabajoTecnicoLink
 )
+
+from database import engine, init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,6 +39,7 @@ class OrdenTrabajoCreate(BaseModel):
     ubicacion_id: Optional[int] = None
     activo_id: Optional[int] = None
     tecnico_id: Optional[int] = None
+    tecnico_ids: Optional[List[int]] = None
     plantilla_id: Optional[int] = None
     fecha_programada: Optional[datetime] = None
     reportado_por: Optional[str] = "Administración"
@@ -349,7 +351,7 @@ def get_ordenes(
     query = select(OrdenTrabajo)
     
     if tecnico_id:
-        query = query.where(OrdenTrabajo.tecnico_id == tecnico_id)
+        query = query.join(OrdenTrabajoTecnicoLink, OrdenTrabajoTecnicoLink.orden_trabajo_id == OrdenTrabajo.id).where(OrdenTrabajoTecnicoLink.tecnico_id == tecnico_id)
     if planta_id:
         query = query.where(OrdenTrabajo.planta_id == planta_id)
         
@@ -366,7 +368,8 @@ def get_ordenes(
         if mapped_estado in ("Resuelta", "REALIZADA"):
             mapped_estado = "REALIZADA"
         elif mapped_estado != "Cancelada":
-            if ot.tecnico_id:
+            # Si tiene técnicos asignados, evaluar estado
+            if ot.tecnicos:
                 if ot.fecha_programada:
                     mapped_estado = "PROGRAMADA"
                 else:
@@ -389,7 +392,10 @@ def get_ordenes(
         edificio = db.get(Edificio, ot.edificio_id)
         ubicacion = db.get(Ubicacion, ot.ubicacion_id) if ot.ubicacion_id else None
         activo = db.get(Activo, ot.activo_id) if ot.activo_id else None
-        tecnico = db.get(Tecnico, ot.tecnico_id) if ot.tecnico_id else None
+        
+        tecnicos_list = ot.tecnicos
+        tecnico_nombre = ", ".join([t.nombre for t in tecnicos_list]) if tecnicos_list else "No asignado"
+        tecnico_ids = [t.id for t in tecnicos_list]
         
         # Obtener fotos
         fotos_db = db.exec(select(FotoOrdenTrabajo).where(FotoOrdenTrabajo.orden_trabajo_id == ot.id)).all()
@@ -449,8 +455,10 @@ def get_ordenes(
             "activo_tipo": activo.tipo if activo else "Otros",
             "activo_color": activo.color if activo else None,
             "ubicacion_color": ubicacion.color if ubicacion else None,
-            "tecnico_nombre": tecnico.nombre if tecnico else "No asignado",
+            "tecnico_nombre": tecnico_nombre,
             "tecnico_id": ot.tecnico_id,
+            "tecnico_ids": tecnico_ids,
+            "tecnicos": [{"id": t.id, "nombre": t.nombre} for t in tecnicos_list],
             "plantilla_id": ot.plantilla_id,
             "fotos": fotos_list,
             "comentarios_avance": comentarios_list,
@@ -470,7 +478,7 @@ def get_orden_by_id(ot_id: int, db: Session = Depends(get_db)):
     if mapped_estado in ("Resuelta", "REALIZADA"):
         mapped_estado = "REALIZADA"
     elif mapped_estado != "Cancelada":
-        if ot.tecnico_id:
+        if ot.tecnicos:
             if ot.fecha_programada:
                 mapped_estado = "PROGRAMADA"
             else:
@@ -482,7 +490,10 @@ def get_orden_by_id(ot_id: int, db: Session = Depends(get_db)):
     edificio = db.get(Edificio, ot.edificio_id)
     ubicacion = db.get(Ubicacion, ot.ubicacion_id) if ot.ubicacion_id else None
     activo = db.get(Activo, ot.activo_id) if ot.activo_id else None
-    tecnico = db.get(Tecnico, ot.tecnico_id) if ot.tecnico_id else None
+    
+    tecnicos_list = ot.tecnicos
+    tecnico_nombre = ", ".join([t.nombre for t in tecnicos_list]) if tecnicos_list else "No asignado"
+    tecnico_ids = [t.id for t in tecnicos_list]
     
     # Obtener fotos
     fotos_db = db.exec(select(FotoOrdenTrabajo).where(FotoOrdenTrabajo.orden_trabajo_id == ot.id)).all()
@@ -542,8 +553,10 @@ def get_orden_by_id(ot_id: int, db: Session = Depends(get_db)):
         "activo_tipo": activo.tipo if activo else "Otros",
         "activo_color": activo.color if activo else None,
         "ubicacion_color": ubicacion.color if ubicacion else None,
-        "tecnico_nombre": tecnico.nombre if tecnico else "No asignado",
+        "tecnico_nombre": tecnico_nombre,
         "tecnico_id": ot.tecnico_id,
+        "tecnico_ids": tecnico_ids,
+        "tecnicos": [{"id": t.id, "nombre": t.nombre} for t in tecnicos_list],
         "plantilla_id": ot.plantilla_id,
         "fotos": fotos_list,
         "comentarios_avance": comentarios_list,
@@ -578,7 +591,23 @@ def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
             
     # Calcular automáticamente el estado
     estado = "CREADA"
-    if ot_in.tecnico_id:
+    assigned_tecnicos = []
+    primary_tecnico_id = None
+    
+    if ot_in.tecnico_ids is not None:
+        for tid in ot_in.tecnico_ids:
+            tech = db.get(Tecnico, tid)
+            if tech:
+                assigned_tecnicos.append(tech)
+        if assigned_tecnicos:
+            primary_tecnico_id = assigned_tecnicos[0].id
+    elif ot_in.tecnico_id:
+        tech = db.get(Tecnico, ot_in.tecnico_id)
+        if tech:
+            assigned_tecnicos.append(tech)
+            primary_tecnico_id = tech.id
+            
+    if assigned_tecnicos:
         if ot_in.fecha_programada:
             estado = "PROGRAMADA"
         else:
@@ -597,8 +626,9 @@ def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
         edificio_id=ot_in.edificio_id,
         ubicacion_id=ot_in.ubicacion_id,
         activo_id=ot_in.activo_id,
-        tecnico_id=ot_in.tecnico_id,
-        plantilla_id=ot_in.plantilla_id
+        tecnico_id=primary_tecnico_id,
+        plantilla_id=ot_in.plantilla_id,
+        tecnicos=assigned_tecnicos
     )
     
     db.add(ot)
@@ -698,9 +728,24 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="La ubicación es obligatoria para este edificio.")
 
     # Process technician assignment
-    if "tecnico_id" in updated_ot:
+    if "tecnico_ids" in updated_ot:
+        tids = updated_ot["tecnico_ids"] or []
+        assigned = []
+        for tid in tids:
+            tech = db.get(Tecnico, tid)
+            if tech:
+                assigned.append(tech)
+        ot.tecnicos = assigned
+        ot.tecnico_id = assigned[0].id if assigned else None
+    elif "tecnico_id" in updated_ot:
         val = updated_ot["tecnico_id"]
-        ot.tecnico_id = int(val) if val is not None and str(val).isdigit() else None
+        tid = int(val) if val is not None and str(val).isdigit() else None
+        ot.tecnico_id = tid
+        if tid:
+            tech = db.get(Tecnico, tid)
+            ot.tecnicos = [tech] if tech else []
+        else:
+            ot.tecnicos = []
         
     # Process scheduled date
     if "fecha_programada" in updated_ot:
@@ -800,7 +845,7 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
                     db.add(activo)
         else:
             # Re-evaluate non-terminal state
-            if ot.tecnico_id:
+            if ot.tecnicos:
                 if ot.fecha_programada:
                     ot.estado = "PROGRAMADA"
                 else:
@@ -810,7 +855,7 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
     else:
         # Re-evaluate state if not terminal
         if ot.estado not in ("REALIZADA", "Resuelta", "Cancelada"):
-            if ot.tecnico_id:
+            if ot.tecnicos:
                 if ot.fecha_programada:
                     ot.estado = "PROGRAMADA"
                 else:

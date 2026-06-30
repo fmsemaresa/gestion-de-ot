@@ -193,6 +193,23 @@ def create_db_and_tables():
         except Exception as ex_rep:
             print(f"Error al reparar baños: {ex_rep}")
 
+        # Migrate legacy single technician to many-to-many link table
+        try:
+            with engine.begin() as conn:
+                from sqlalchemy import inspect, text
+                inspector = inspect(engine)
+                if 'ordentrabajotecnicolink' in inspector.get_table_names():
+                    res = conn.execute(text("SELECT COUNT(*) FROM ordentrabajotecnicolink")).fetchone()
+                    if res and res[0] == 0:
+                        print("Migrando asignaciones de técnicos históricas a la tabla many-to-many...")
+                        conn.execute(text("""
+                            INSERT INTO ordentrabajotecnicolink (orden_trabajo_id, tecnico_id)
+                            SELECT id, tecnico_id FROM ordentrabajo WHERE tecnico_id IS NOT NULL
+                        """))
+                        print("Asignaciones de técnicos históricas migradas exitosamente.")
+        except Exception as ex_tech:
+            print(f"Error al migrar asignaciones de técnicos: {ex_tech}")
+
     except Exception as e:
         print(f"Error al verificar/migrar columnas de base de datos: {e}")
 
