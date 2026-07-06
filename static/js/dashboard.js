@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const otGrid = document.getElementById('ot-grid');
     const filterOtState = document.getElementById('filter-ot-state');
+    const searchOt = document.getElementById('search-ot');
     const btnCreateOt = document.getElementById('btn-create-ot');
     
     const activoGrid = document.getElementById('activo-grid');
@@ -1226,6 +1227,46 @@ document.addEventListener('DOMContentLoaded', () => {
                     filteredOts = ots.filter(ot => ot.edificio_id == selectedEdificioId);
                 } else if (selectedUbicacionId) {
                     filteredOts = ots.filter(ot => ot.ubicacion_id == selectedUbicacionId);
+                }
+
+                // Apply dynamic multi-word text search if query exists
+                const searchQuery = searchOt ? searchOt.value.trim().toLowerCase() : '';
+                if (searchQuery) {
+                    const queryWords = searchQuery.split(/\s+/).filter(w => w.length > 0);
+                    if (queryWords.length > 0) {
+                        filteredOts = filteredOts.filter(ot => {
+                            return queryWords.every(word => {
+                                const otIdStr = `ot-${ot.id}`.toLowerCase();
+                                const otIdNumStr = String(ot.id);
+                                const desc = (ot.descripcion || '').toLowerCase();
+                                const tipo = (ot.tipo || '').toLowerCase();
+                                const estado = (ot.estado || '').toLowerCase();
+                                const prioridad = (ot.prioridad || '').toLowerCase();
+                                const reportado = (ot.reportado_por || '').toLowerCase();
+                                const edificio = (ot.edificio_nombre || '').toLowerCase();
+                                const ubicacion = (ot.ubicacion_nombre || '').toLowerCase();
+                                const planta = (ot.planta_nombre || '').toLowerCase();
+                                
+                                const tecnicos = (ot.tecnicos || []).map(t => t.nombre.toLowerCase()).join(' ');
+                                const tecnico_solo = ot.tecnico_nombre ? ot.tecnico_nombre.toLowerCase() : '';
+                                const plantilla = ot.plantilla_nombre ? ot.plantilla_nombre.toLowerCase() : '';
+                                
+                                return otIdStr.includes(word) ||
+                                       otIdNumStr === word ||
+                                       desc.includes(word) ||
+                                       tipo.includes(word) ||
+                                       estado.includes(word) ||
+                                       prioridad.includes(word) ||
+                                       reportado.includes(word) ||
+                                       edificio.includes(word) ||
+                                       ubicacion.includes(word) ||
+                                       planta.includes(word) ||
+                                       tecnicos.includes(word) ||
+                                       tecnico_solo.includes(word) ||
+                                       plantilla.includes(word);
+                            });
+                        });
+                    }
                 }
 
                 // Add or update to allLoadedOts
@@ -3044,6 +3085,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     filterOtState.addEventListener('change', loadWorkOrders);
+    if (searchOt) {
+        searchOt.addEventListener('input', loadWorkOrders);
+    }
     filterActivoState.addEventListener('change', loadAssets);
 
     // --- 5. LOAD ASSETS ---
