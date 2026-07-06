@@ -1259,5 +1259,171 @@ textarea.form-control {
     margin-top: 1px;
 }
 
+/* ==========================================================================
+   Google Calendar Hourly Layout Styles
+   ========================================================================== */
+
+/* Hourly grid container */
+.calendar-hourly-container {
+    display: flex;
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    margin-top: 0.5rem;
+}
+
+/* Left timeline sidebar */
+.calendar-timeline-hours {
+    width: 60px;
+    border-right: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.calendar-timeline-hour-label {
+    height: 60px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    box-sizing: border-box;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+}
+
+/* Right grid container (holds columns) */
+.calendar-timeline-cols {
+    flex: 1;
+    display: flex;
+    position: relative;
+    background: var(--bg-primary);
+    overflow-x: auto;
+}
+
+/* Grid background lines overlay */
+.calendar-grid-lines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    z-index: 1;
+}
+
+.calendar-grid-line {
+    height: 60px;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--border-color);
+    opacity: 0.4;
+}
+
+/* Single day column */
+.calendar-timeline-col {
+    flex: 1;
+    min-width: 140px;
+    position: relative;
+    border-right: 1px solid var(--border-color);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    z-index: 2;
+}
+
+.calendar-timeline-col:last-child {
+    border-right: none;
+}
+
+/* Header label for week columns */
+.calendar-col-header {
+    padding: 0.5rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    font-weight: bold;
+    font-size: 0.8rem;
+    color: var(--text-main);
+    user-select: none;
+}
+
+/* Overlays container inside day column */
+.calendar-events-overlay {
+    position: relative;
+    height: 720px; /* 12 hours * 60px */
+    box-sizing: border-box;
+    width: 100%;
+}
+
+/* Absolute-positioned event card */
+.calendar-absolute-ot {
+    position: absolute;
+    border-radius: 6px;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.75rem;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+    z-index: 10;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, width 0.2s ease, left 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.calendar-absolute-ot:hover {
+    transform: scale(1.02);
+    z-index: 100;
+    box-shadow: var(--shadow-lg);
+    filter: brightness(1.1);
+}
+
+.calendar-absolute-ot.priority-alta {
+    background-color: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-left: 3px solid var(--danger);
+    color: #fca5a5;
+}
+
+.calendar-absolute-ot.priority-media {
+    background-color: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-left: 3px solid var(--warning);
+    color: #fde047;
+}
+
+.calendar-absolute-ot.priority-baja {
+    background-color: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-left: 3px solid var(--accent-color);
+    color: #93c5fd;
+}
+
+.calendar-absolute-ot .ot-abs-id {
+    font-weight: 700;
+    font-size: 0.7rem;
+}
+
+.calendar-absolute-ot .ot-abs-desc {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
 
 

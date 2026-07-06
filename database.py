@@ -37,6 +37,11 @@ def create_db_and_tables():
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE ordentrabajo ADD COLUMN fecha_inicio TIMESTAMP"))
             print("Columna 'fecha_inicio' agregada exitosamente.")
+        if 'fecha_fin_programada' not in columns:
+            print("Migrando base de datos: agregando columna 'fecha_fin_programada' a la tabla 'ordentrabajo'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE ordentrabajo ADD COLUMN fecha_fin_programada TIMESTAMP"))
+            print("Columna 'fecha_fin_programada' agregada exitosamente.")
         if 'estado_ejecucion' not in columns:
             print("Migrando base de datos: agregando columna 'estado_ejecucion' a la tabla 'ordentrabajo'...")
             with engine.begin() as conn:

@@ -42,6 +42,7 @@ class OrdenTrabajoCreate(BaseModel):
     tecnico_ids: Optional[List[int]] = None
     plantilla_id: Optional[int] = None
     fecha_programada: Optional[datetime] = None
+    fecha_fin_programada: Optional[datetime] = None
     reportado_por: Optional[str] = "Administración"
     componentes_trabajados: Optional[List[ComponenteTrabajadoInput]] = None
     custom_checklist_items: Optional[List[dict]] = None
@@ -440,6 +441,7 @@ def get_ordenes(
             "fecha_creacion": ot.fecha_creacion.isoformat() + "Z" if ot.fecha_creacion else None,
             "fecha_resolucion": ot.fecha_resolucion.isoformat() + "Z" if ot.fecha_resolucion else None,
             "fecha_programada": ot.fecha_programada.isoformat() if ot.fecha_programada else None,
+            "fecha_fin_programada": ot.fecha_fin_programada.isoformat() if ot.fecha_fin_programada else None,
             "fecha_inicio": ot.fecha_inicio.isoformat() + "Z" if ot.fecha_inicio else None,
             "estado_ejecucion": ot.estado_ejecucion,
             "reportado_por": ot.reportado_por,
@@ -538,6 +540,7 @@ def get_orden_by_id(ot_id: int, db: Session = Depends(get_db)):
         "fecha_creacion": ot.fecha_creacion.isoformat() + "Z" if ot.fecha_creacion else None,
         "fecha_resolucion": ot.fecha_resolucion.isoformat() + "Z" if ot.fecha_resolucion else None,
         "fecha_programada": ot.fecha_programada.isoformat() if ot.fecha_programada else None,
+        "fecha_fin_programada": ot.fecha_fin_programada.isoformat() if ot.fecha_fin_programada else None,
         "fecha_inicio": ot.fecha_inicio.isoformat() + "Z" if ot.fecha_inicio else None,
         "estado_ejecucion": ot.estado_ejecucion,
         "reportado_por": ot.reportado_por,
@@ -615,12 +618,17 @@ def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
     else:
         estado = "CREADA"
         
+    if ot_in.fecha_programada and ot_in.fecha_fin_programada:
+        if ot_in.fecha_fin_programada < ot_in.fecha_programada:
+            raise HTTPException(status_code=400, detail="La fecha/hora de término no puede ser anterior a la de inicio.")
+
     ot = OrdenTrabajo(
         descripcion=ot_in.descripcion,
         tipo=ot_in.tipo,
         estado=estado,
         prioridad=ot_in.prioridad,
         fecha_programada=ot_in.fecha_programada,
+        fecha_fin_programada=ot_in.fecha_fin_programada,
         reportado_por=ot_in.reportado_por,
         planta_id=ot_in.planta_id,
         edificio_id=ot_in.edificio_id,
@@ -763,6 +771,30 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
                 ot.fecha_programada = val
         else:
             ot.fecha_programada = None
+
+    # Process scheduled end date
+    if "fecha_fin_programada" in updated_ot:
+        val = updated_ot["fecha_fin_programada"]
+        if val:
+            if isinstance(val, str):
+                try:
+                    if "T" in val:
+                        ot.fecha_fin_programada = datetime.fromisoformat(val.replace("Z", "+00:00"))
+                    else:
+                        ot.fecha_fin_programada = datetime.strptime(val, "%Y-%m-%d")
+                except Exception:
+                    ot.fecha_fin_programada = datetime.fromisoformat(val)
+            else:
+                ot.fecha_fin_programada = val
+        else:
+            ot.fecha_fin_programada = None
+
+    # Validate: fecha_fin_programada cannot be anterior to fecha_programada
+    if ot.fecha_programada and ot.fecha_fin_programada:
+        p_dt = ot.fecha_programada.replace(tzinfo=None)
+        f_dt = ot.fecha_fin_programada.replace(tzinfo=None)
+        if f_dt < p_dt:
+            raise HTTPException(status_code=400, detail="La fecha/hora de término no puede ser anterior a la de inicio.")
 
     # Process start date
     if "fecha_inicio" in updated_ot:

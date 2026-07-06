@@ -1987,6 +1987,74 @@ document.addEventListener('DOMContentLoaded', () => {
             return 0;
         };
 
+        const layoutEvents = (dayOts) => {
+            const startHour = 8;
+            const endHour = 20;
+            const totalMinutes = (endHour - startHour) * 60; // 720 minutes
+            
+            const timedEvents = [];
+            dayOts.forEach(ot => {
+                const pDate = new Date(ot.fecha_programada);
+                const isAllDay = pDate.getHours() === 0 && pDate.getMinutes() === 0 && pDate.getSeconds() === 0;
+                
+                if (!isAllDay) {
+                    const startMin = (pDate.getHours() - startHour) * 60 + pDate.getMinutes();
+                    let endMin = startMin + 60; // default 1 hour duration
+                    
+                    if (ot.fecha_fin_programada) {
+                        const pDateEnd = new Date(ot.fecha_fin_programada);
+                        endMin = (pDateEnd.getHours() - startHour) * 60 + pDateEnd.getMinutes();
+                    }
+                    
+                    const clampedStart = Math.max(0, Math.min(totalMinutes - 30, startMin));
+                    const clampedEnd = Math.max(clampedStart + 30, Math.min(totalMinutes, endMin));
+                    
+                    timedEvents.push({
+                        ot,
+                        startMin: clampedStart,
+                        endMin: clampedEnd,
+                        col: 0,
+                        totalCols: 1
+                    });
+                }
+            });
+            
+            if (timedEvents.length === 0) return [];
+            
+            // Sort by start time, then duration descending
+            timedEvents.sort((a, b) => a.startMin - b.startMin || (b.endMin - b.startMin) - (a.endMin - a.startMin));
+            
+            // Assign columns greedily
+            const columns = [];
+            timedEvents.forEach(evt => {
+                let placed = false;
+                for (let i = 0; i < columns.length; i++) {
+                    const lastEvt = columns[i][columns[i].length - 1];
+                    if (lastEvt.endMin <= evt.startMin) {
+                        columns[i].push(evt);
+                        evt.col = i;
+                        placed = true;
+                        break;
+                    }
+                }
+                if (!placed) {
+                    columns.push([evt]);
+                    evt.col = columns.length - 1;
+                }
+            });
+            
+            // Determine maximum overlapping column count for each event
+            timedEvents.forEach(evt => {
+                const overlapping = timedEvents.filter(other => 
+                    other.startMin < evt.endMin && other.endMin > evt.startMin
+                );
+                const maxCol = Math.max(...overlapping.map(o => o.col), 0);
+                evt.totalCols = maxCol + 1;
+            });
+            
+            return timedEvents;
+        };
+
         // 1. Sidebar (Unscheduled OTs)
         let sidebarOtsHtml = '';
         if (unscheduledOts.length === 0) {
@@ -2226,10 +2294,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
         } else if (calendarViewSubMode === 'week') {
-            cellsContainer.style.display = 'flex';
-            cellsContainer.style.flexDirection = 'row';
-            cellsContainer.style.gap = '0.5rem';
-            cellsContainer.style.alignItems = 'stretch';
+            cellsContainer.style.display = 'block';
+            cellsContainer.style.flexDirection = '';
+            cellsContainer.style.gap = '';
+            cellsContainer.style.alignItems = '';
             cellsContainer.parentElement.style.display = '';
 
             const currentDayOfWeek = calendarCurrentDate.getDay();
@@ -2244,11 +2312,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 weekDays.push(d);
             }
 
+            const headersListHtml = [];
+            const allDayColsHtml = [];
+            const timedColsHtml = [];
+            
             weekDays.forEach(d => {
-                const cellDiv = document.createElement('div');
                 const isToday = d.getDate() === new Date().getDate() && 
                                 d.getMonth() === new Date().getMonth() && 
                                 d.getFullYear() === new Date().getFullYear();
+                                
+                const cellDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 
                 const dayOts = scheduledOts.filter(ot => {
                     const pDate = new Date(ot.fecha_programada);
@@ -2256,214 +2329,327 @@ document.addEventListener('DOMContentLoaded', () => {
                            pDate.getMonth() === d.getMonth() &&
                            pDate.getDate() === d.getDate();
                 });
-
-                const hasOts = dayOts.length > 0;
-
-                let cellClass = 'calendar-day-cell week-cell';
-                if (isToday) cellClass += ' today';
-                cellDiv.className = cellClass;
                 
-                cellDiv.style.backgroundColor = hasOts ? 'var(--bg-card)' : 'var(--bg-primary)';
-                cellDiv.style.border = hasOts ? '1px solid var(--border-color)' : '1px dashed var(--border-color)';
-                cellDiv.style.padding = '0.75rem';
-                cellDiv.style.minHeight = '450px';
-                cellDiv.style.display = 'flex';
-                cellDiv.style.flexDirection = 'column';
-                cellDiv.style.gap = '0.5rem';
-                cellDiv.style.transition = 'all 0.25s ease';
+                const allDayOts = dayOts.filter(ot => {
+                    const pDate = new Date(ot.fecha_programada);
+                    return pDate.getHours() === 0 && pDate.getMinutes() === 0 && pDate.getSeconds() === 0;
+                });
                 
-                if (hasOts) {
-                    cellDiv.style.flex = '2 1 0%';
-                    cellDiv.style.minWidth = '160px';
+                const timedLayoutEvents = layoutEvents(dayOts);
+                const formattedDayName = dayNames[d.getDay()].substring(0, 3);
+                
+                // 1. Header Box
+                headersListHtml.push(`
+                    <div style="flex: 1; min-width: 140px; text-align: center; padding: 0.5rem; border-right: 1px solid var(--border-color); background: ${isToday ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-secondary)'}; box-sizing: border-box; ${isToday ? 'border-bottom: 2px solid var(--primary-color);' : ''}">
+                        <div style="font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted);">${formattedDayName}</div>
+                        <div style="font-size: 1.1rem; font-weight: 700; color: ${isToday ? 'var(--primary-color)' : 'var(--text-main)'};">${d.getDate()}</div>
+                    </div>
+                `);
+                
+                // 2. All Day Box
+                let allDayHtml = '';
+                if (allDayOts.length > 0) {
+                    allDayOts.forEach(ot => {
+                        allDayHtml += `
+                            <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" style="margin: 2px 0;">
+                                <div class="ot-tag-id">#OT-${ot.id}</div>
+                                <div class="ot-tag-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
+                            </div>
+                        `;
+                    });
                 } else {
-                    cellDiv.style.flex = '1 1 0%';
-                    cellDiv.style.minWidth = '80px';
-                    cellDiv.style.maxWidth = '120px';
-                    cellDiv.style.opacity = '0.75';
+                    allDayHtml = `<div style="font-size: 0.65rem; color: var(--text-muted); font-style: italic; text-align: center; padding: 4px 0;">Sin programar</div>`;
                 }
                 
-                const cellDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                cellDiv.dataset.date = cellDateStr;
-
-                // Sort week day OTs by priority desc, then creation date asc
-                dayOts.sort((a, b) => {
-                    const wA = getPriorityWeight(a.prioridad);
-                    const wB = getPriorityWeight(b.prioridad);
-                    if (wB !== wA) return wB - wA;
-                    return new Date(a.fecha_creacion) - new Date(b.fecha_creacion);
-                });
-
-                let otTagsHtml = '';
-                dayOts.forEach(ot => {
+                allDayColsHtml.push(`
+                    <div style="flex: 1; min-width: 140px; padding: 4px; border-right: 1px solid var(--border-color); background: var(--bg-card); box-sizing: border-box;">
+                        ${allDayHtml}
+                    </div>
+                `);
+                
+                // 3. Timed Events Column
+                let timedOtsHtml = '';
+                timedLayoutEvents.forEach(evt => {
+                    const ot = evt.ot;
+                    const top = evt.startMin;
+                    const height = evt.endMin - evt.startMin;
+                    const width = (1 / evt.totalCols) * 100;
+                    const left = (evt.col / evt.totalCols) * 100;
+                    
                     const pDate = new Date(ot.fecha_programada);
-                    let timeStr = '';
-                    if (pDate.getHours() !== 0 || pDate.getMinutes() !== 0) {
-                        timeStr = ` <span style="font-weight: 600; font-size: 0.75rem; opacity: 0.85;">(${String(pDate.getHours()).padStart(2, '0')}:${String(pDate.getMinutes()).padStart(2, '0')})</span>`;
+                    const startStr = String(pDate.getHours()).padStart(2, '0') + ':' + String(pDate.getMinutes()).padStart(2, '0');
+                    let endStr = '';
+                    if (ot.fecha_fin_programada) {
+                        const pDateEnd = new Date(ot.fecha_fin_programada);
+                        endStr = ' - ' + String(pDateEnd.getHours()).padStart(2, '0') + ':' + String(pDateEnd.getMinutes()).padStart(2, '0');
                     }
-                    otTagsHtml += `
-                        <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}">
-                            <div class="ot-tag-id">#OT-${ot.id}${timeStr}</div>
-                            <div class="ot-tag-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
+                    
+                    timedOtsHtml += `
+                        <div class="calendar-absolute-ot priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" 
+                             style="top: ${top}px; height: ${height}px; left: calc(${left}% + 1px); width: calc(${width}% - 2px);">
+                            <div class="ot-abs-id">#OT-${ot.id} <span style="font-weight: normal; font-size: 0.6rem; opacity: 0.85;">(${startStr}${endStr})</span></div>
+                            <div class="ot-abs-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
                         </div>
                     `;
                 });
-
-                const formattedDayName = dayNames[d.getDay()].substring(0, 3);
-                cellDiv.innerHTML = `
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; margin-bottom: 0.5rem;">
-                        <span style="font-weight: bold; font-size: 0.85rem; color: var(--text-main);">${formattedDayName}</span>
-                        <span class="day-number-label" style="${isToday ? 'background: var(--primary-color, #2563eb); color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: bold;' : 'font-size: 0.85rem; color: var(--text-muted);'}">${d.getDate()}</span>
+                
+                timedColsHtml.push(`
+                    <div class="calendar-timeline-col" data-date="${cellDateStr}">
+                        <div class="calendar-events-overlay">
+                            ${timedOtsHtml}
+                        </div>
                     </div>
-                    <div class="calendar-ot-list" style="flex: 1; display: flex; flex-direction: column; gap: 0.5rem; overflow-y: auto; min-height: 380px;">
-                        ${otTagsHtml}
+                `);
+            });
+            
+            // Build hour labels
+            let hourLabelsHtml = '';
+            for (let h = 8; h < 20; h++) {
+                const label = String(h).padStart(2, '0') + ':00';
+                hourLabelsHtml += `<div class="calendar-timeline-hour-label">${label}</div>`;
+            }
+            
+            let gridLinesHtml = '';
+            for (let h = 8; h <= 20; h++) {
+                gridLinesHtml += `<div class="calendar-grid-line"></div>`;
+            }
+            
+            // Weekly html structure
+            const weeklyViewHtml = `
+                <div style="display: flex; flex-direction: column; width: 100%; margin-top: 0.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow-sm);">
+                    <!-- Row 1: Headers -->
+                    <div style="display: flex; border-bottom: 1px solid var(--border-color);">
+                        <div style="width: 60px; flex-shrink: 0; border-right: 1px solid var(--border-color); background: var(--bg-secondary);"></div>
+                        <div style="flex: 1; display: flex; overflow-x: auto;">
+                            ${headersListHtml.join('')}
+                        </div>
                     </div>
-                `;
+                    
+                    <!-- Row 2: All Day Section -->
+                    <div style="display: flex; border-bottom: 1px solid var(--border-color); min-height: 45px;">
+                        <div style="width: 60px; flex-shrink: 0; border-right: 1px solid var(--border-color); background: var(--bg-secondary); padding: 6px; font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-align: center; text-transform: uppercase; box-sizing: border-box; display: flex; align-items: center; justify-content: center;">Todo el día</div>
+                        <div style="flex: 1; display: flex; overflow-x: auto;">
+                            ${allDayColsHtml.join('')}
+                        </div>
+                    </div>
+                    
+                    <!-- Row 3: Hourly Grid -->
+                    <div style="display: flex; height: 720px; overflow-y: auto; position: relative;">
+                        <!-- Time labels sidebar -->
+                        <div class="calendar-timeline-hours">
+                            ${hourLabelsHtml}
+                        </div>
+                        <!-- Day columns and overlays -->
+                        <div style="flex: 1; display: flex; position: relative; overflow-x: auto;">
+                            <div class="calendar-grid-lines">
+                                ${gridLinesHtml}
+                            </div>
+                            ${timedColsHtml.join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            cellsContainer.innerHTML = weeklyViewHtml;
 
-                cellsContainer.appendChild(cellDiv);
-
-                cellDiv.addEventListener('click', (e) => {
-                    if (e.target.closest('.calendar-ot-tag') || e.target.closest('.day-number-label')) return;
-                    openNewOTModal(cellDateStr);
+            // Bind click to open edit OT modal for absolute events
+            cellsContainer.querySelectorAll('.calendar-absolute-ot').forEach(tag => {
+                tag.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const otId = tag.dataset.otId;
+                    openEditOTModal(otId);
                 });
+            });
 
-                const dayLabelBtn = cellDiv.querySelector('.day-number-label');
-                if (dayLabelBtn) {
-                    dayLabelBtn.style.cursor = 'pointer';
-                    dayLabelBtn.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        calendarCurrentDate = new Date(d);
-                        calendarViewSubMode = 'day';
-                        loadWorkOrders();
-                    });
-                }
+            // Bind click to open edit OT modal for all-day tags
+            cellsContainer.querySelectorAll('.calendar-ot-tag').forEach(tag => {
+                tag.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const otId = tag.dataset.otId;
+                    openEditOTModal(otId);
+                });
+            });
+
+            // Bind click to create OT on grid click
+            cellsContainer.querySelectorAll('.calendar-events-overlay').forEach(overlay => {
+                overlay.addEventListener('click', (e) => {
+                    if (e.target.closest('.calendar-absolute-ot')) return;
+                    
+                    const rect = overlay.getBoundingClientRect();
+                    const clickY = e.clientY - rect.top;
+                    const clickedMinutes = Math.floor(clickY);
+                    const clickedHours = 8 + Math.floor(clickedMinutes / 60);
+                    const formatHour = String(clickedHours).padStart(2, '0') + ':00';
+                    
+                    const parentCol = overlay.closest('.calendar-timeline-col');
+                    const colDateStr = parentCol.dataset.date;
+                    
+                    openNewOTModal(colDateStr, formatHour);
+                });
             });
 
         } else if (calendarViewSubMode === 'day') {
-            const cellDateStr = `${calendarCurrentDate.getFullYear()}-${String(calendarCurrentDate.getMonth() + 1).padStart(2, '0')}-${String(calendarCurrentDate.getDate()).padStart(2, '0')}`;
+            cellsContainer.style.display = 'block';
+            cellsContainer.style.flexDirection = '';
+            cellsContainer.style.gap = '';
+            cellsContainer.style.alignItems = '';
+            cellsContainer.parentElement.style.display = '';
+
+            const isToday = calendarCurrentDate.getDate() === new Date().getDate() && 
+                            calendarCurrentDate.getMonth() === new Date().getMonth() && 
+                            calendarCurrentDate.getFullYear() === new Date().getFullYear();
+
+            const formattedDayName = dayNames[calendarCurrentDate.getDay()];
+            const headerHtml = `
+                <div style="flex: 1; text-align: left; padding: 0.75rem 1.25rem; background: ${isToday ? 'rgba(37, 99, 235, 0.05)' : 'var(--bg-secondary)'}; border-bottom: 2px solid ${isToday ? 'var(--primary-color)' : 'var(--border-color)'}; box-sizing: border-box;">
+                    <span style="font-size: 1.2rem; font-weight: 700; color: var(--text-main);">${formattedDayName}</span>
+                    <span style="font-size: 1.2rem; font-weight: 700; margin-left: 0.25rem; color: var(--primary-color);">${calendarCurrentDate.getDate()} de ${months[calendarCurrentDate.getMonth()]}</span>
+                </div>
+            `;
             
+            const cellDateStr = `${calendarCurrentDate.getFullYear()}-${String(calendarCurrentDate.getMonth() + 1).padStart(2, '0')}-${String(calendarCurrentDate.getDate()).padStart(2, '0')}`;
             const dayOts = scheduledOts.filter(ot => {
                 const pDate = new Date(ot.fecha_programada);
                 return pDate.getFullYear() === calendarCurrentDate.getFullYear() &&
                        pDate.getMonth() === calendarCurrentDate.getMonth() &&
                        pDate.getDate() === calendarCurrentDate.getDate();
             });
-
-            // Split into unassigned (time 00:00) vs assigned
-            const unassignedHourOts = dayOts.filter(ot => {
+            
+            const allDayOts = dayOts.filter(ot => {
                 const pDate = new Date(ot.fecha_programada);
                 return pDate.getHours() === 0 && pDate.getMinutes() === 0 && pDate.getSeconds() === 0;
             });
             
-            const assignedHourOts = dayOts.filter(ot => {
-                const pDate = new Date(ot.fecha_programada);
-                return pDate.getHours() !== 0 || pDate.getMinutes() !== 0 || pDate.getSeconds() !== 0;
-            });
-
-            // Sort unassigned OTs by priority desc, then creation date asc
-            unassignedHourOts.sort((a, b) => {
-                const wA = getPriorityWeight(a.prioridad);
-                const wB = getPriorityWeight(b.prioridad);
-                if (wB !== wA) return wB - wA;
-                return new Date(a.fecha_creacion) - new Date(b.fecha_creacion);
-            });
-
-            let unassignedOtsHtml = '';
-            if (unassignedHourOts.length > 0) {
-                unassignedHourOts.forEach(ot => {
-                    unassignedOtsHtml += `
-                        <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" style="margin: 0; width: 100%; max-width: 250px;">
-                            <div class="ot-tag-id">#OT-${ot.id} <span style="font-size:0.7rem; opacity:0.8; font-weight:normal;">(Sin Hora)</span></div>
+            const timedLayoutEvents = layoutEvents(dayOts);
+            
+            let allDayHtml = '';
+            if (allDayOts.length > 0) {
+                allDayOts.forEach(ot => {
+                    allDayHtml += `
+                        <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" style="margin: 2px 0; max-width: 350px;">
+                            <div class="ot-tag-id">#OT-${ot.id}</div>
                             <div class="ot-tag-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
                         </div>
                     `;
                 });
             } else {
-                unassignedOtsHtml = '<div style="font-size: 0.85rem; color: var(--text-muted); padding: 0.5rem 0;">No hay órdenes sin hora asignada para hoy.</div>';
+                allDayHtml = `<div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic; padding: 4px 0;">No hay órdenes sin hora asignada.</div>`;
             }
-
+            
+            let timedOtsHtml = '';
+            timedLayoutEvents.forEach(evt => {
+                const ot = evt.ot;
+                const top = evt.startMin;
+                const height = evt.endMin - evt.startMin;
+                const width = (1 / evt.totalCols) * 100;
+                const left = (evt.col / evt.totalCols) * 100;
+                
+                const pDate = new Date(ot.fecha_programada);
+                const startStr = String(pDate.getHours()).padStart(2, '0') + ':' + String(pDate.getMinutes()).padStart(2, '0');
+                let endStr = '';
+                if (ot.fecha_fin_programada) {
+                    const pDateEnd = new Date(ot.fecha_fin_programada);
+                    endStr = ' - ' + String(pDateEnd.getHours()).padStart(2, '0') + ':' + String(pDateEnd.getMinutes()).padStart(2, '0');
+                }
+                
+                timedOtsHtml += `
+                    <div class="calendar-absolute-ot priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" 
+                         style="top: ${top}px; height: ${height}px; left: calc(${left}% + 1px); width: calc(${width}% - 2px);">
+                        <div class="ot-abs-id">#OT-${ot.id} <span style="font-weight: normal; font-size: 0.65rem; opacity: 0.85;">(${startStr}${endStr})</span></div>
+                        <div class="ot-abs-desc" style="-webkit-line-clamp: 4;">${ot.tipo}: ${ot.descripcion || ''}</div>
+                    </div>
+                `;
+            });
+            
+            let hourLabelsHtml = '';
+            for (let h = 8; h < 20; h++) {
+                const label = String(h).padStart(2, '0') + ':00';
+                hourLabelsHtml += `<div class="calendar-timeline-hour-label">${label}</div>`;
+            }
+            
+            let gridLinesHtml = '';
+            for (let h = 8; h <= 20; h++) {
+                gridLinesHtml += `<div class="calendar-grid-line"></div>`;
+            }
+            
             const dailyViewHtml = `
-                <div class="daily-view-container" style="display: flex; flex-direction: column; gap: 1.5rem; width: 100%; padding: 0.5rem 0;">
-                    <!-- Section: Unassigned / All Day OTs -->
-                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; box-shadow: var(--shadow-sm);">
-                        <h4 style="margin-top: 0; margin-bottom: 0.75rem; font-size: 0.95rem; color: var(--text-main); display: flex; align-items: center; gap: 0.5rem;">
-                            <span>📅 Todo el Día / Sin Hora Asignada</span>
-                            <span class="badge" style="background: var(--bg-primary); padding: 0.15rem 0.4rem; border-radius: 10px; font-size: 0.75rem; font-weight: normal;">${unassignedHourOts.length}</span>
-                        </h4>
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
-                            ${unassignedOtsHtml}
+                <div style="display: flex; flex-direction: column; width: 100%; margin-top: 0.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow-sm);">
+                    <!-- Row 1: Header -->
+                    <div style="display: flex; border-bottom: 1px solid var(--border-color);">
+                        <div style="width: 60px; flex-shrink: 0; border-right: 1px solid var(--border-color); background: var(--bg-secondary);"></div>
+                        <div style="flex: 1;">
+                            ${headerHtml}
                         </div>
                     </div>
-
-                    <!-- Section: Hourly Timeline -->
-                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem; box-shadow: var(--shadow-sm);">
-                        <h4 style="margin-top: 0; margin-bottom: 1rem; font-size: 0.95rem; color: var(--text-main);">⏰ Cronograma por Horas</h4>
-                        <div class="hourly-timeline" id="daily-timeline-rows" style="display: flex; flex-direction: column; border-top: 1px solid var(--border-color);">
-                            <!-- hourly rows will go here -->
+                    
+                    <!-- Row 2: All Day Section -->
+                    <div style="display: flex; border-bottom: 1px solid var(--border-color); min-height: 45px;">
+                        <div style="width: 60px; flex-shrink: 0; border-right: 1px solid var(--border-color); background: var(--bg-secondary); padding: 6px; font-size: 0.65rem; color: var(--text-muted); font-weight: 700; text-align: center; text-transform: uppercase; box-sizing: border-box; display: flex; align-items: center; justify-content: center;">Todo el día</div>
+                        <div style="flex: 1; padding: 8px 1.25rem; background: var(--bg-card); box-sizing: border-box;">
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                ${allDayHtml}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Row 3: Hourly Grid -->
+                    <div style="display: flex; height: 720px; overflow-y: auto; position: relative;">
+                        <!-- Time labels sidebar -->
+                        <div class="calendar-timeline-hours">
+                            ${hourLabelsHtml}
+                        </div>
+                        <!-- Day column and overlays -->
+                        <div style="flex: 1; display: flex; position: relative;">
+                            <div class="calendar-grid-lines">
+                                ${gridLinesHtml}
+                            </div>
+                            <div class="calendar-timeline-col" data-date="${cellDateStr}" style="flex: 1;">
+                                <div class="calendar-events-overlay">
+                                    ${timedOtsHtml}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             `;
             
             cellsContainer.innerHTML = dailyViewHtml;
-            cellsContainer.style.display = 'block';
-            cellsContainer.parentElement.style.display = 'block';
 
-            const timelineRows = document.getElementById('daily-timeline-rows');
-            for (let hour = 8; hour <= 18; hour++) {
-                const hourStr = String(hour).padStart(2, '0') + ':00';
-                
-                const hourOts = assignedHourOts.filter(ot => {
-                    const pDate = new Date(ot.fecha_programada);
-                    return pDate.getHours() === hour;
+            // Bind click to open edit OT modal for absolute events
+            cellsContainer.querySelectorAll('.calendar-absolute-ot').forEach(tag => {
+                tag.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const otId = tag.dataset.otId;
+                    openEditOTModal(otId);
                 });
+            });
 
-                // Sort hour OTs by priority desc, then creation date asc
-                hourOts.sort((a, b) => {
-                    const wA = getPriorityWeight(a.prioridad);
-                    const wB = getPriorityWeight(b.prioridad);
-                    if (wB !== wA) return wB - wA;
-                    return new Date(a.fecha_creacion) - new Date(b.fecha_creacion);
+            // Bind click to open edit OT modal for all-day tags
+            cellsContainer.querySelectorAll('.calendar-ot-tag').forEach(tag => {
+                tag.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const otId = tag.dataset.otId;
+                    openEditOTModal(otId);
                 });
+            });
 
-                let hourOtsHtml = '';
-                hourOts.forEach(ot => {
-                    const pDate = new Date(ot.fecha_programada);
-                    const timeStr = String(pDate.getHours()).padStart(2, '0') + ':' + String(pDate.getMinutes()).padStart(2, '0');
-                    hourOtsHtml += `
-                        <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" style="margin: 0; min-width: 150px; max-width: 250px;">
-                            <div class="ot-tag-id">#OT-${ot.id} <span style="font-size:0.7rem; opacity:0.8; font-weight:normal;">(${timeStr})</span></div>
-                            <div class="ot-tag-desc">${ot.tipo}: ${ot.descripcion || ''}</div>
-                        </div>
-                    `;
+            // Bind click to create OT on grid click
+            cellsContainer.querySelectorAll('.calendar-events-overlay').forEach(overlay => {
+                overlay.addEventListener('click', (e) => {
+                    if (e.target.closest('.calendar-absolute-ot')) return;
+                    
+                    const rect = overlay.getBoundingClientRect();
+                    const clickY = e.clientY - rect.top;
+                    const clickedMinutes = Math.floor(clickY);
+                    const clickedHours = 8 + Math.floor(clickedMinutes / 60);
+                    const formatHour = String(clickedHours).padStart(2, '0') + ':00';
+                    
+                    const parentCol = overlay.closest('.calendar-timeline-col');
+                    const colDateStr = parentCol.dataset.date;
+                    
+                    openNewOTModal(colDateStr, formatHour);
                 });
-
-                const rowDiv = document.createElement('div');
-                rowDiv.className = 'timeline-hour-row';
-                rowDiv.style.display = 'flex';
-                rowDiv.style.borderBottom = '1px solid var(--border-color)';
-                rowDiv.style.minHeight = '3.5rem';
-                rowDiv.style.cursor = 'pointer';
-                rowDiv.style.transition = 'background-color 0.2s';
-                
-                rowDiv.innerHTML = `
-                    <div class="hour-label" style="width: 70px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.85rem; color: var(--text-muted); border-right: 1px solid var(--border-color); padding: 0.5rem; background: var(--bg-primary); user-select: none;">
-                        ${hourStr}
-                    </div>
-                    <div class="hour-content" style="flex: 1; display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1rem; overflow-x: auto; flex-wrap: wrap;">
-                        ${hourOtsHtml}
-                    </div>
-                `;
-
-                rowDiv.addEventListener('mouseenter', () => { rowDiv.style.backgroundColor = 'var(--bg-primary)'; });
-                rowDiv.addEventListener('mouseleave', () => { rowDiv.style.backgroundColor = ''; });
-
-                rowDiv.addEventListener('click', (e) => {
-                    if (e.target.closest('.calendar-ot-tag')) return;
-                    openNewOTModal(cellDateStr, hourStr);
-                });
-
-                timelineRows.appendChild(rowDiv);
-            }
+            });
         }
 
         // Add view toggles event listeners
@@ -3516,12 +3702,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const tid = parseInt(cb.value);
             if (ot) {
                 if (ot.tecnico_ids && ot.tecnico_ids.includes(tid)) {
-                    cb.checked = true;
-                } else if (!ot.tecnico_ids && ot.tecnico_id === tid) {
-                    cb.checked = true;
-                }
-            }
-        });
+         const timeFinInput = document.getElementById('assign-hora-fin-programada');
 
         if (ot) {
             if (ot.fecha_programada) {
@@ -3538,9 +3719,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 dateInput.value = '';
                 timeInput.value = '';
             }
+
+            if (ot.fecha_fin_programada) {
+                const pDateEnd = new Date(ot.fecha_fin_programada);
+                const hoursEnd = String(pDateEnd.getHours()).padStart(2, '0');
+                const minutesEnd = String(pDateEnd.getMinutes()).padStart(2, '0');
+                timeFinInput.value = `${hoursEnd}:${minutesEnd}`;
+            } else {
+                timeFinInput.value = '';
+            }
         } else {
             dateInput.value = '';
             timeInput.value = '';
+            timeFinInput.value = '';
         }
         assignModal.style.display = 'flex';
     }
@@ -3558,10 +3749,23 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const fechaProgramadaVal = document.getElementById('assign-fecha-programada').value || null;
         const horaProgramadaVal = document.getElementById('assign-hora-programada').value || '';
+        const horaFinProgramadaVal = document.getElementById('assign-hora-fin-programada').value || '';
+
+        if (fechaProgramadaVal && horaProgramadaVal && horaFinProgramadaVal) {
+            if (horaFinProgramadaVal < horaProgramadaVal) {
+                alert("La hora de término no puede ser anterior a la hora de inicio.");
+                return;
+            }
+        }
 
         let fullFechaProgramada = fechaProgramadaVal;
         if (fechaProgramadaVal) {
             fullFechaProgramada = fechaProgramadaVal + 'T' + (horaProgramadaVal || '00:00') + ':00';
+        }
+
+        let fullFechaFinProgramada = null;
+        if (fechaProgramadaVal && horaFinProgramadaVal) {
+            fullFechaFinProgramada = fechaProgramadaVal + 'T' + horaFinProgramadaVal + ':00';
         }
 
         const ot = allLoadedOts.find(o => o.id === parseInt(otId)) || loadedWorkOrdersList.find(o => o.id === parseInt(otId));
@@ -3586,6 +3790,7 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({
                 tecnico_ids: selectedTechIds,
                 fecha_programada: fullFechaProgramada,
+                fecha_fin_programada: fullFechaFinProgramada,
                 estado: targetState
             })
         })
@@ -3770,12 +3975,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // Handle date pre-filling
         const otFechaProgramada = document.getElementById('ot-fecha-programada');
         const otHoraProgramada = document.getElementById('ot-hora-programada');
+        const otHoraFinProgramada = document.getElementById('ot-hora-fin-programada');
         if (prefilledDate) {
             otFechaProgramada.value = prefilledDate;
             otHoraProgramada.value = prefilledTime || '08:00';
+            if (prefilledTime) {
+                const parts = prefilledTime.split(':');
+                const hour = parseInt(parts[0]);
+                const nextHour = (hour + 1) % 24;
+                otHoraFinProgramada.value = String(nextHour).padStart(2, '0') + ':' + parts[1];
+            } else {
+                otHoraFinProgramada.value = '09:00';
+            }
         } else {
             otFechaProgramada.value = '';
             otHoraProgramada.value = '';
+            otHoraFinProgramada.value = '';
         }        // Clear checklist template selector dropdown
         const otSelectPlantilla = document.getElementById('ot-select-plantilla');
         otSelectPlantilla.innerHTML = '<option value="">Cargando...</option>';
@@ -4061,10 +4276,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const fechaProgramadaVal = document.getElementById('ot-fecha-programada').value || null;
         const horaProgramadaVal = document.getElementById('ot-hora-programada') ? document.getElementById('ot-hora-programada').value : '';
+        const horaFinProgramadaVal = document.getElementById('ot-hora-fin-programada') ? document.getElementById('ot-hora-fin-programada').value : '';
+
+        if (fechaProgramadaVal && horaProgramadaVal && horaFinProgramadaVal) {
+            if (horaFinProgramadaVal < horaProgramadaVal) {
+                alert("La hora de término no puede ser anterior a la hora de inicio.");
+                return;
+            }
+        }
         
         let fullFechaProgramada = fechaProgramadaVal;
         if (fechaProgramadaVal) {
             fullFechaProgramada = fechaProgramadaVal + 'T' + (horaProgramadaVal || '00:00') + ':00';
+        }
+
+        let fullFechaFinProgramada = null;
+        if (fechaProgramadaVal && horaFinProgramadaVal) {
+            fullFechaFinProgramada = fechaProgramadaVal + 'T' + horaFinProgramadaVal + ':00';
         }
 
         // Recopilar componentes/despieces seleccionados con sus comentarios individuales
@@ -4092,6 +4320,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tecnico_ids: tecnicoIds,
             plantilla_id: plantillaId,
             fecha_programada: fullFechaProgramada,
+            fecha_fin_programada: fullFechaFinProgramada,
             componentes_trabajados: componentes_trabajados,
             custom_checklist_items: customChecklistItems
         };
@@ -4775,6 +5004,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tecnico_ids: Array.from(document.querySelectorAll('input[name="edit-ot-tecnicos"]:checked')).map(cb => parseInt(cb.value)),
             fecha_programada: document.getElementById('edit-ot-fecha-programada').value,
             hora_programada: document.getElementById('edit-ot-hora-programada').value,
+            hora_fin_programada: document.getElementById('edit-ot-hora-fin-programada').value,
             plantilla_id: document.getElementById('edit-ot-select-plantilla').value,
             estado: document.getElementById('edit-ot-status').value,
             componentes: componentes
@@ -4820,6 +5050,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Populate scheduled date & time
         const dateInput = document.getElementById('edit-ot-fecha-programada');
         const timeInput = document.getElementById('edit-ot-hora-programada');
+        const timeFinInput = document.getElementById('edit-ot-hora-fin-programada');
         if (ot.fecha_programada) {
             const pDate = new Date(ot.fecha_programada);
             dateInput.value = pDate.toISOString().substring(0, 10);
@@ -4827,6 +5058,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             dateInput.value = '';
             timeInput.value = '';
+        }
+
+        if (ot.fecha_fin_programada) {
+            const pDateEnd = new Date(ot.fecha_fin_programada);
+            timeFinInput.value = String(pDateEnd.getHours()).padStart(2, '0') + ':' + String(pDateEnd.getMinutes()).padStart(2, '0');
+        } else {
+            timeFinInput.value = '';
         }
 
         // Populate checklists dropdown
@@ -5021,6 +5259,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const fechaProgramadaVal = document.getElementById('edit-ot-fecha-programada').value || null;
         const horaProgramadaVal = document.getElementById('edit-ot-hora-programada').value || '';
+        const horaFinProgramadaVal = document.getElementById('edit-ot-hora-fin-programada').value || '';
+
+        if (fechaProgramadaVal && horaProgramadaVal && horaFinProgramadaVal) {
+            if (horaFinProgramadaVal < horaProgramadaVal) {
+                alert("La hora de término no puede ser anterior a la hora de inicio.");
+                return;
+            }
+        }
         
         let fechaProgramadaFull = null;
         if (fechaProgramadaVal) {
@@ -5029,6 +5275,11 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 fechaProgramadaFull = `${fechaProgramadaVal}T00:00:00`;
             }
+        }
+
+        let fechaFinProgramadaFull = null;
+        if (fechaProgramadaVal && horaFinProgramadaVal) {
+            fechaFinProgramadaFull = `${fechaProgramadaVal}T${horaFinProgramadaVal}:00`;
         }
 
         const componentes_trabajados = [];
@@ -5055,6 +5306,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tecnico_id: tecnicoIds.length > 0 ? tecnicoIds[0] : null,
             tecnico_ids: tecnicoIds,
             fecha_programada: fechaProgramadaFull,
+            fecha_fin_programada: fechaFinProgramadaFull,
             plantilla_id: plantillaId,
             componentes_trabajados: componentes_trabajados,
             custom_checklist_items: editCustomChecklistItems
