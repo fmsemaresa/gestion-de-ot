@@ -3738,6 +3738,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const dateInput = document.getElementById('assign-fecha-programada');
         const timeInput = document.getElementById('assign-hora-programada');
+        const timeFinInput = document.getElementById('assign-hora-fin-programada');
         
         // Reset and pre-check checkboxes
         const checkboxes = document.querySelectorAll('input[name="assign-tecnicos"]');
@@ -3746,7 +3747,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const tid = parseInt(cb.value);
             if (ot) {
                 if (ot.tecnico_ids && ot.tecnico_ids.includes(tid)) {
-         const timeFinInput = document.getElementById('assign-hora-fin-programada');
+                    cb.checked = true;
+                } else if (!ot.tecnico_ids && ot.tecnico_id === tid) {
+                    cb.checked = true;
+                }
+            }
+        });
 
         if (ot) {
             if (ot.fecha_programada) {
