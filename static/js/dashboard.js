@@ -3356,8 +3356,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const otUbicacion = document.getElementById('ot-select-ubicacion');
         const otULabel = document.querySelector('label[for="ot-select-ubicacion"]');
         if (otULabel && otUbicacion) {
-            otUbicacion.required = true;
-            otULabel.innerHTML = 'Ubicación *';
+            otUbicacion.required = false;
+            otULabel.innerHTML = 'Ubicación (Opcional)';
         }
 
         // Close drawers
@@ -3978,14 +3978,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });    // --- 9. MANUAL OT CREATION MODAL ---
     function updateUbicacionRequirement(isNZ, uSelect, uLabel) {
         if (!uSelect || !uLabel) return;
+        uSelect.required = false;
         if (isNZ) {
-            uSelect.required = false;
             uLabel.innerHTML = 'Ubicación (Opcional)';
             uSelect.disabled = false;
             uSelect.innerHTML = '<option value="">-- No requerido para NZ --</option>';
         } else {
-            uSelect.required = true;
-            uLabel.innerHTML = 'Ubicación *';
+            uLabel.innerHTML = 'Ubicación (Opcional)';
         }
     }
     function openNewOTModal(prefilledDate = null, prefilledTime = null) {
