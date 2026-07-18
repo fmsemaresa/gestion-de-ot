@@ -2544,7 +2544,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const headerHtml = `
                 <div style="flex: 1; text-align: left; padding: 0.75rem 1.25rem; background: ${isToday ? 'rgba(37, 99, 235, 0.05)' : 'var(--bg-secondary)'}; border-bottom: 2px solid ${isToday ? 'var(--primary-color)' : 'var(--border-color)'}; box-sizing: border-box;">
                     <span style="font-size: 1.2rem; font-weight: 700; color: var(--text-main);">${formattedDayName}</span>
-                    <span style="font-size: 1.2rem; font-weight: 700; margin-left: 0.25rem; color: var(--primary-color);">${calendarCurrentDate.getDate()} de ${months[calendarCurrentDate.getMonth()]}</span>
+                    <span style="font-size: 1.2rem; font-weight: 700; margin-left: 0.25rem; color: var(--primary-color);">${calendarCurrentDate.getDate()} de ${monthNames[calendarCurrentDate.getMonth()]}</span>
                 </div>
             `;
             
