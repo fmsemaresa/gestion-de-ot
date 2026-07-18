@@ -78,6 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const otGrid = document.getElementById('ot-grid');
     const filterOtState = document.getElementById('filter-ot-state');
+    const sortOtBy = document.getElementById('sort-ot-by');
     const searchOt = document.getElementById('search-ot');
     const btnCreateOt = document.getElementById('btn-create-ot');
     
@@ -1186,17 +1187,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 4. LOAD WORK ORDERS ---
     function sortOts(otArray) {
         if (!otArray) return [];
-        const priorityWeight = {
-            'alta': 1,
-            'media': 2,
-            'baja': 3
-        };
-        return otArray.sort((a, b) => {
-            const pA = priorityWeight[(a.prioridad || 'media').toLowerCase()] || 2;
-            const pB = priorityWeight[(b.prioridad || 'media').toLowerCase()] || 2;
-            if (pA !== pB) return pA - pB;
-            return new Date(a.fecha_creacion || 0) - new Date(b.fecha_creacion || 0);
-        });
+        const sortSelect = document.getElementById('sort-ot-by');
+        const sortBy = sortSelect ? sortSelect.value : 'priority';
+        
+        if (sortBy === 'date-desc') {
+            return otArray.sort((a, b) => new Date(b.fecha_creacion || 0) - new Date(a.fecha_creacion || 0));
+        } else if (sortBy === 'date-asc') {
+            return otArray.sort((a, b) => new Date(a.fecha_creacion || 0) - new Date(b.fecha_creacion || 0));
+        } else {
+            const priorityWeight = {
+                'alta': 1,
+                'media': 2,
+                'baja': 3
+            };
+            return otArray.sort((a, b) => {
+                const pA = priorityWeight[(a.prioridad || 'media').toLowerCase()] || 2;
+                const pB = priorityWeight[(b.prioridad || 'media').toLowerCase()] || 2;
+                if (pA !== pB) return pA - pB;
+                return new Date(a.fecha_creacion || 0) - new Date(b.fecha_creacion || 0);
+            });
+        }
     }
 
     function loadWorkOrders() {
@@ -3085,6 +3095,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     filterOtState.addEventListener('change', loadWorkOrders);
+    if (sortOtBy) {
+        sortOtBy.addEventListener('change', loadWorkOrders);
+    }
     if (searchOt) {
         searchOt.addEventListener('input', loadWorkOrders);
     }
