@@ -31,11 +31,11 @@ class ComponenteTrabajadoInput(BaseModel):
     comentario: Optional[str] = None
 
 class OrdenTrabajoCreate(BaseModel):
-    descripcion: str
+    descripcion: Optional[str] = None
     tipo: str = "Correctiva"
     prioridad: str = "Media"
     planta_id: int
-    edificio_id: int
+    edificio_id: Optional[int] = None
     ubicacion_id: Optional[int] = None
     activo_id: Optional[int] = None
     tecnico_id: Optional[int] = None
@@ -568,20 +568,24 @@ def get_orden_by_id(ot_id: int, db: Session = Depends(get_db)):
 
 @app.post("/api/ordenes", response_model=OrdenTrabajo)
 def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
-    # Validar que los campos de ubicación sean correctos
+    # Validar que la planta sea válida
     planta = db.get(Planta, ot_in.planta_id)
-    edificio = db.get(Edificio, ot_in.edificio_id)
-    if not planta or not edificio:
-        raise HTTPException(status_code=404, detail="Planta o Edificio no válido")
+    if not planta:
+        raise HTTPException(status_code=404, detail="Planta no válida")
         
-    if edificio.nombre == "NZ":
-        # Ubicación es opcional para el sector especial NZ
-        pass
-    else:
-        # Ubicación es obligatoria para cualquier otro edificio
-        if not ot_in.ubicacion_id:
-            raise HTTPException(status_code=400, detail="La ubicación es obligatoria para este edificio.")
-            
+    # Resolver edificio automáticamente si no se selecciona
+    edificio_id = ot_in.edificio_id
+    if not edificio_id or edificio_id == 0:
+        first_edificio = db.exec(select(Edificio).where(Edificio.planta_id == ot_in.planta_id)).first()
+        if not first_edificio:
+            raise HTTPException(status_code=404, detail="No se encontró ningún edificio para la planta seleccionada")
+        edificio_id = first_edificio.id
+        
+    edificio = db.get(Edificio, edificio_id)
+    if not edificio:
+        raise HTTPException(status_code=404, detail="Edificio no encontrado")
+        
+    # Ubicación es opcional momentáneamente
     if ot_in.ubicacion_id:
         ubicacion = db.get(Ubicacion, ot_in.ubicacion_id)
         if not ubicacion:
@@ -623,7 +627,7 @@ def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="La fecha/hora de término no puede ser anterior a la de inicio.")
 
     ot = OrdenTrabajo(
-        descripcion=ot_in.descripcion,
+        descripcion=ot_in.descripcion or "Sin descripción",
         tipo=ot_in.tipo,
         estado=estado,
         prioridad=ot_in.prioridad,
@@ -631,7 +635,7 @@ def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
         fecha_fin_programada=ot_in.fecha_fin_programada,
         reportado_por=ot_in.reportado_por,
         planta_id=ot_in.planta_id,
-        edificio_id=ot_in.edificio_id,
+        edificio_id=edificio_id,
         ubicacion_id=ot_in.ubicacion_id,
         activo_id=ot_in.activo_id,
         tecnico_id=primary_tecnico_id,
@@ -711,7 +715,13 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
         ot.planta_id = int(val) if val is not None else ot.planta_id
     if "edificio_id" in updated_ot:
         val = updated_ot["edificio_id"]
-        ot.edificio_id = int(val) if val is not None else ot.edificio_id
+        if val is not None and val != "" and str(val).isdigit():
+            ot.edificio_id = int(val)
+        else:
+            # Fallback to first building of the plant
+            first_edificio = db.exec(select(Edificio).where(Edificio.planta_id == ot.planta_id)).first()
+            if first_edificio:
+                ot.edificio_id = first_edificio.id
     if "ubicacion_id" in updated_ot:
         val = updated_ot["ubicacion_id"]
         ot.ubicacion_id = int(val) if (val is not None and val != "" and str(val).isdigit()) else None
@@ -721,19 +731,17 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
     if "tipo" in updated_ot:
         ot.tipo = updated_ot["tipo"]
     if "descripcion" in updated_ot:
-        ot.descripcion = updated_ot["descripcion"]
+        ot.descripcion = updated_ot["descripcion"] or "Sin descripción"
     if "plantilla_id" in updated_ot:
         val = updated_ot["plantilla_id"]
         ot.plantilla_id = int(val) if (val is not None and val != "" and str(val).isdigit()) else None
     if "reportado_por" in updated_ot:
         ot.reportado_por = updated_ot["reportado_por"]
 
-    # Validate location requirement based on final building
+    # Validate location requirement (temporarily bypassed)
     edificio = db.get(Edificio, ot.edificio_id)
     if not edificio:
         raise HTTPException(status_code=404, detail="Edificio no encontrado")
-    if edificio.nombre != "NZ" and not ot.ubicacion_id:
-        raise HTTPException(status_code=400, detail="La ubicación es obligatoria para este edificio.")
 
     # Process technician assignment
     if "tecnico_ids" in updated_ot:

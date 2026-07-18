@@ -4311,9 +4311,9 @@ document.addEventListener('DOMContentLoaded', () => {
     otForm.addEventListener('submit', (e) => {
         e.preventDefault();
 
-        const plantaId = parseInt(document.getElementById('ot-select-planta').value);
-        const edificioId = parseInt(document.getElementById('ot-select-edificio').value);
-        const ubicacionId = parseInt(document.getElementById('ot-select-ubicacion').value);
+        const plantaId = document.getElementById('ot-select-planta').value ? parseInt(document.getElementById('ot-select-planta').value) : null;
+        const edificioId = document.getElementById('ot-select-edificio').value ? parseInt(document.getElementById('ot-select-edificio').value) : null;
+        const ubicacionId = document.getElementById('ot-select-ubicacion').value ? parseInt(document.getElementById('ot-select-ubicacion').value) : null;
         const activoId = document.getElementById('ot-select-activo').value ? parseInt(document.getElementById('ot-select-activo').value) : null;
         
         const tipo = document.getElementById('ot-tipo').value;
@@ -5291,8 +5291,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function saveEditOT() {
         const otId = document.getElementById('edit-ot-id').value;
-        const plantaId = parseInt(document.getElementById('edit-ot-select-planta').value);
-        const edificioId = parseInt(document.getElementById('edit-ot-select-edificio').value);
+        const plantaId = document.getElementById('edit-ot-select-planta').value ? parseInt(document.getElementById('edit-ot-select-planta').value) : null;
+        const edificioId = document.getElementById('edit-ot-select-edificio').value ? parseInt(document.getElementById('edit-ot-select-edificio').value) : null;
         const ubicacionIdVal = document.getElementById('edit-ot-select-ubicacion').value;
         const ubicacionId = ubicacionIdVal ? parseInt(ubicacionIdVal) : null;
         const activoIdVal = document.getElementById('edit-ot-select-activo').value;
