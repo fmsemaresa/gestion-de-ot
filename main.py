@@ -13,7 +13,7 @@ from models import (
     Planta, Edificio, Ubicacion, Activo, 
     ComponenteActivo, Tecnico, OrdenTrabajo,
     PlantillaChequeo, ItemPlantillaChequeo, RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT, OcupanteUbicacion,
-    OrdenTrabajoComponente, OrdenTrabajoTecnicoLink
+    OrdenTrabajoComponente, OrdenTrabajoTecnicoLink, HorarioProgramado, Proyecto, RegistroRapido
 )
 
 from database import engine, init_db
@@ -30,6 +30,29 @@ class ComponenteTrabajadoInput(BaseModel):
     componente_id: int
     comentario: Optional[str] = None
 
+class HorarioProgramadoInput(BaseModel):
+    fecha_inicio: datetime
+    fecha_fin: datetime
+
+class ProyectoCreate(BaseModel):
+    nombre: str
+    descripcion: Optional[str] = None
+    estado: Optional[str] = "EN_PROGRESO"
+    color: Optional[str] = "#3b82f6"
+
+class ProyectoUpdate(BaseModel):
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
+    estado: Optional[str] = None
+    color: Optional[str] = None
+
+class RegistroRapidoCreate(BaseModel):
+    texto: str
+
+class RegistroRapidoUpdate(BaseModel):
+    texto: Optional[str] = None
+    completado: Optional[bool] = None
+
 class OrdenTrabajoCreate(BaseModel):
     descripcion: Optional[str] = None
     tipo: str = "Correctiva"
@@ -41,11 +64,13 @@ class OrdenTrabajoCreate(BaseModel):
     tecnico_id: Optional[int] = None
     tecnico_ids: Optional[List[int]] = None
     plantilla_id: Optional[int] = None
+    proyecto_id: Optional[int] = None
     fecha_programada: Optional[datetime] = None
     fecha_fin_programada: Optional[datetime] = None
     reportado_por: Optional[str] = "Administración"
     componentes_trabajados: Optional[List[ComponenteTrabajadoInput]] = None
     custom_checklist_items: Optional[List[dict]] = None
+    horarios_programados: Optional[List[HorarioProgramadoInput]] = None
 
 app = FastAPI(
     title="Gestión de OTs - FMS Climatización API", 
@@ -60,6 +85,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Dependencia para obtener la sesión de base de datos
@@ -464,7 +490,14 @@ def get_ordenes(
             "plantilla_id": ot.plantilla_id,
             "fotos": fotos_list,
             "comentarios_avance": comentarios_list,
-            "componentes_trabajados": componentes_list
+            "componentes_trabajados": componentes_list,
+            "horarios_programados": [
+                {
+                    "id": h.id,
+                    "fecha_inicio": h.fecha_inicio.isoformat(),
+                    "fecha_fin": h.fecha_fin.isoformat()
+                } for h in ot.horarios_programados
+            ]
         })
         
     return results
@@ -531,6 +564,8 @@ def get_orden_by_id(ot_id: int, db: Session = Depends(get_db)):
         "comentario": ot_comp.comentario
     } for ot_comp, comp in componentes_db]
     
+    proyecto = db.get(Proyecto, ot.proyecto_id) if ot.proyecto_id else None
+
     return {
         "id": ot.id,
         "descripcion": ot.descripcion,
@@ -549,6 +584,9 @@ def get_orden_by_id(ot_id: int, db: Session = Depends(get_db)):
         "edificio_id": ot.edificio_id,
         "ubicacion_id": ot.ubicacion_id,
         "activo_id": ot.activo_id,
+        "proyecto_id": ot.proyecto_id,
+        "proyecto_nombre": proyecto.nombre if proyecto else None,
+        "proyecto_color": proyecto.color if proyecto else None,
         "planta_nombre": planta.nombre if planta else None,
         "edificio_nombre": edificio.nombre if edificio else None,
         "ubicacion_nombre": ubicacion.nombre if ubicacion else None,
@@ -563,7 +601,14 @@ def get_orden_by_id(ot_id: int, db: Session = Depends(get_db)):
         "plantilla_id": ot.plantilla_id,
         "fotos": fotos_list,
         "comentarios_avance": comentarios_list,
-        "componentes_trabajados": componentes_list
+        "componentes_trabajados": componentes_list,
+        "horarios_programados": [
+            {
+                "id": h.id,
+                "fecha_inicio": h.fecha_inicio.isoformat(),
+                "fecha_fin": h.fecha_fin.isoformat()
+            } for h in ot.horarios_programados
+        ]
     }
 
 @app.post("/api/ordenes", response_model=OrdenTrabajo)
@@ -614,16 +659,25 @@ def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
             assigned_tecnicos.append(tech)
             primary_tecnico_id = tech.id
             
+    # Sincronizar fechas programadas principales con el primer horario de la lista
+    fecha_prog = ot_in.fecha_programada
+    fecha_fin_prog = ot_in.fecha_fin_programada
+    if ot_in.horarios_programados:
+        sorted_slots = sorted(ot_in.horarios_programados, key=lambda x: x.fecha_inicio)
+        if sorted_slots:
+            fecha_prog = sorted_slots[0].fecha_inicio
+            fecha_fin_prog = sorted_slots[0].fecha_fin
+
     if assigned_tecnicos:
-        if ot_in.fecha_programada:
+        if fecha_prog:
             estado = "PROGRAMADA"
         else:
             estado = "ASIGNADA"
     else:
         estado = "CREADA"
         
-    if ot_in.fecha_programada and ot_in.fecha_fin_programada:
-        if ot_in.fecha_fin_programada < ot_in.fecha_programada:
+    if fecha_prog and fecha_fin_prog:
+        if fecha_fin_prog < fecha_prog:
             raise HTTPException(status_code=400, detail="La fecha/hora de término no puede ser anterior a la de inicio.")
 
     ot = OrdenTrabajo(
@@ -631,8 +685,8 @@ def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
         tipo=ot_in.tipo,
         estado=estado,
         prioridad=ot_in.prioridad,
-        fecha_programada=ot_in.fecha_programada,
-        fecha_fin_programada=ot_in.fecha_fin_programada,
+        fecha_programada=fecha_prog,
+        fecha_fin_programada=fecha_fin_prog,
         reportado_por=ot_in.reportado_por,
         planta_id=ot_in.planta_id,
         edificio_id=edificio_id,
@@ -640,12 +694,25 @@ def create_orden(ot_in: OrdenTrabajoCreate, db: Session = Depends(get_db)):
         activo_id=ot_in.activo_id,
         tecnico_id=primary_tecnico_id,
         plantilla_id=ot_in.plantilla_id,
+        proyecto_id=ot_in.proyecto_id,
         tecnicos=assigned_tecnicos
     )
     
     db.add(ot)
     db.commit()
     db.refresh(ot)
+
+    # Guardar horarios programados
+    if ot_in.horarios_programados:
+        for slot in ot_in.horarios_programados:
+            hp = HorarioProgramado(
+                orden_trabajo_id=ot.id,
+                fecha_inicio=slot.fecha_inicio,
+                fecha_fin=slot.fecha_fin
+            )
+            db.add(hp)
+        db.commit()
+        db.refresh(ot)
     
     # Guardar componentes seleccionados
     if ot_in.componentes_trabajados:
@@ -737,6 +804,9 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
         ot.plantilla_id = int(val) if (val is not None and val != "" and str(val).isdigit()) else None
     if "reportado_por" in updated_ot:
         ot.reportado_por = updated_ot["reportado_por"]
+    if "proyecto_id" in updated_ot:
+        val = updated_ot["proyecto_id"]
+        ot.proyecto_id = int(val) if (val is not None and val != "" and str(val).isdigit()) else None
 
     # Validate location requirement (temporarily bypassed)
     edificio = db.get(Edificio, ot.edificio_id)
@@ -763,46 +833,88 @@ def update_orden(ot_id: int, updated_ot: dict, db: Session = Depends(get_db)):
         else:
             ot.tecnicos = []
         
-    # Process scheduled date
-    if "fecha_programada" in updated_ot:
-        val = updated_ot["fecha_programada"]
-        if val:
-            if isinstance(val, str):
+    # Process multiple schedules if present, otherwise fall back to single schedule update
+    if "horarios_programados" in updated_ot:
+        # Clear existing schedules
+        existing_slots = db.exec(select(HorarioProgramado).where(HorarioProgramado.orden_trabajo_id == ot.id)).all()
+        for slot in existing_slots:
+            db.delete(slot)
+        db.commit()
+        
+        # Add new schedules
+        new_slots = updated_ot["horarios_programados"] or []
+        parsed_slots = []
+        for slot in new_slots:
+            start_val = slot.get("fecha_inicio")
+            end_val = slot.get("fecha_fin")
+            if start_val and end_val:
                 try:
-                    if "T" in val:
-                        ot.fecha_programada = datetime.fromisoformat(val.replace("Z", "+00:00"))
-                    else:
-                        ot.fecha_programada = datetime.strptime(val, "%Y-%m-%d")
+                    start_dt = datetime.fromisoformat(start_val.replace("Z", "+00:00")).replace(tzinfo=None)
+                    end_dt = datetime.fromisoformat(end_val.replace("Z", "+00:00")).replace(tzinfo=None)
                 except Exception:
-                    ot.fecha_programada = datetime.fromisoformat(val)
-            else:
-                ot.fecha_programada = val
+                    start_dt = datetime.fromisoformat(start_val).replace(tzinfo=None)
+                    end_dt = datetime.fromisoformat(end_val).replace(tzinfo=None)
+                hp = HorarioProgramado(
+                    orden_trabajo_id=ot.id,
+                    fecha_inicio=start_dt,
+                    fecha_fin=end_dt
+                )
+                db.add(hp)
+                parsed_slots.append(hp)
+        db.commit()
+        
+        # Sincronizar fechas programadas principales de la OT
+        if parsed_slots:
+            sorted_slots = sorted(parsed_slots, key=lambda x: x.fecha_inicio)
+            ot.fecha_programada = sorted_slots[0].fecha_inicio
+            ot.fecha_fin_programada = sorted_slots[0].fecha_fin
         else:
             ot.fecha_programada = None
-
-    # Process scheduled end date
-    if "fecha_fin_programada" in updated_ot:
-        val = updated_ot["fecha_fin_programada"]
-        if val:
-            if isinstance(val, str):
-                try:
-                    if "T" in val:
-                        ot.fecha_fin_programada = datetime.fromisoformat(val.replace("Z", "+00:00"))
-                    else:
-                        ot.fecha_fin_programada = datetime.strptime(val, "%Y-%m-%d")
-                except Exception:
-                    ot.fecha_fin_programada = datetime.fromisoformat(val)
-            else:
-                ot.fecha_fin_programada = val
-        else:
             ot.fecha_fin_programada = None
+        db.add(ot)
+        db.commit()
+        db.refresh(ot)
+    else:
+        # Process scheduled date (Legacy support)
+        if "fecha_programada" in updated_ot:
+            val = updated_ot["fecha_programada"]
+            if val:
+                if isinstance(val, str):
+                    try:
+                        if "T" in val:
+                            ot.fecha_programada = datetime.fromisoformat(val.replace("Z", "+00:00"))
+                        else:
+                            ot.fecha_programada = datetime.strptime(val, "%Y-%m-%d")
+                    except Exception:
+                        ot.fecha_programada = datetime.fromisoformat(val)
+                else:
+                    ot.fecha_programada = val
+            else:
+                ot.fecha_programada = None
 
-    # Validate: fecha_fin_programada cannot be anterior to fecha_programada
-    if ot.fecha_programada and ot.fecha_fin_programada:
-        p_dt = ot.fecha_programada.replace(tzinfo=None)
-        f_dt = ot.fecha_fin_programada.replace(tzinfo=None)
-        if f_dt < p_dt:
-            raise HTTPException(status_code=400, detail="La fecha/hora de término no puede ser anterior a la de inicio.")
+        # Process scheduled end date (Legacy support)
+        if "fecha_fin_programada" in updated_ot:
+            val = updated_ot["fecha_fin_programada"]
+            if val:
+                if isinstance(val, str):
+                    try:
+                        if "T" in val:
+                            ot.fecha_fin_programada = datetime.fromisoformat(val.replace("Z", "+00:00"))
+                        else:
+                            ot.fecha_fin_programada = datetime.strptime(val, "%Y-%m-%d")
+                    except Exception:
+                        ot.fecha_fin_programada = datetime.fromisoformat(val)
+                else:
+                    ot.fecha_fin_programada = val
+            else:
+                ot.fecha_fin_programada = None
+
+        # Validate: fecha_fin_programada cannot be anterior to fecha_programada
+        if ot.fecha_programada and ot.fecha_fin_programada:
+            p_dt = ot.fecha_programada.replace(tzinfo=None)
+            f_dt = ot.fecha_fin_programada.replace(tzinfo=None)
+            if f_dt < p_dt:
+                raise HTTPException(status_code=400, detail="La fecha/hora de término no puede ser anterior a la de inicio.")
 
     # Process start date
     if "fecha_inicio" in updated_ot:
@@ -3011,7 +3123,141 @@ async def importar_unificado(file: UploadFile = File(...), db: Session = Depends
         }
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al procesar archivo Excel: {str(e)}")
+# --- ENDPOINTS DE PROYECTOS ---
+
+@app.get("/api/proyectos")
+def get_proyectos(db: Session = Depends(get_db)):
+    proyectos = db.exec(select(Proyecto).order_by(Proyecto.id.desc())).all()
+    result = []
+    for p in proyectos:
+        ots = db.exec(select(OrdenTrabajo).where(OrdenTrabajo.proyecto_id == p.id)).all()
+        completed_ots = sum(1 for ot in ots if ot.estado_ejecucion == "REALIZADA" or ot.estado == "REALIZADA")
+        result.append({
+            "id": p.id,
+            "nombre": p.nombre,
+            "descripcion": p.descripcion,
+            "estado": p.estado,
+            "color": p.color,
+            "fecha_creacion": p.fecha_creacion.isoformat() + "Z" if p.fecha_creacion else None,
+            "total_ots": len(ots),
+            "completed_ots": completed_ots
+        })
+    return result
+
+@app.post("/api/proyectos", response_model=dict)
+def create_proyecto(p_in: ProyectoCreate, db: Session = Depends(get_db)):
+    proyecto = Proyecto(
+        nombre=p_in.nombre,
+        descripcion=p_in.descripcion,
+        estado=p_in.estado or "EN_PROGRESO",
+        color=p_in.color or "#3b82f6"
+    )
+    db.add(proyecto)
+    db.commit()
+    db.refresh(proyecto)
+    return {
+        "id": proyecto.id,
+        "nombre": proyecto.nombre,
+        "descripcion": proyecto.descripcion,
+        "estado": proyecto.estado,
+        "color": proyecto.color,
+        "fecha_creacion": proyecto.fecha_creacion.isoformat() + "Z" if proyecto.fecha_creacion else None
+    }
+
+@app.put("/api/proyectos/{proyecto_id}", response_model=dict)
+def update_proyecto(proyecto_id: int, p_in: ProyectoUpdate, db: Session = Depends(get_db)):
+    proyecto = db.get(Proyecto, proyecto_id)
+    if not proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    if p_in.nombre is not None:
+        proyecto.nombre = p_in.nombre
+    if p_in.descripcion is not None:
+        proyecto.descripcion = p_in.descripcion
+    if p_in.estado is not None:
+        proyecto.estado = p_in.estado
+    if p_in.color is not None:
+        proyecto.color = p_in.color
+    db.add(proyecto)
+    db.commit()
+    db.refresh(proyecto)
+    return {
+        "id": proyecto.id,
+        "nombre": proyecto.nombre,
+        "descripcion": proyecto.descripcion,
+        "estado": proyecto.estado,
+        "color": proyecto.color
+    }
+
+@app.delete("/api/proyectos/{proyecto_id}")
+def delete_proyecto(proyecto_id: int, db: Session = Depends(get_db)):
+    proyecto = db.get(Proyecto, proyecto_id)
+    if not proyecto:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado")
+    ots = db.exec(select(OrdenTrabajo).where(OrdenTrabajo.proyecto_id == proyecto_id)).all()
+    for ot in ots:
+        ot.proyecto_id = None
+        db.add(ot)
+    db.delete(proyecto)
+    db.commit()
+    return {"message": "Proyecto eliminado exitosamente"}
+
+
+# --- ENDPOINTS DE REGISTROS RÁPIDOS ---
+
+@app.get("/api/registros-rapidos")
+def get_registros_rapidos(db: Session = Depends(get_db)):
+    registros = db.exec(select(RegistroRapido).order_by(RegistroRapido.id.asc())).all()
+    return [
+        {
+            "id": r.id,
+            "texto": r.texto,
+            "completado": r.completado,
+            "fecha_creacion": r.fecha_creacion.isoformat() + "Z" if r.fecha_creacion else None
+        }
+        for r in registros
+    ]
+
+@app.post("/api/registros-rapidos", response_model=dict)
+def create_registro_rapido(r_in: RegistroRapidoCreate, db: Session = Depends(get_db)):
+    registro = RegistroRapido(texto=r_in.texto)
+    db.add(registro)
+    db.commit()
+    db.refresh(registro)
+    return {
+        "id": registro.id,
+        "texto": registro.texto,
+        "completado": registro.completado,
+        "fecha_creacion": registro.fecha_creacion.isoformat() + "Z" if registro.fecha_creacion else None
+    }
+
+@app.put("/api/registros-rapidos/{registro_id}", response_model=dict)
+def update_registro_rapido(registro_id: int, r_in: RegistroRapidoUpdate, db: Session = Depends(get_db)):
+    registro = db.get(RegistroRapido, registro_id)
+    if not registro:
+        raise HTTPException(status_code=404, detail="Registro rápido no encontrado")
+    if r_in.texto is not None:
+        registro.texto = r_in.texto
+    if r_in.completado is not None:
+        registro.completado = r_in.completado
+    db.add(registro)
+    db.commit()
+    db.refresh(registro)
+    return {
+        "id": registro.id,
+        "texto": registro.texto,
+        "completado": registro.completado,
+        "fecha_creacion": registro.fecha_creacion.isoformat() + "Z" if registro.fecha_creacion else None
+    }
+
+@app.delete("/api/registros-rapidos/{registro_id}")
+def delete_registro_rapido(registro_id: int, db: Session = Depends(get_db)):
+    registro = db.get(RegistroRapido, registro_id)
+    if not registro:
+        raise HTTPException(status_code=404, detail="Registro rápido no encontrado")
+    db.delete(registro)
+    db.commit()
+    return {"message": "Registro rápido eliminado exitosamente"}
+
 
 # Montar los archivos estáticos para la interfaz de usuario
 app.mount("/static", StaticFiles(directory="static"), name="static")

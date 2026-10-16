@@ -199,15 +199,21 @@ body {
 /* KPI Cards Row */
 .kpi-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 1024px) {
+    .kpi-container {
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    }
 }
 
 .kpi-card {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    padding: 1.5rem;
+    padding: 0.5rem 0.75rem;
     border-radius: var(--border-radius);
     display: flex;
     justify-content: space-between;
@@ -264,33 +270,38 @@ body {
 }
 
 .kpi-card.interactive:hover {
-    transform: translateY(-5px);
+    transform: translateY(-3px);
     border-color: var(--border-focus);
     box-shadow: var(--shadow-lg);
     background-color: var(--bg-card-hover);
 }
 
 .kpi-info h3 {
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .kpi-value {
-    font-size: 2rem;
+    font-size: 0.85rem;
     font-weight: 700;
+    line-height: 1.2;
 }
 
 .kpi-icon-wrapper {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
+    font-size: 1rem;
+    flex-shrink: 0;
 }
 
 .kpi-icon-wrapper.blue { background: rgba(59, 130, 246, 0.1); color: var(--accent-color); }
@@ -317,8 +328,101 @@ body {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
-    padding: 1.5rem;
+    padding: 0.65rem 0.85rem;
     box-shadow: var(--shadow-sm);
+}
+
+.hierarchy-panel .panel-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Sidebar Section 2: Registros Rápidos */
+.registros-rapidos-panel {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 0.65rem 0.85rem;
+    box-shadow: var(--shadow-sm);
+    margin-top: 0.75rem;
+}
+
+.registros-rapidos-panel .panel-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.registros-rapidos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.registro-rapido-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0.5rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 0.75rem;
+    transition: var(--transition-fast);
+}
+
+.registro-rapido-item:hover {
+    border-color: var(--border-focus);
+}
+
+.registro-rapido-item.completed span.registro-texto {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.registro-rapido-actions {
+    display: flex;
+    gap: 0.2rem;
+    align-items: center;
+}
+
+.btn-rr-action {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0.1rem 0.25rem;
+    border-radius: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.btn-rr-action:hover {
+    opacity: 1;
+    background: var(--bg-secondary);
+}
+
+/* Project Badge on OT Cards */
+.ot-tag-proyecto {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    color: white;
+    margin-right: 0.35rem;
 }
 
 .panel-title {

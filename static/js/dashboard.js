@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let calendarMonth = new Date().getMonth();
     let customChecklistItems = [];
     let editCustomChecklistItems = [];
+    let newOtSchedules = [];
+    let editOtSchedules = [];
     let calendarViewSubMode = 'month'; // 'day', 'week', 'month'
     let calendarCurrentDate = new Date();
 
@@ -304,10 +306,262 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (kpiAsignadas) kpiAsignadas.textContent = kpis.asignadas;
                 if (kpiProgramadas) kpiProgramadas.textContent = kpis.programadas;
                 if (kpiRealizadas) kpiRealizadas.textContent = kpis.realizadas;
-                if (kpiActivos) kpiActivos.innerHTML = `${kpis.activos_operativos} <span style="font-size: 1rem; color: var(--text-muted);">/ ${kpis.total_activos}</span>`;
+                if (kpiActivos) kpiActivos.innerHTML = `${kpis.activos_operativos} <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">/ ${kpis.total_activos}</span>`;
             })
             .catch(err => console.error('Error al cargar KPIs:', err));
     }
+
+    // --- PROYECTOS & REGISTROS RÁPIDOS ---
+    let proyectosList = [];
+    let registrosRapidosList = [];
+
+    const btnCreateProyecto = document.getElementById('btn-create-proyecto');
+    const proyectoModal = document.getElementById('proyecto-modal');
+    const proyectoForm = document.getElementById('proyecto-form');
+    const closeProyectoModal = document.getElementById('close-proyecto-modal');
+    const btnCancelProyecto = document.getElementById('btn-cancel-proyecto');
+    const inputRegistroRapido = document.getElementById('input-registro-rapido');
+    const registrosRapidosListContainer = document.getElementById('registros-rapidos-list');
+    const registrosRapidosCount = document.getElementById('registros-rapidos-count');
+    const otSelectProyecto = document.getElementById('ot-select-proyecto');
+    const editOtSelectProyecto = document.getElementById('edit-ot-select-proyecto');
+
+    async function loadProyectos() {
+        try {
+            const res = await fetch('/api/proyectos');
+            if (res.ok) {
+                proyectosList = await res.json();
+                populateProyectoSelects();
+            }
+        } catch (err) {
+            console.error('Error al cargar proyectos:', err);
+        }
+    }
+
+    function populateProyectoSelects() {
+        let options = '<option value="">-- Sin Proyecto --</option>';
+        proyectosList.forEach(p => {
+            options += `<option value="${p.id}">📁 ${p.nombre}</option>`;
+        });
+        if (otSelectProyecto) otSelectProyecto.innerHTML = options;
+        if (editOtSelectProyecto) editOtSelectProyecto.innerHTML = options;
+    }
+
+    async function loadRegistrosRapidos() {
+        try {
+            const res = await fetch('/api/registros-rapidos');
+            if (res.ok) {
+                registrosRapidosList = await res.json();
+                renderRegistrosRapidos();
+            }
+        } catch (err) {
+            console.error('Error al cargar registros rápidos:', err);
+        }
+    }
+
+    function renderRegistrosRapidos() {
+        if (!registrosRapidosListContainer) return;
+        const pendingCount = registrosRapidosList.filter(r => !r.completado).length;
+        if (registrosRapidosCount) registrosRapidosCount.textContent = pendingCount;
+
+        if (registrosRapidosList.length === 0) {
+            registrosRapidosListContainer.innerHTML = '<p style="color: var(--text-muted); font-size: 0.75rem; text-align: center; padding: 0.5rem 0;">Sin registros rápidos.</p>';
+            return;
+        }
+
+        let html = '';
+        registrosRapidosList.forEach(r => {
+            html += `
+                <div class="registro-rapido-item ${r.completado ? 'completed' : ''}" data-id="${r.id}">
+                    <div style="display: flex; align-items: center; gap: 0.35rem; flex: 1; min-width: 0;">
+                        <input type="checkbox" class="rr-checkbox" data-id="${r.id}" ${r.completado ? 'checked' : ''} style="cursor: pointer;">
+                        <span class="registro-texto" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;" title="${r.texto}">${r.texto}</span>
+                    </div>
+                    <div class="registro-rapido-actions">
+                        <button class="btn-rr-action btn-rr-to-ot" data-id="${r.id}" title="Convertir a OT">📋</button>
+                        <button class="btn-rr-action btn-rr-to-proyecto" data-id="${r.id}" title="Convertir a Proyecto">📁</button>
+                        <button class="btn-rr-action btn-rr-edit" data-id="${r.id}" title="Editar texto">✏️</button>
+                        <button class="btn-rr-action btn-rr-delete" data-id="${r.id}" title="Eliminar">🗑️</button>
+                    </div>
+                </div>
+            `;
+        });
+        registrosRapidosListContainer.innerHTML = html;
+
+        // Bind item actions
+        registrosRapidosListContainer.querySelectorAll('.rr-checkbox').forEach(cb => {
+            cb.addEventListener('change', async () => {
+                const id = parseInt(cb.dataset.id);
+                await fetch(`/api/registros-rapidos/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ completado: cb.checked })
+                });
+                loadRegistrosRapidos();
+            });
+        });
+
+        registrosRapidosListContainer.querySelectorAll('.btn-rr-to-ot').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = parseInt(btn.dataset.id);
+                const item = registrosRapidosList.find(r => r.id === id);
+                if (item) {
+                    openNewOTModal();
+                    const descInput = document.getElementById('ot-descripcion');
+                    if (descInput) descInput.value = item.texto;
+                }
+            });
+        });
+
+        registrosRapidosListContainer.querySelectorAll('.btn-rr-to-proyecto').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = parseInt(btn.dataset.id);
+                const item = registrosRapidosList.find(r => r.id === id);
+                if (item) {
+                    openProyectoModal(null, item.texto);
+                }
+            });
+        });
+
+        registrosRapidosListContainer.querySelectorAll('.btn-rr-edit').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = parseInt(btn.dataset.id);
+                const item = registrosRapidosList.find(r => r.id === id);
+                if (item) {
+                    const newText = prompt("Editar registro rápido:", item.texto);
+                    if (newText !== null && newText.trim() !== "") {
+                        await fetch(`/api/registros-rapidos/${id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ texto: newText.trim() })
+                        });
+                        loadRegistrosRapidos();
+                    }
+                }
+            });
+        });
+
+        registrosRapidosListContainer.querySelectorAll('.btn-rr-delete').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = parseInt(btn.dataset.id);
+                if (confirm("¿Eliminar este registro rápido?")) {
+                    await fetch(`/api/registros-rapidos/${id}`, { method: 'DELETE' });
+                    loadRegistrosRapidos();
+                }
+            });
+        });
+    }
+
+    if (inputRegistroRapido) {
+        inputRegistroRapido.addEventListener('keypress', async (e) => {
+            if (e.key === 'Enter') {
+                const val = inputRegistroRapido.value.trim();
+                if (val) {
+                    await fetch('/api/registros-rapidos', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ texto: val })
+                    });
+                    inputRegistroRapido.value = '';
+                    loadRegistrosRapidos();
+                }
+            }
+        });
+    }
+
+    function openProyectoModal(proyectoId = null, prefilledName = null) {
+        const modalTitle = document.getElementById('proyecto-modal-title');
+        const idInput = document.getElementById('proyecto-id-input');
+        const nombreInput = document.getElementById('proyecto-nombre-input');
+        const descInput = document.getElementById('proyecto-descripcion-input');
+        const estadoInput = document.getElementById('proyecto-estado-input');
+        const colorInput = document.getElementById('proyecto-color-input');
+
+        if (proyectoId) {
+            const p = proyectosList.find(x => x.id === proyectoId);
+            if (p) {
+                if (modalTitle) modalTitle.textContent = "Editar Proyecto";
+                if (idInput) idInput.value = p.id;
+                if (nombreInput) nombreInput.value = p.nombre;
+                if (descInput) descInput.value = p.descripcion || '';
+                if (estadoInput) estadoInput.value = p.estado || 'EN_PROGRESO';
+                if (colorInput) colorInput.value = p.color || '#3b82f6';
+            }
+        } else {
+            if (modalTitle) modalTitle.textContent = "Nuevo Proyecto";
+            if (idInput) idInput.value = '';
+            if (nombreInput) nombreInput.value = prefilledName || '';
+            if (descInput) descInput.value = '';
+            if (estadoInput) estadoInput.value = 'EN_PROGRESO';
+            if (colorInput) colorInput.value = '#3b82f6';
+        }
+        if (proyectoModal) proyectoModal.style.display = 'flex';
+    }
+
+    if (btnCreateProyecto) {
+        btnCreateProyecto.addEventListener('click', () => {
+            openProyectoModal();
+        });
+    }
+
+    if (closeProyectoModal) {
+        closeProyectoModal.addEventListener('click', () => {
+            if (proyectoModal) proyectoModal.style.display = 'none';
+        });
+    }
+
+    if (btnCancelProyecto) {
+        btnCancelProyecto.addEventListener('click', () => {
+            if (proyectoModal) proyectoModal.style.display = 'none';
+        });
+    }
+
+    if (proyectoForm) {
+        proyectoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('proyecto-id-input').value;
+            const nombre = document.getElementById('proyecto-nombre-input').value.trim();
+            const descripcion = document.getElementById('proyecto-descripcion-input').value.trim();
+            const estado = document.getElementById('proyecto-estado-input').value;
+            const color = document.getElementById('proyecto-color-input').value;
+
+            if (!nombre) {
+                alert("El nombre del proyecto es obligatorio");
+                return;
+            }
+
+            const payload = { nombre, descripcion, estado, color };
+            try {
+                let res;
+                if (id) {
+                    res = await fetch(`/api/proyectos/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } else {
+                    res = await fetch('/api/proyectos', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+                if (res.ok) {
+                    if (proyectoModal) proyectoModal.style.display = 'none';
+                    await loadProyectos();
+                    loadWorkOrders();
+                } else {
+                    alert("Error al guardar el proyecto");
+                }
+            } catch (err) {
+                console.error("Error al guardar proyecto:", err);
+            }
+        });
+    }
+
+    // Load initial proyectos & registros rápidos
+    loadProyectos();
+    loadRegistrosRapidos();
 
     // --- 3. LOAD HIERARCHY TREE & SEARCH ---
     let locationsSearchList = [];
@@ -394,13 +648,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (selectedPlantaId && u.planta_id !== selectedPlantaId) {
                         return false;
                     }
-                    const matchName = u.nombre.toLowerCase().includes(query) || 
-                                      u.planta_nombre.toLowerCase().includes(query) || 
-                                      u.edificio_nombre.toLowerCase().includes(query);
+                    const matchName = (u.nombre && u.nombre.toLowerCase().includes(query)) || 
+                                      (u.planta_nombre && u.planta_nombre.toLowerCase().includes(query)) || 
+                                      (u.edificio_nombre && u.edificio_nombre.toLowerCase().includes(query));
                     const matchMeta = (u.codigo && u.codigo.toLowerCase().includes(query)) ||
                                       (u.uso && u.uso.toLowerCase().includes(query)) ||
                                       (u.cargo && u.cargo.toLowerCase().includes(query));
-                    const matchOcupante = u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().includes(query));
+                    const matchOcupante = u.ocupantes && u.ocupantes.some(o => o.nombre && o.nombre.toLowerCase().includes(query));
                     
                     return matchName || matchMeta || matchOcupante;
                 });
@@ -411,9 +665,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         return false;
                     }
 
-                    const cleanName = u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const cleanPlanta = u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const cleanEdificio = u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanName = u.nombre ? u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanPlanta = u.planta_nombre ? u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanEdificio = u.edificio_nombre ? u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
                     // Match location, plant, or building name
                     if (cleanName.includes(cleanQuery) || cleanPlanta.includes(cleanQuery) || cleanEdificio.includes(cleanQuery)) {
@@ -430,12 +684,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     // Match occupants
-                    if (u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                    if (u.ocupantes && u.ocupantes.some(o => o.nombre && o.nombre.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
                         return true;
                     }
 
-                    // Match asset names
-                    if (u.activos && u.activos.some(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                    // Match asset names (cast to string to handle numeric names)
+                    if (u.activos && u.activos.some(act => act && String(act).toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
                         return true;
                     }
 
@@ -465,21 +719,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (cleanQuery === '') {
                 filtered = locationsSearchList.filter(u => {
-                    const matchName = u.nombre.toLowerCase().includes(query) || 
-                                      u.planta_nombre.toLowerCase().includes(query) || 
-                                      u.edificio_nombre.toLowerCase().includes(query);
+                    const matchName = (u.nombre && u.nombre.toLowerCase().includes(query)) || 
+                                      (u.planta_nombre && u.planta_nombre.toLowerCase().includes(query)) || 
+                                      (u.edificio_nombre && u.edificio_nombre.toLowerCase().includes(query));
                     const matchMeta = (u.codigo && u.codigo.toLowerCase().includes(query)) ||
                                       (u.uso && u.uso.toLowerCase().includes(query)) ||
                                       (u.cargo && u.cargo.toLowerCase().includes(query));
-                    const matchOcupante = u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().includes(query));
+                    const matchOcupante = u.ocupantes && u.ocupantes.some(o => o.nombre && o.nombre.toLowerCase().includes(query));
                     
                     return matchName || matchMeta || matchOcupante;
                 });
             } else {
                 filtered = locationsSearchList.filter(u => {
-                    const cleanName = u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const cleanPlanta = u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const cleanEdificio = u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanName = u.nombre ? u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanPlanta = u.planta_nombre ? u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanEdificio = u.edificio_nombre ? u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
                     if (cleanName.includes(cleanQuery) || cleanPlanta.includes(cleanQuery) || cleanEdificio.includes(cleanQuery)) {
                         return true;
@@ -493,11 +747,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         return true;
                     }
 
-                    if (u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                    if (u.ocupantes && u.ocupantes.some(o => o.nombre && o.nombre.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
                         return true;
                     }
 
-                    if (u.activos && u.activos.some(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                    if (u.activos && u.activos.some(act => act && String(act).toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
                         return true;
                     }
                     return false;
@@ -1057,9 +1311,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             const card = document.createElement('div');
+            const projectBadge = ot.proyecto_nombre ? `<span class="ot-tag-proyecto" style="background: ${ot.proyecto_color || '#3b82f6'};">📁 ${ot.proyecto_nombre}</span>` : '';
             card.className = `entity-card priority-${ot.prioridad.toLowerCase()}`;
             card.innerHTML = `
-                <div class="card-tag ${statusClass}">${statusLabel}</div>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.35rem;">
+                    <div class="card-tag ${statusClass}" style="margin-bottom: 0;">${statusLabel}</div>
+                    ${projectBadge}
+                </div>
                 <h4 class="entity-title" style="font-weight: bold;"><span style="font-weight: normal;">#OT-${ot.id}</span> - ${ot.tipo}</h4>
                 <div class="entity-subtitle" style="font-weight: bold; color: var(--text-color); margin-bottom: 0.5rem;">${ot.planta_nombre} / ${ot.edificio_nombre} ${ot.ubicacion_nombre ? '/ ' + ot.ubicacion_nombre : ''}</div>
                 <p style="font-size:0.85rem; background:rgba(0,0,0,0.1); padding:0.5rem; border-radius:6px; margin-bottom:0.4rem; color:#cbd5e1;">${ot.descripcion}</p>
@@ -2026,10 +2284,37 @@ document.addEventListener('DOMContentLoaded', () => {
         ];
         
         // Split OTs: scheduled vs unscheduled
-        const unscheduledOts = filteredOts.filter(ot => !ot.fecha_programada);
-        const scheduledOts = filteredOts.filter(ot => ot.fecha_programada);
+        const unscheduledOts = filteredOts.filter(ot => !ot.fecha_programada && (!ot.horarios_programados || ot.horarios_programados.length === 0));
+        const scheduledOts = filteredOts.filter(ot => ot.fecha_programada || (ot.horarios_programados && ot.horarios_programados.length > 0));
 
-        // Priority weights helper
+        const getOtDaySchedule = (ot, d) => {
+            const slots = [];
+            if (ot.fecha_programada) {
+                const pDate = new Date(ot.fecha_programada);
+                if (pDate.getFullYear() === d.getFullYear() &&
+                    pDate.getMonth() === d.getMonth() &&
+                    pDate.getDate() === d.getDate()) {
+                    const pDateEnd = ot.fecha_fin_programada ? new Date(ot.fecha_fin_programada) : new Date(pDate.getTime() + 60 * 60 * 1000);
+                    slots.push({ start: pDate, end: pDateEnd });
+                }
+            }
+            if (ot.horarios_programados && ot.horarios_programados.length > 0) {
+                ot.horarios_programados.forEach(slot => {
+                    const pDate = new Date(slot.fecha_inicio);
+                    if (pDate.getFullYear() === d.getFullYear() &&
+                        pDate.getMonth() === d.getMonth() &&
+                        pDate.getDate() === d.getDate()) {
+                        const pDateEnd = slot.fecha_fin ? new Date(slot.fecha_fin) : new Date(pDate.getTime() + 60 * 60 * 1000);
+                        const isDup = slots.some(s => s.start.getTime() === pDate.getTime() && s.end.getTime() === pDateEnd.getTime());
+                        if (!isDup) {
+                            slots.push({ start: pDate, end: pDateEnd });
+                        }
+                    }
+                });
+            }
+            return slots;
+        };
+
         const getPriorityWeight = (priority) => {
             const p = (priority || '').toLowerCase();
             if (p === 'alta') return 3;
@@ -2038,30 +2323,28 @@ document.addEventListener('DOMContentLoaded', () => {
             return 0;
         };
 
-        const layoutEvents = (dayOts) => {
+        const layoutEvents = (dayOccurrences) => {
             const startHour = 8;
             const endHour = 20;
             const totalMinutes = (endHour - startHour) * 60; // 720 minutes
             
             const timedEvents = [];
-            dayOts.forEach(ot => {
-                const pDate = new Date(ot.fecha_programada);
+            dayOccurrences.forEach(occ => {
+                const pDate = occ.start;
                 const isAllDay = pDate.getHours() === 0 && pDate.getMinutes() === 0 && pDate.getSeconds() === 0;
                 
                 if (!isAllDay) {
                     const startMin = (pDate.getHours() - startHour) * 60 + pDate.getMinutes();
-                    let endMin = startMin + 60; // default 1 hour duration
-                    
-                    if (ot.fecha_fin_programada) {
-                        const pDateEnd = new Date(ot.fecha_fin_programada);
-                        endMin = (pDateEnd.getHours() - startHour) * 60 + pDateEnd.getMinutes();
-                    }
+                    const pDateEnd = occ.end;
+                    const endMin = (pDateEnd.getHours() - startHour) * 60 + pDateEnd.getMinutes();
                     
                     const clampedStart = Math.max(0, Math.min(totalMinutes - 30, startMin));
                     const clampedEnd = Math.max(clampedStart + 30, Math.min(totalMinutes, endMin));
                     
                     timedEvents.push({
-                        ot,
+                        ot: occ.ot,
+                        occStart: occ.start,
+                        occEnd: occ.end,
                         startMin: clampedStart,
                         endMin: clampedEnd,
                         col: 0,
@@ -2294,16 +2577,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 const cellDateStr = `${cell.year}-${String(cell.month + 1).padStart(2, '0')}-${String(cell.day).padStart(2, '0')}`;
                 cellDiv.dataset.date = cellDateStr;
 
-                const dayOts = scheduledOts.filter(ot => {
-                    const pDate = new Date(ot.fecha_programada);
-                    return pDate.getFullYear() === cell.year &&
-                           pDate.getMonth() === cell.month &&
-                           pDate.getDate() === cell.day;
+                const dayDate = new Date(cell.year, cell.month, cell.day);
+                const dayOccurrences = [];
+                scheduledOts.forEach(ot => {
+                    const slots = getOtDaySchedule(ot, dayDate);
+                    slots.forEach(slot => {
+                        dayOccurrences.push({
+                            ot: ot,
+                            start: slot.start,
+                            end: slot.end
+                        });
+                    });
                 });
 
                 let otTagsHtml = '';
-                dayOts.forEach(ot => {
-                    const pDate = new Date(ot.fecha_programada);
+                dayOccurrences.forEach(occ => {
+                    const ot = occ.ot;
+                    const pDate = occ.start;
                     let timeStr = '';
                     if (pDate.getHours() !== 0 || pDate.getMinutes() !== 0) {
                         timeStr = ` <span style="font-weight: 600; font-size: 0.75rem; opacity: 0.85;">(${String(pDate.getHours()).padStart(2, '0')}:${String(pDate.getMinutes()).padStart(2, '0')})</span>`;
@@ -2374,19 +2664,24 @@ document.addEventListener('DOMContentLoaded', () => {
                                 
                 const cellDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
                 
-                const dayOts = scheduledOts.filter(ot => {
-                    const pDate = new Date(ot.fecha_programada);
-                    return pDate.getFullYear() === d.getFullYear() &&
-                           pDate.getMonth() === d.getMonth() &&
-                           pDate.getDate() === d.getDate();
+                const dayOccurrences = [];
+                scheduledOts.forEach(ot => {
+                    const slots = getOtDaySchedule(ot, d);
+                    slots.forEach(slot => {
+                        dayOccurrences.push({
+                            ot: ot,
+                            start: slot.start,
+                            end: slot.end
+                        });
+                    });
                 });
                 
-                const allDayOts = dayOts.filter(ot => {
-                    const pDate = new Date(ot.fecha_programada);
+                const allDayOccurrences = dayOccurrences.filter(occ => {
+                    const pDate = occ.start;
                     return pDate.getHours() === 0 && pDate.getMinutes() === 0 && pDate.getSeconds() === 0;
                 });
                 
-                const timedLayoutEvents = layoutEvents(dayOts);
+                const timedLayoutEvents = layoutEvents(dayOccurrences);
                 const formattedDayName = dayNames[d.getDay()].substring(0, 3);
                 
                 // 1. Header Box
@@ -2399,8 +2694,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // 2. All Day Box
                 let allDayHtml = '';
-                if (allDayOts.length > 0) {
-                    allDayOts.forEach(ot => {
+                if (allDayOccurrences.length > 0) {
+                    allDayOccurrences.forEach(occ => {
+                        const ot = occ.ot;
                         allDayHtml += `
                             <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" style="margin: 2px 0;">
                                 <div class="ot-tag-id">#OT-${ot.id}</div>
@@ -2427,13 +2723,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const width = (1 / evt.totalCols) * 100;
                     const left = (evt.col / evt.totalCols) * 100;
                     
-                    const pDate = new Date(ot.fecha_programada);
-                    const startStr = String(pDate.getHours()).padStart(2, '0') + ':' + String(pDate.getMinutes()).padStart(2, '0');
-                    let endStr = '';
-                    if (ot.fecha_fin_programada) {
-                        const pDateEnd = new Date(ot.fecha_fin_programada);
-                        endStr = ' - ' + String(pDateEnd.getHours()).padStart(2, '0') + ':' + String(pDateEnd.getMinutes()).padStart(2, '0');
-                    }
+                    const startStr = String(evt.occStart.getHours()).padStart(2, '0') + ':' + String(evt.occStart.getMinutes()).padStart(2, '0');
+                    const endStr = ' - ' + String(evt.occEnd.getHours()).padStart(2, '0') + ':' + String(evt.occEnd.getMinutes()).padStart(2, '0');
                     
                     timedOtsHtml += `
                         <div class="calendar-absolute-ot priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" 
@@ -2559,23 +2850,29 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             
             const cellDateStr = `${calendarCurrentDate.getFullYear()}-${String(calendarCurrentDate.getMonth() + 1).padStart(2, '0')}-${String(calendarCurrentDate.getDate()).padStart(2, '0')}`;
-            const dayOts = scheduledOts.filter(ot => {
-                const pDate = new Date(ot.fecha_programada);
-                return pDate.getFullYear() === calendarCurrentDate.getFullYear() &&
-                       pDate.getMonth() === calendarCurrentDate.getMonth() &&
-                       pDate.getDate() === calendarCurrentDate.getDate();
+            const dayOccurrences = [];
+            scheduledOts.forEach(ot => {
+                const slots = getOtDaySchedule(ot, calendarCurrentDate);
+                slots.forEach(slot => {
+                    dayOccurrences.push({
+                        ot: ot,
+                        start: slot.start,
+                        end: slot.end
+                    });
+                });
             });
             
-            const allDayOts = dayOts.filter(ot => {
-                const pDate = new Date(ot.fecha_programada);
+            const allDayOccurrences = dayOccurrences.filter(occ => {
+                const pDate = occ.start;
                 return pDate.getHours() === 0 && pDate.getMinutes() === 0 && pDate.getSeconds() === 0;
             });
             
-            const timedLayoutEvents = layoutEvents(dayOts);
+            const timedLayoutEvents = layoutEvents(dayOccurrences);
             
             let allDayHtml = '';
-            if (allDayOts.length > 0) {
-                allDayOts.forEach(ot => {
+            if (allDayOccurrences.length > 0) {
+                allDayOccurrences.forEach(occ => {
+                    const ot = occ.ot;
                     allDayHtml += `
                         <div class="calendar-ot-tag priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" style="margin: 2px 0; max-width: 350px;">
                             <div class="ot-tag-id">#OT-${ot.id}</div>
@@ -2595,13 +2892,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const width = (1 / evt.totalCols) * 100;
                 const left = (evt.col / evt.totalCols) * 100;
                 
-                const pDate = new Date(ot.fecha_programada);
-                const startStr = String(pDate.getHours()).padStart(2, '0') + ':' + String(pDate.getMinutes()).padStart(2, '0');
-                let endStr = '';
-                if (ot.fecha_fin_programada) {
-                    const pDateEnd = new Date(ot.fecha_fin_programada);
-                    endStr = ' - ' + String(pDateEnd.getHours()).padStart(2, '0') + ':' + String(pDateEnd.getMinutes()).padStart(2, '0');
-                }
+                const startStr = String(evt.occStart.getHours()).padStart(2, '0') + ':' + String(evt.occStart.getMinutes()).padStart(2, '0');
+                const endStr = ' - ' + String(evt.occEnd.getHours()).padStart(2, '0') + ':' + String(evt.occEnd.getMinutes()).padStart(2, '0');
                 
                 timedOtsHtml += `
                     <div class="calendar-absolute-ot priority-${ot.prioridad.toLowerCase()}" data-ot-id="${ot.id}" 
@@ -3365,6 +3657,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Helper to open New OT Modal pre-filled for a specific asset
     function openNewOTModalForAsset(plantaId, edificioId, ubicacionId, activoId) {
         resetOtComponents();
+        newOtSchedules = [];
+        renderNewOtSchedules();
 
         const otUbicacion = document.getElementById('ot-select-ubicacion');
         const otULabel = document.querySelector('label[for="ot-select-ubicacion"]');
@@ -4014,6 +4308,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Reset custom checklist items
         customChecklistItems = [];
+        newOtSchedules = [];
+        renderNewOtSchedules();
         const otNewPointText = document.getElementById('ot-new-point-text');
         const otNewPointType = document.getElementById('ot-new-point-type');
         const otNewPointUnit = document.getElementById('ot-new-point-unit');
@@ -4035,25 +4331,34 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUbicacionRequirement(false, otUbicacion, otULabel);
 
         // Handle date pre-filling
-        const otFechaProgramada = document.getElementById('ot-fecha-programada');
-        const otHoraProgramada = document.getElementById('ot-hora-programada');
-        const otHoraFinProgramada = document.getElementById('ot-hora-fin-programada');
+        const otFechaProgramadaInput = document.getElementById('ot-fecha-programada-input');
+        const otHoraProgramadaInput = document.getElementById('ot-hora-programada-input');
+        const otHoraFinProgramadaInput = document.getElementById('ot-hora-fin-programada-input');
         if (prefilledDate) {
-            otFechaProgramada.value = prefilledDate;
-            otHoraProgramada.value = prefilledTime || '08:00';
+            if (otFechaProgramadaInput) otFechaProgramadaInput.value = prefilledDate;
+            if (otHoraProgramadaInput) otHoraProgramadaInput.value = prefilledTime || '08:00';
             if (prefilledTime) {
                 const parts = prefilledTime.split(':');
                 const hour = parseInt(parts[0]);
                 const nextHour = (hour + 1) % 24;
-                otHoraFinProgramada.value = String(nextHour).padStart(2, '0') + ':' + parts[1];
+                if (otHoraFinProgramadaInput) otHoraFinProgramadaInput.value = String(nextHour).padStart(2, '0') + ':' + parts[1];
             } else {
-                otHoraFinProgramada.value = '09:00';
+                if (otHoraFinProgramadaInput) otHoraFinProgramadaInput.value = '09:00';
+            }
+            if (otFechaProgramadaInput && otHoraProgramadaInput && otHoraFinProgramadaInput) {
+                newOtSchedules.push({
+                    date: otFechaProgramadaInput.value,
+                    start: otHoraProgramadaInput.value,
+                    end: otHoraFinProgramadaInput.value
+                });
+                renderNewOtSchedules();
             }
         } else {
-            otFechaProgramada.value = '';
-            otHoraProgramada.value = '';
-            otHoraFinProgramada.value = '';
-        }        // Clear checklist template selector dropdown
+            if (otFechaProgramadaInput) otFechaProgramadaInput.value = '';
+            if (otHoraProgramadaInput) otHoraProgramadaInput.value = '';
+            if (otHoraFinProgramadaInput) otHoraFinProgramadaInput.value = '';
+        }
+        // Clear checklist template selector dropdown
         const otSelectPlantilla = document.getElementById('ot-select-plantilla');
         otSelectPlantilla.innerHTML = '<option value="">Cargando...</option>';
 
@@ -4336,26 +4641,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const plantillaIdVal = document.getElementById('ot-select-plantilla').value;
         const plantillaId = plantillaIdVal ? parseInt(plantillaIdVal) : null;
 
-        const fechaProgramadaVal = document.getElementById('ot-fecha-programada').value || null;
-        const horaProgramadaVal = document.getElementById('ot-hora-programada') ? document.getElementById('ot-hora-programada').value : '';
-        const horaFinProgramadaVal = document.getElementById('ot-hora-fin-programada') ? document.getElementById('ot-hora-fin-programada').value : '';
-
-        if (fechaProgramadaVal && horaProgramadaVal && horaFinProgramadaVal) {
-            if (horaFinProgramadaVal < horaProgramadaVal) {
-                alert("La hora de término no puede ser anterior a la hora de inicio.");
-                return;
-            }
-        }
-        
-        let fullFechaProgramada = fechaProgramadaVal;
-        if (fechaProgramadaVal) {
-            fullFechaProgramada = fechaProgramadaVal + 'T' + (horaProgramadaVal || '00:00') + ':00';
-        }
-
-        let fullFechaFinProgramada = null;
-        if (fechaProgramadaVal && horaFinProgramadaVal) {
-            fullFechaFinProgramada = fechaProgramadaVal + 'T' + horaFinProgramadaVal + ':00';
-        }
+        // Convert newOtSchedules to API format
+        const horarios_programados = newOtSchedules.map(slot => {
+            return {
+                fecha_inicio: `${slot.date}T${slot.start}:00`,
+                fecha_fin: `${slot.date}T${slot.end}:00`
+            };
+        });
 
         // Recopilar componentes/despieces seleccionados con sus comentarios individuales
         const componentes_trabajados = [];
@@ -4368,23 +4660,29 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+        const proyectoIdVal = otSelectProyecto ? otSelectProyecto.value : null;
+        const proyectoId = proyectoIdVal ? parseInt(proyectoIdVal) : null;
+
         const payload = {
             descripcion,
             tipo,
-            estado: tecnicoIds.length > 0 ? (fechaProgramadaVal ? 'PROGRAMADA' : 'ASIGNADA') : 'CREADA',
+            estado: tecnicoIds.length > 0 ? (horarios_programados.length > 0 ? 'PROGRAMADA' : 'ASIGNADA') : 'CREADA',
             prioridad,
             reportado_por: 'Administración',
             planta_id: plantaId,
             edificio_id: edificioId,
             ubicacion_id: ubicacionId,
             activo_id: activoId,
+            proyecto_id: proyectoId,
             tecnico_id: tecnicoIds.length > 0 ? tecnicoIds[0] : null,
             tecnico_ids: tecnicoIds,
             plantilla_id: plantillaId,
-            fecha_programada: fullFechaProgramada,
-            fecha_fin_programada: fullFechaFinProgramada,
+            // Guardar el primer horario como legacy por compatibilidad
+            fecha_programada: horarios_programados.length > 0 ? horarios_programados[0].fecha_inicio : null,
+            fecha_fin_programada: horarios_programados.length > 0 ? horarios_programados[0].fecha_fin : null,
             componentes_trabajados: componentes_trabajados,
-            custom_checklist_items: customChecklistItems
+            custom_checklist_items: customChecklistItems,
+            horarios_programados: horarios_programados
         };
 
         fetch('/api/ordenes', {
@@ -4400,6 +4698,8 @@ document.addEventListener('DOMContentLoaded', () => {
             otModal.style.display = 'none';
             otForm.reset();
             resetOtComponents();
+            newOtSchedules = [];
+            renderNewOtSchedules();
             loadKPIs();
             loadWorkOrders();
         })
@@ -4574,15 +4874,71 @@ document.addEventListener('DOMContentLoaded', () => {
     const excelImportUnifiedFile = document.getElementById('excel-import-unified-file');
     const excelImportChecklistsFile = document.getElementById('excel-import-checklists-file');
 
+    async function triggerExcelDownload(url, defaultFilename, btnElement) {
+        const originalHtml = btnElement ? btnElement.innerHTML : '';
+        try {
+            if (btnElement) {
+                btnElement.disabled = true;
+                btnElement.innerHTML = '<span>⏳</span> Generando...';
+                btnElement.style.opacity = '0.7';
+                btnElement.style.cursor = 'wait';
+            }
+
+            const response = await fetch(url);
+            if (!response.ok) {
+                let errorMsg = 'Error en el servidor al generar el archivo Excel';
+                try {
+                    const errData = await response.json();
+                    if (errData.detail) errorMsg = errData.detail;
+                } catch (_) {}
+                throw new Error(errorMsg);
+            }
+
+            let filename = defaultFilename;
+            const disposition = response.headers.get('Content-Disposition');
+            if (disposition && disposition.includes('filename=')) {
+                const parts = disposition.split('filename=');
+                if (parts.length > 1) {
+                    filename = parts[1].split(';')[0].trim().replaceAll('"', '').replaceAll("'", '');
+                }
+            }
+
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(blobUrl);
+            }, 1500);
+
+        } catch (error) {
+            console.error('Error al exportar Excel:', error);
+            alert(`No se pudo descargar el archivo Excel: ${error.message}`);
+        } finally {
+            if (btnElement) {
+                btnElement.disabled = false;
+                btnElement.innerHTML = originalHtml;
+                btnElement.style.opacity = '';
+                btnElement.style.cursor = '';
+            }
+        }
+    }
+
     if (btnExportOtsExcel) {
         btnExportOtsExcel.addEventListener('click', () => {
-            window.open('/api/excel/exportar/ordenes', '_blank');
+            triggerExcelDownload('/api/excel/exportar/ordenes', 'reporte_ordenes.xlsx', btnExportOtsExcel);
         });
     }
 
     if (btnExportActivosExcel) {
         btnExportActivosExcel.addEventListener('click', () => {
-            window.open('/api/excel/exportar/activos', '_blank');
+            triggerExcelDownload('/api/excel/exportar/activos', 'inventario_activos.xlsx', btnExportActivosExcel);
         });
     }
 
@@ -5108,26 +5464,34 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('edit-ot-prioridad').value = ot.prioridad;
         document.getElementById('edit-ot-status').value = ot.estado;
         document.getElementById('edit-ot-descripcion').value = ot.descripcion;
+        if (editOtSelectProyecto) editOtSelectProyecto.value = ot.proyecto_id || '';
 
-        // Populate scheduled date & time
-        const dateInput = document.getElementById('edit-ot-fecha-programada');
-        const timeInput = document.getElementById('edit-ot-hora-programada');
-        const timeFinInput = document.getElementById('edit-ot-hora-fin-programada');
-        if (ot.fecha_programada) {
-            const pDate = new Date(ot.fecha_programada);
-            dateInput.value = pDate.toISOString().substring(0, 10);
-            timeInput.value = String(pDate.getHours()).padStart(2, '0') + ':' + String(pDate.getMinutes()).padStart(2, '0');
-        } else {
-            dateInput.value = '';
-            timeInput.value = '';
+        // Populate scheduled dates/times
+        editOtSchedules = [];
+        if (ot.horarios_programados && ot.horarios_programados.length > 0) {
+            ot.horarios_programados.forEach(slot => {
+                const startParts = slot.fecha_inicio.split('T');
+                const endParts = slot.fecha_fin.split('T');
+                if (startParts.length === 2 && endParts.length === 2) {
+                    editOtSchedules.push({
+                        date: startParts[0],
+                        start: startParts[1].substring(0, 5),
+                        end: endParts[1].substring(0, 5)
+                    });
+                }
+            });
+        } else if (ot.fecha_programada) {
+            const startParts = ot.fecha_programada.split('T');
+            const endParts = ot.fecha_fin_programada ? ot.fecha_fin_programada.split('T') : null;
+            if (startParts.length === 2) {
+                editOtSchedules.push({
+                    date: startParts[0],
+                    start: startParts[1].substring(0, 5),
+                    end: endParts && endParts.length === 2 ? endParts[1].substring(0, 5) : "18:00"
+                });
+            }
         }
-
-        if (ot.fecha_fin_programada) {
-            const pDateEnd = new Date(ot.fecha_fin_programada);
-            timeFinInput.value = String(pDateEnd.getHours()).padStart(2, '0') + ':' + String(pDateEnd.getMinutes()).padStart(2, '0');
-        } else {
-            timeFinInput.value = '';
-        }
+        renderEditOtSchedules();
 
         // Populate checklists dropdown
         const checklistSelect = document.getElementById('edit-ot-select-plantilla');
@@ -5319,30 +5683,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const plantillaIdVal = document.getElementById('edit-ot-select-plantilla').value;
         const plantillaId = plantillaIdVal ? parseInt(plantillaIdVal) : null;
 
-        const fechaProgramadaVal = document.getElementById('edit-ot-fecha-programada').value || null;
-        const horaProgramadaVal = document.getElementById('edit-ot-hora-programada').value || '';
-        const horaFinProgramadaVal = document.getElementById('edit-ot-hora-fin-programada').value || '';
-
-        if (fechaProgramadaVal && horaProgramadaVal && horaFinProgramadaVal) {
-            if (horaFinProgramadaVal < horaProgramadaVal) {
-                alert("La hora de término no puede ser anterior a la hora de inicio.");
-                return;
-            }
-        }
-        
-        let fechaProgramadaFull = null;
-        if (fechaProgramadaVal) {
-            if (horaProgramadaVal) {
-                fechaProgramadaFull = `${fechaProgramadaVal}T${horaProgramadaVal}:00`;
-            } else {
-                fechaProgramadaFull = `${fechaProgramadaVal}T00:00:00`;
-            }
-        }
-
-        let fechaFinProgramadaFull = null;
-        if (fechaProgramadaVal && horaFinProgramadaVal) {
-            fechaFinProgramadaFull = `${fechaProgramadaVal}T${horaFinProgramadaVal}:00`;
-        }
+        const horarios_programados = editOtSchedules.map(slot => {
+            return {
+                fecha_inicio: `${slot.date}T${slot.start}:00`,
+                fecha_fin: `${slot.date}T${slot.end}:00`
+            };
+        });
 
         const componentes_trabajados = [];
         document.querySelectorAll('.edit-ot-comp-checkbox').forEach(cb => {
@@ -5356,22 +5702,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        const editProyectoIdVal = editOtSelectProyecto ? editOtSelectProyecto.value : null;
+        const editProyectoId = editProyectoIdVal ? parseInt(editProyectoIdVal) : null;
+
         const payload = {
             planta_id: plantaId,
             edificio_id: edificioId,
             ubicacion_id: ubicacionId,
             activo_id: activoId,
+            proyecto_id: editProyectoId,
             tipo: tipo,
             prioridad: prioridad,
             estado: estado,
             descripcion: descripcion,
             tecnico_id: tecnicoIds.length > 0 ? tecnicoIds[0] : null,
             tecnico_ids: tecnicoIds,
-            fecha_programada: fechaProgramadaFull,
-            fecha_fin_programada: fechaFinProgramadaFull,
+            fecha_programada: horarios_programados.length > 0 ? horarios_programados[0].fecha_inicio : null,
+            fecha_fin_programada: horarios_programados.length > 0 ? horarios_programados[0].fecha_fin : null,
             plantilla_id: plantillaId,
             componentes_trabajados: componentes_trabajados,
-            custom_checklist_items: editCustomChecklistItems
+            custom_checklist_items: editCustomChecklistItems,
+            horarios_programados: horarios_programados
         };
 
         try {
@@ -5570,15 +5921,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     const matchMeta = (u.codigo && u.codigo.toLowerCase().includes(query)) ||
                                       (u.uso && u.uso.toLowerCase().includes(query)) ||
                                       (u.cargo && u.cargo.toLowerCase().includes(query));
-                    const matchOcupante = u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().includes(query));
+                    const matchOcupante = u.ocupantes && u.ocupantes.some(o => o.nombre && o.nombre.toLowerCase().includes(query));
                     
                     return matchName || matchMeta || matchOcupante;
                 });
             } else {
                 filtered = locationsSearchList.filter(u => {
-                    const cleanName = u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const cleanPlanta = u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const cleanEdificio = u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const cleanName = u.nombre ? u.nombre.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanPlanta = u.planta_nombre ? u.planta_nombre.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+                    const cleanEdificio = u.edificio_nombre ? u.edificio_nombre.toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
                     if (cleanName.includes(cleanQuery) || cleanPlanta.includes(cleanQuery) || cleanEdificio.includes(cleanQuery)) {
                         return true;
@@ -5592,11 +5943,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         return true;
                     }
 
-                    if (u.ocupantes && u.ocupantes.some(o => o.nombre.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                    if (u.ocupantes && u.ocupantes.some(o => o.nombre && o.nombre.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
                         return true;
                     }
 
-                    if (u.activos && u.activos.some(act => act.toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
+                    if (u.activos && u.activos.some(act => act && String(act).toLowerCase().replace(/[^a-z0-9]/g, '').includes(cleanQuery))) {
                         return true;
                     }
                     return false;
@@ -5778,6 +6129,74 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function renderNewOtSchedules() {
+        const listDiv = document.getElementById('ot-schedules-list');
+        if (!listDiv) return;
+        
+        if (newOtSchedules.length === 0) {
+            listDiv.innerHTML = '<div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic; text-align: center; padding: 6px 0;">Sin horarios programados</div>';
+            return;
+        }
+        
+        listDiv.innerHTML = '';
+        newOtSchedules.forEach((item, idx) => {
+            const dateParts = item.date.split('-');
+            const formattedDate = dateParts.length === 3 ? `${dateParts[2]}-${dateParts[1]}` : item.date;
+            const itemHtml = `
+                <div class="custom-schedule-badge" style="display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.8rem; width: 100%; box-sizing: border-box; margin-bottom: 2px;">
+                    <div>
+                        📅 <strong style="color: var(--text-main);">${formattedDate}</strong> 
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.4rem;">(${item.start} - ${item.end})</span>
+                    </div>
+                    <button type="button" class="btn-delete-schedule" data-index="${idx}" style="background: none; border: none; color: var(--text-danger, #ff4d4d); cursor: pointer; font-weight: bold; font-size: 0.85rem; padding: 0 0.25rem;">✕</button>
+                </div>
+            `;
+            listDiv.insertAdjacentHTML('beforeend', itemHtml);
+        });
+        
+        listDiv.querySelectorAll('.btn-delete-schedule').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(btn.dataset.index);
+                newOtSchedules.splice(idx, 1);
+                renderNewOtSchedules();
+            });
+        });
+    }
+
+    function renderEditOtSchedules() {
+        const listDiv = document.getElementById('edit-ot-schedules-list');
+        if (!listDiv) return;
+        
+        if (editOtSchedules.length === 0) {
+            listDiv.innerHTML = '<div style="font-size: 0.75rem; color: var(--text-muted); font-style: italic; text-align: center; padding: 6px 0;">Sin horarios programados</div>';
+            return;
+        }
+        
+        listDiv.innerHTML = '';
+        editOtSchedules.forEach((item, idx) => {
+            const dateParts = item.date.split('-');
+            const formattedDate = dateParts.length === 3 ? `${dateParts[2]}-${dateParts[1]}` : item.date;
+            const itemHtml = `
+                <div class="custom-schedule-badge" style="display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.8rem; width: 100%; box-sizing: border-box; margin-bottom: 2px;">
+                    <div>
+                        📅 <strong style="color: var(--text-main);">${formattedDate}</strong> 
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.4rem;">(${item.start} - ${item.end})</span>
+                    </div>
+                    <button type="button" class="btn-delete-edit-schedule" data-index="${idx}" style="background: none; border: none; color: var(--text-danger, #ff4d4d); cursor: pointer; font-weight: bold; font-size: 0.85rem; padding: 0 0.25rem;">✕</button>
+                </div>
+            `;
+            listDiv.insertAdjacentHTML('beforeend', itemHtml);
+        });
+        
+        listDiv.querySelectorAll('.btn-delete-edit-schedule').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const idx = parseInt(btn.dataset.index);
+                editOtSchedules.splice(idx, 1);
+                renderEditOtSchedules();
+            });
+        });
+    }
+
     // Toggle units visibility
     const otNewPointType = document.getElementById('ot-new-point-type');
     if (otNewPointType) {
@@ -5857,6 +6276,75 @@ document.addEventListener('DOMContentLoaded', () => {
             if (textInput) textInput.value = '';
             if (unitInput) unitInput.value = '';
             renderEditCustomChecklistItems();
+        });
+    }
+
+    // Add schedule buttons
+    const btnOtAddSchedule = document.getElementById('btn-ot-add-schedule');
+    if (btnOtAddSchedule) {
+        btnOtAddSchedule.addEventListener('click', () => {
+            const dateInput = document.getElementById('ot-fecha-programada-input');
+            const startInput = document.getElementById('ot-hora-programada-input');
+            const endInput = document.getElementById('ot-hora-fin-programada-input');
+            
+            const dateVal = dateInput ? dateInput.value : '';
+            const startVal = startInput ? startInput.value : '';
+            const endVal = endInput ? endInput.value : '';
+            
+            if (!dateVal || !startVal || !endVal) {
+                alert('Por favor complete la fecha, hora de inicio y hora de término.');
+                return;
+            }
+            if (endVal < startVal) {
+                alert('La hora de término no puede ser anterior a la hora de inicio.');
+                return;
+            }
+            
+            newOtSchedules.push({
+                date: dateVal,
+                start: startVal,
+                end: endVal
+            });
+            
+            if (dateInput) dateInput.value = '';
+            if (startInput) startInput.value = '';
+            if (endInput) endInput.value = '';
+            
+            renderNewOtSchedules();
+        });
+    }
+
+    const btnEditOtAddSchedule = document.getElementById('btn-edit-ot-add-schedule');
+    if (btnEditOtAddSchedule) {
+        btnEditOtAddSchedule.addEventListener('click', () => {
+            const dateInput = document.getElementById('edit-ot-fecha-programada-input');
+            const startInput = document.getElementById('edit-ot-hora-programada-input');
+            const endInput = document.getElementById('edit-ot-hora-fin-programada-input');
+            
+            const dateVal = dateInput ? dateInput.value : '';
+            const startVal = startInput ? startInput.value : '';
+            const endVal = endInput ? endInput.value : '';
+            
+            if (!dateVal || !startVal || !endVal) {
+                alert('Por favor complete la fecha, hora de inicio y hora de término.');
+                return;
+            }
+            if (endVal < startVal) {
+                alert('La hora de término no puede ser anterior a la hora de inicio.');
+                return;
+            }
+            
+            editOtSchedules.push({
+                date: dateVal,
+                start: startVal,
+                end: endVal
+            });
+            
+            if (dateInput) dateInput.value = '';
+            if (startInput) startInput.value = '';
+            if (endInput) endInput.value = '';
+            
+            renderEditOtSchedules();
         });
     }
 

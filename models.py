@@ -140,11 +140,13 @@ class OrdenTrabajo(SQLModel, table=True):
     activo_id: Optional[int] = Field(default=None, foreign_key="activo.id")
     tecnico_id: Optional[int] = Field(default=None, foreign_key="tecnico.id")
     plantilla_id: Optional[int] = Field(default=None, foreign_key="plantillachequeo.id")
+    proyecto_id: Optional[int] = Field(default=None, foreign_key="proyecto.id")
     
     activo: Optional[Activo] = Relationship(back_populates="ordenes_trabajo")
     tecnico: Optional[Tecnico] = Relationship(back_populates="ordenes_trabajo_legacy")
     tecnicos: List[Tecnico] = Relationship(back_populates="ordenes_trabajo", link_model=OrdenTrabajoTecnicoLink)
     plantilla: Optional[PlantillaChequeo] = Relationship(back_populates="ordenes_trabajo")
+    proyecto: Optional["Proyecto"] = Relationship(back_populates="ordenes")
     respuestas_checklist: List["RespuestaChequeo"] = Relationship(
         back_populates="orden_trabajo",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
@@ -161,6 +163,28 @@ class OrdenTrabajo(SQLModel, table=True):
         back_populates="orden_trabajo",
         sa_relationship_kwargs={"cascade": "all, delete-orphan"}
     )
+    horarios_programados: List["HorarioProgramado"] = Relationship(
+        back_populates="orden_trabajo",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
+
+
+class Proyecto(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    nombre: str = Field(index=True)
+    descripcion: Optional[str] = Field(default=None)
+    estado: str = Field(default="EN_PROGRESO")  # EN_PROGRESO, COMPLETADO, PAUSADO
+    color: Optional[str] = Field(default="#3b82f6")
+    fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
+    
+    ordenes: List[OrdenTrabajo] = Relationship(back_populates="proyecto")
+
+
+class RegistroRapido(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    texto: str
+    completado: bool = Field(default=False)
+    fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
 
 
 class OrdenTrabajoComponente(SQLModel, table=True):
@@ -205,6 +229,15 @@ class ComentarioAvanceOT(SQLModel, table=True):
     fecha_creacion: datetime = Field(default_factory=datetime.utcnow)
     
     orden_trabajo: Optional[OrdenTrabajo] = Relationship(back_populates="comentarios_avance")
+
+class HorarioProgramado(SQLModel, table=True):
+    __tablename__ = "horarioprogramado"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    orden_trabajo_id: int = Field(foreign_key="ordentrabajo.id")
+    fecha_inicio: datetime
+    fecha_fin: datetime
+    
+    orden_trabajo: Optional[OrdenTrabajo] = Relationship(back_populates="horarios_programados")
 
 
 

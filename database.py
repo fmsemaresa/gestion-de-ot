@@ -7,7 +7,7 @@ from models import (
     Planta, Edificio, Ubicacion, Activo, ComponenteActivo,
     Tecnico, OrdenTrabajo, PlantillaChequeo, ItemPlantillaChequeo,
     RespuestaChequeo, FotoOrdenTrabajo, ComentarioAvanceOT, OcupanteUbicacion,
-    OrdenTrabajoComponente
+    OrdenTrabajoComponente, Proyecto, RegistroRapido
 )
 
 # Render uses DATABASE_URL for PostgreSQL connection
@@ -42,6 +42,11 @@ def create_db_and_tables():
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE ordentrabajo ADD COLUMN fecha_fin_programada TIMESTAMP"))
             print("Columna 'fecha_fin_programada' agregada exitosamente.")
+        if 'proyecto_id' not in columns:
+            print("Migrando base de datos: agregando columna 'proyecto_id' a la tabla 'ordentrabajo'...")
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE ordentrabajo ADD COLUMN proyecto_id INTEGER REFERENCES proyecto(id)"))
+            print("Columna 'proyecto_id' agregada exitosamente.")
         if 'estado_ejecucion' not in columns:
             print("Migrando base de datos: agregando columna 'estado_ejecucion' a la tabla 'ordentrabajo'...")
             with engine.begin() as conn:
